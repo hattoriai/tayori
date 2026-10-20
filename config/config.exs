@@ -39,6 +39,10 @@ if config_env() == :dev do
     ]
 end
 
+# Swoosh is optional, for the emails of the :subscriptions feature: the
+# app gives its own mailer, and Tayori needs no HTTP client of Swoosh's.
+config :swoosh, :api_client, false
+
 if config_env() == :test do
   config :logger, level: :warning
   config :phoenix, :json_library, JSON

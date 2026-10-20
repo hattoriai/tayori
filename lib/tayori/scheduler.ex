@@ -83,6 +83,18 @@ defmodule Tayori.Scheduler do
   defp announce(config, id) do
     Tayori.broadcast({Tayori, :published, id})
 
+    if Config.feature?(config, :subscriptions) do
+      Task.Supervisor.start_child(Tayori.TaskSupervisor, fn ->
+        Tayori.Subscribers.send_entry(config, id)
+      end)
+    end
+
+    if Config.feature?(config, :webhooks) do
+      Task.Supervisor.start_child(Tayori.TaskSupervisor, fn ->
+        Tayori.Webhooks.deliver(config, id)
+      end)
+    end
+
     if config.notifier do
       Task.Supervisor.start_child(Tayori.TaskSupervisor, fn ->
         config.notifier.published(Tayori.Entries.get!(id))

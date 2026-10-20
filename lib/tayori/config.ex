@@ -29,10 +29,46 @@ defmodule Tayori.Config do
     * `:prefix` - the schema of the tables, in PostgreSQL.
     * `:notifier` - a module of the `Tayori.Notifier` behaviour, told of
       each entry once, when it is published.
+    * `:features` - the extras the app wants, none by default; the
+      changelog itself is always there. A feature that is off has no
+      admin page, no route, no element and no process:
+        * `:reactions` - readers react to an entry with an emoji.
+        * `:announcements` - an entry shown as a popup, a toast or a
+          banner in the app, until a date.
+        * `:analytics` - the views of each entry, by where it was read.
+        * `:subscriptions` - readers subscribe by email on the public
+          page, and an entry can be sent to them.
+        * `:webhooks` - webhooks, Slack and Discord, told of each entry.
+        * `:embed` - the news on another domain than the app's.
+    * `:mailer` - the app's `Swoosh.Mailer`, which sends the emails of
+      the `:subscriptions` feature (required with it).
+    * `:email_from` - who the emails are from: `{"Atelier", "news@atelier.app"}`
+      or an address (required with `:subscriptions`).
+    * `:page_url` - the address of the public page
+      (`"https://atelier.app/changelog"`), for the links of the emails
+      (required with `:subscriptions`).
+    * `:reactions` - the emoji readers react with
+      (`["👍", "🎉", "❤️", "🚀", "👀"]`).
   """
 
+  @features [:reactions, :announcements, :analytics, :subscriptions, :webhooks, :embed]
+  @reactions ["👍", "🎉", "❤️", "🚀", "👀"]
+
   @enforce_keys [:repo, :pubsub]
-  defstruct [:repo, :pubsub, :secret_key_base, :vault, :prefix, :notifier, locales: ["en"]]
+  defstruct [
+    :repo,
+    :pubsub,
+    :secret_key_base,
+    :vault,
+    :prefix,
+    :notifier,
+    :mailer,
+    :email_from,
+    :page_url,
+    locales: ["en"],
+    features: [],
+    reactions: @reactions
+  ]
 
   @type t :: %__MODULE__{
           repo: module(),
@@ -41,8 +77,17 @@ defmodule Tayori.Config do
           vault: module() | nil,
           prefix: String.t() | nil,
           notifier: module() | nil,
-          locales: [String.t(), ...]
+          mailer: module() | nil,
+          email_from: String.t() | {String.t(), String.t()} | nil,
+          page_url: String.t() | nil,
+          locales: [String.t(), ...],
+          features: [feature()],
+          reactions: [String.t(), ...]
         }
+
+  @typedoc "An extra the app can turn on."
+  @type feature ::
+          :reactions | :announcements | :analytics | :subscriptions | :webhooks | :embed
 
   @key {Tayori, :config}
 
@@ -63,7 +108,39 @@ defmodule Tayori.Config do
       raise ArgumentError, ":secret_key_base must be a string of at least 32 bytes"
     end
 
+    features = Keyword.get(opts, :features, [])
+
+    unless is_list(features) and Enum.all?(features, &(&1 in @features)) do
+      raise ArgumentError,
+            ":features must be a list of #{inspect(@features)}, got: #{inspect(features)}"
+    end
+
+    reactions = Keyword.get(opts, :reactions, @reactions)
+
+    unless is_list(reactions) and reactions != [] and Enum.all?(reactions, &emoji?/1) do
+      raise ArgumentError, ":reactions must be a list of emoji, got: #{inspect(reactions)}"
+    end
+
+    if :subscriptions in features do
+      for key <- [:mailer, :email_from, :page_url], opts[key] == nil do
+        raise ArgumentError, "the :subscriptions feature needs the #{inspect(key)} option"
+      end
+
+      unless Code.ensure_loaded?(Swoosh.Email) do
+        raise ArgumentError, "the :subscriptions feature needs the :swoosh dependency"
+      end
+    end
+
+    if :webhooks in features and not Code.ensure_loaded?(Req) do
+      raise ArgumentError, "the :webhooks feature needs the :req dependency"
+    end
+
     %__MODULE__{
+      mailer: opts[:mailer],
+      email_from: opts[:email_from],
+      page_url: opts[:page_url] && String.trim_trailing(opts[:page_url], "/"),
+      features: Enum.uniq(features),
+      reactions: reactions,
       repo: repo,
       pubsub: pubsub,
       secret_key_base: secret,
@@ -92,6 +169,21 @@ defmodule Tayori.Config do
         config
     end
   end
+
+  # An emoji is a short string with no letters, digits or spaces.
+  defp emoji?(value) do
+    is_binary(value) and value != "" and byte_size(value) <= 16 and
+      not String.match?(value, ~r/[\p{L}\p{N}\s]/u)
+  end
+
+  @doc "All the extras an app can turn on."
+  @spec features() :: [feature()]
+  def features, do: @features
+
+  @doc "Whether the app turned an extra on."
+  @spec feature?(t(), feature()) :: boolean()
+  def feature?(%__MODULE__{features: features}, feature) when feature in @features,
+    do: feature in features
 
   @doc "The language every entry has."
   @spec default_locale(t()) :: String.t()

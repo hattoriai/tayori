@@ -5,13 +5,22 @@ defmodule Tayori.Entry do
 
     * `:slug` - its address on the public page, from the title of its
       first language unless the admin gives one.
-    * `:categories` - free labels ("New", "Improved", "Fixed"), shown on it.
+    * `:categories` - the keys of its categories (`Tayori.Category`).
+    * `:cover` - an optional image at the top of the entry and on its
+      card, and its picture when a link to it is shared:
+      `%{"url" => ..., "key" => ..., "width" => ..., "height" => ..., "alt" => ...}`.
     * `:segments` - the readers it is for: an entry with no segments is
       for everyone, and is the only kind on the public page; an entry with
       segments is for the readers in at least one of them (see
       `Tayori.Reader`).
     * `:published_at` - nil while it is a draft; a time in the future
       while it is scheduled.
+    * `:pinned_at` - when it was pinned: pinned entries come first.
+    * `:announce` - `"popup"`, `"toast"` or `"banner"`: the entry is shown
+      in the app as one, until `:announce_until` (the `:announcements`
+      feature).
+    * `:email` - whether it is sent to the subscribers when it is
+      published (the `:subscriptions` feature); `:emailed_at` once it is.
     * `:author` - who wrote it, as the admin's resolver gave them
       (`%{"id" => ..., "name" => ...}`).
 
@@ -28,12 +37,24 @@ defmodule Tayori.Entry do
 
   @type status :: :draft | :scheduled | :published
 
+  @announce_kinds ~w(popup toast banner)
+
+  @doc "The ways an entry can be announced in the app."
+  @spec announce_kinds() :: [String.t()]
+  def announce_kinds, do: @announce_kinds
+
   @type t :: %__MODULE__{
           id: Ecto.UUID.t() | nil,
           slug: String.t() | nil,
           categories: [String.t()],
           segments: [String.t()],
+          cover: map() | nil,
           published_at: DateTime.t() | nil,
+          pinned_at: DateTime.t() | nil,
+          announce: String.t() | nil,
+          announce_until: DateTime.t() | nil,
+          email: boolean(),
+          emailed_at: DateTime.t() | nil,
           announced_at: DateTime.t() | nil,
           author: map() | nil,
           translations: [Translation.t()] | Ecto.Association.NotLoaded.t(),
@@ -46,8 +67,14 @@ defmodule Tayori.Entry do
     field :slug, :string
     field :categories, {:array, :string}, default: []
     field :segments, {:array, :string}, default: []
+    field :cover, :map
     field :published_at, :utc_datetime_usec
+    field :pinned_at, :utc_datetime_usec
+    field :announce, :string
+    field :announce_until, :utc_datetime_usec
     field :announced_at, :utc_datetime_usec
+    field :email, :boolean, default: false
+    field :emailed_at, :utc_datetime_usec
     field :author, :map
     field :translation, :any, virtual: true
     has_many :translations, Translation, on_replace: :delete, preload_order: [asc: :locale]
@@ -88,9 +115,20 @@ defmodule Tayori.Entry do
   @doc false
   def changeset(entry, attrs, locales) do
     entry
-    |> cast(attrs, [:slug, :categories, :segments, :published_at])
+    |> cast(attrs, [
+      :slug,
+      :categories,
+      :segments,
+      :published_at,
+      :announce,
+      :announce_until,
+      :email
+    ])
     |> update_change(:categories, &clean_list/1)
     |> update_change(:segments, &clean_list/1)
+    |> update_change(:announce, &blank_to_nil/1)
+    |> validate_inclusion(:announce, @announce_kinds)
+    |> clear_announce_until()
     |> cast_assoc(:translations,
       with: &Translation.changeset(&1, &2, locales),
       sort_param: :translations_sort,
@@ -161,6 +199,33 @@ defmodule Tayori.Entry do
     |> String.slice(0, 80)
     |> String.trim_trailing("-")
   end
+
+  # An entry announced as nothing is announced until no time.
+  defp clear_announce_until(changeset) do
+    if get_field(changeset, :announce) == nil,
+      do: put_change(changeset, :announce_until, nil),
+      else: changeset
+  end
+
+  defp blank_to_nil(value) when is_binary(value) do
+    case String.trim(value) do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
+
+  defp blank_to_nil(value), do: value
+
+  @doc """
+  Whether the entry is announced in the app at a time: announced as a
+  popup, toast or banner, and its announcement not over.
+  """
+  @spec announcing?(t(), DateTime.t()) :: boolean()
+  def announcing?(%__MODULE__{announce: nil}, _now), do: false
+  def announcing?(%__MODULE__{announce_until: nil}, _now), do: true
+
+  def announcing?(%__MODULE__{announce_until: until}, now),
+    do: DateTime.compare(until, now) == :gt
 
   defp clean_list(values) do
     values

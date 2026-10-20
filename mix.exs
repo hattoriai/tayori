@@ -68,7 +68,8 @@ defmodule Tayori.MixProject do
       {:esbuild, "~> 0.10", only: :dev, runtime: false},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false},
       # The body of an entry, and its editor in the admin.
-      {:kotoba, "~> 0.3"},
+      # Until Kotoba releases Attachments.store/2 (hattoriai/kotoba#45).
+      {:kotoba, path: "../kotoba", override: true},
       # The publication date's picker in the admin.
       {:koyomi, "~> 0.2"},
       {:lazy_html, "~> 0.1", only: :test},
@@ -86,6 +87,10 @@ defmodule Tayori.MixProject do
       # The drafts written with AI, with the key an admin gives: any
       # provider ReqLLM knows. Without it, the admin has no AI.
       {:req_llm, "~> 1.6", optional: true},
+      # Emails to the subscribers (the :subscriptions feature), with the
+      # app's own mailer, and webhooks (the :webhooks feature).
+      {:swoosh, "~> 1.17", optional: true},
+      {:req, "~> 0.5", optional: true},
       {:telemetry, "~> 1.0"},
       # The time zones of the development server's date picker.
       {:tz, "~> 0.28", only: [:dev, :test]}

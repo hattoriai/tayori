@@ -150,6 +150,59 @@ defmodule Tayori.Entries do
   defp usec(nil), do: nil
   defp usec(%DateTime{microsecond: {value, _precision}} = at), do: %{at | microsecond: {value, 6}}
 
+  @doc "Pins an entry: pinned entries come first, the last pinned first."
+  @spec pin(Entry.t()) :: {:ok, Entry.t()} | {:error, Ecto.Changeset.t()}
+  def pin(%Entry{} = entry), do: put(entry, pinned_at: usec(DateTime.utc_now()))
+
+  @doc "Unpins an entry."
+  @spec unpin(Entry.t()) :: {:ok, Entry.t()} | {:error, Ecto.Changeset.t()}
+  def unpin(%Entry{} = entry), do: put(entry, pinned_at: nil)
+
+  @doc """
+  Puts a cover on an entry, from a stored image: a
+  `Kotoba.Nodes.Attachment` (as `Kotoba.Attachments.store/2` or an upload
+  of the admin makes it), with its alternative text. Only an image can be
+  a cover.
+  """
+  @spec put_cover(Entry.t(), Kotoba.Nodes.Attachment.t(), String.t() | nil) ::
+          {:ok, Entry.t()} | {:error, Ecto.Changeset.t() | :not_an_image}
+  def put_cover(%Entry{} = entry, %Kotoba.Nodes.Attachment{} = image, alt \\ nil) do
+    if Kotoba.Nodes.Attachment.image?(image) do
+      put(entry,
+        cover: %{
+          "url" => image.url,
+          "key" => image.key,
+          "width" => image.width,
+          "height" => image.height,
+          "alt" => alt || ""
+        }
+      )
+    else
+      {:error, :not_an_image}
+    end
+  end
+
+  @doc "Changes the alternative text of an entry's cover."
+  @spec put_cover_alt(Entry.t(), String.t()) :: {:ok, Entry.t()} | {:error, Ecto.Changeset.t()}
+  def put_cover_alt(%Entry{cover: %{} = cover} = entry, alt) when is_binary(alt),
+    do: put(entry, cover: Map.put(cover, "alt", String.slice(String.trim(alt), 0, 300)))
+
+  @doc """
+  Takes the cover off an entry. The image stays in the storage: delete it
+  with the storage adapter (`Kotoba.Storage`) if nothing else uses it.
+  """
+  @spec remove_cover(Entry.t()) :: {:ok, Entry.t()} | {:error, Ecto.Changeset.t()}
+  def remove_cover(%Entry{} = entry), do: put(entry, cover: nil)
+
+  defp put(entry, changes) do
+    config = Config.get()
+
+    entry
+    |> Ecto.Changeset.change(changes)
+    |> config.repo.update(prefix: config.prefix)
+    |> changed()
+  end
+
   @doc "Deletes an entry and its translations."
   @spec delete(Entry.t()) :: {:ok, Entry.t()} | {:error, Ecto.Changeset.t()}
   def delete(%Entry{} = entry) do

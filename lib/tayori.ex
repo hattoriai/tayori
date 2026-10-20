@@ -67,11 +67,16 @@ defmodule Tayori do
   The news a reader sees, the newest first, each entry with its
   translation in the reader's language.
 
+  The first page starts with the pinned entries, the last pinned first;
+  the next pages (`:before`) leave them out, so that no entry comes twice.
+
   Options:
 
-    * `:limit` - how many entries (20).
+    * `:limit` - how many entries (20), besides the pinned ones.
     * `:before` - an entry: the entries published before it, for the next
       page.
+    * `:category` - the key of a category: its entries only.
+    * `:search` - words of the title, summary or body, in any language.
     * `:now` - the time to read the news at (now).
   """
   @spec news(Reader.t(), keyword()) :: [Entry.t()]
@@ -79,13 +84,31 @@ defmodule Tayori do
     config = Config.get()
     now = Keyword.get_lazy(opts, :now, &DateTime.utc_now/0)
 
-    config
-    |> Query.visible(reader, now)
-    |> before(opts[:before])
-    |> Query.newest_first()
-    |> limit(^Keyword.get(opts, :limit, 20))
-    |> config.repo.all(prefix: config.prefix)
-    |> with_translations(config, reader)
+    base =
+      config
+      |> Query.visible(reader, now)
+      |> Query.in_category(config, opts[:category])
+      |> Query.search(opts[:search])
+
+    pinned =
+      if opts[:before] == nil do
+        base
+        |> where([e], not is_nil(e.pinned_at))
+        |> order_by([e], desc: e.pinned_at, desc: e.id)
+        |> config.repo.all(prefix: config.prefix)
+      else
+        []
+      end
+
+    rest =
+      base
+      |> where([e], is_nil(e.pinned_at))
+      |> before(opts[:before])
+      |> Query.newest_first()
+      |> limit(^Keyword.get(opts, :limit, 20))
+      |> config.repo.all(prefix: config.prefix)
+
+    with_translations(pinned ++ rest, config, reader)
   end
 
   defp before(query, nil), do: query
@@ -222,6 +245,10 @@ defmodule Tayori do
 
   @doc false
   def broadcast(message), do: Phoenix.PubSub.broadcast(Config.get().pubsub, @topic, message)
+
+  @doc false
+  def broadcast_reader(id, message),
+    do: Phoenix.PubSub.broadcast(Config.get().pubsub, reader_topic(id), message)
 
   defp reader_topic(id), do: @topic <> ":reader:" <> id
 
