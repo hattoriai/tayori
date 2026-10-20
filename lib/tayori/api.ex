@@ -109,6 +109,18 @@ defmodule Tayori.API do
   the extras a frontend shows (`"reactions"`, `"announcements"`), with
   the `emoji` of the reactions.
 
+  With the `:mcp` config (`Tayori.MCP`), also:
+
+    * `POST /uploads/:token` - an image for an entry, from an agent: the
+      file in a multipart `file` field, or as the body, with the token of
+      the `request_upload` tool, good for one file for ten minutes:
+      `{"url", "markdown", "name", "contentType", "bytes", "width",
+      "height"}`, a 201. A 404 for a token that is not good (unknown,
+      used, past its time), a 413 for a file over 25 MB, a 415 for a file
+      whose bytes are not a PNG, JPEG, GIF or WebP image. The token is the
+      request's only credential: no session, no CSRF token (see the
+      [MCP](mcp.md) guide for a `tayori_api` behind `protect_from_forgery`).
+
   An error is `{"error": code}`: `"not_found"`, `"unauthorized"` (a
   visitor reacts), `"unknown_emoji"`, `"token_expired"` (a reader token
   older than its `:max_age`, a 401).
@@ -123,7 +135,7 @@ defmodule Tayori.API do
   import Plug.Conn
 
   alias Tayori.{Announcements, Categories, Category, Config, Embed, Entries, Entry}
-  alias Tayori.{Messages, Reactions, Reader, Resolver, Views}
+  alias Tayori.{Messages, Reactions, Reader, Resolver, Uploads, Views}
   alias Tayori.Panel
   alias Tayori.Router.Page
 
@@ -150,6 +162,7 @@ defmodule Tayori.API do
   @impl Plug
   def call(conn, :preflight), do: preflight(conn)
   def call(conn, :asset), do: asset(Embed.cors(conn))
+  def call(conn, :upload), do: upload(conn)
 
   def call(conn, action) do
     opts = Map.put(conn.assigns.mount.options, :page, page_url(conn))
@@ -591,6 +604,113 @@ defmodule Tayori.API do
   defp blank(_value), do: nil
 
   defp not_found(conn), do: json(conn, 404, %{error: "not_found"})
+
+  # An agent's image, with a token of the request_upload tool.
+  defp upload(%{path_params: %{"token" => token}} = conn) do
+    with %{} <- Config.get().mcp,
+         {:ok, name} <- Uploads.check(token),
+         {:ok, conn, {path, file_name, claim}} <- read_upload(conn),
+         :ok <- Uploads.consume(token),
+         {:ok, image} <- Uploads.store(path, name || file_name, claim) do
+      json(conn, 201, %{
+        url: image.url,
+        markdown: "![](#{image.url})",
+        name: image.name,
+        contentType: image.content_type,
+        bytes: image.bytes,
+        width: image.width,
+        height: image.height
+      })
+    else
+      {:error, %Plug.Conn{} = conn, reason} -> upload_error(conn, reason)
+      {:error, reason} -> upload_error(conn, reason)
+      _not_found -> json(conn, 404, %{error: "not_found"})
+    end
+  end
+
+  defp upload_error(conn, :too_large), do: json(conn, 413, %{error: "too_large"})
+  defp upload_error(conn, :not_an_image), do: json(conn, 415, %{error: "not_an_image"})
+
+  defp upload_error(conn, reason) when reason in [:empty, :no_file],
+    do: json(conn, 400, %{error: "no_file"})
+
+  defp upload_error(conn, _reason), do: json(conn, 500, %{error: "not_stored"})
+
+  # The file of a multipart `file` field (parsed here when the endpoint
+  # did not), or the body itself, kept in a temporary file.
+  defp read_upload(conn) do
+    multipart? = match?(["multipart/" <> _ | _], get_req_header(conn, "content-type"))
+
+    case conn.body_params do
+      %{"file" => %Plug.Upload{path: path, filename: name, content_type: claim}} ->
+        {:ok, conn, {path, name, claim}}
+
+      %Plug.Conn.Unfetched{} when multipart? ->
+        read_multipart(conn)
+
+      _parsed when multipart? ->
+        {:error, conn, :no_file}
+
+      _body ->
+        read_raw(conn)
+    end
+  end
+
+  defp read_multipart(conn) do
+    conn =
+      Plug.Parsers.call(
+        conn,
+        Plug.Parsers.init(parsers: [:multipart], length: Uploads.max_bytes() + 65_536)
+      )
+
+    case conn.body_params do
+      %{"file" => %Plug.Upload{path: path, filename: name, content_type: claim}} ->
+        {:ok, conn, {path, name, claim}}
+
+      _ ->
+        {:error, conn, :no_file}
+    end
+  rescue
+    Plug.Parsers.RequestTooLargeError -> {:error, conn, :too_large}
+  end
+
+  defp read_raw(conn) do
+    path = Plug.Upload.random_file!("tayori-upload")
+    claim = conn |> get_req_header("content-type") |> List.first()
+    {:ok, file} = File.open(path, [:write, :binary])
+
+    try do
+      case write_body(conn, file, 0) do
+        {:ok, conn} -> {:ok, conn, {path, nil, claim}}
+        {:error, conn, reason} -> {:error, conn, reason}
+      end
+    after
+      File.close(file)
+    end
+  end
+
+  defp write_body(conn, file, written) do
+    case read_body(conn, length: 1_000_000) do
+      {status, chunk, conn} ->
+        written = written + byte_size(chunk)
+
+        cond do
+          written > Uploads.max_bytes() ->
+            {:error, conn, :too_large}
+
+          status == :more ->
+            IO.binwrite(file, chunk)
+            write_body(conn, file, written)
+
+          true ->
+            IO.binwrite(file, chunk)
+            {:ok, conn}
+        end
+
+      {:error, _reason} ->
+        {:error, conn, :no_file}
+    end
+  end
 
   defp json(conn, status, body) do
     conn
