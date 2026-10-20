@@ -106,6 +106,20 @@ defmodule Tayori.AITest do
       assert prompt =~ "- Export button"
     end
 
+    test "complete waits for the whole text, for so long" do
+      assert AI.complete({:assist, "fix", "Hi", "en"}) == {:error, :not_configured}
+
+      configure()
+      FakeAI.answer(["TITLE: Ex", "ports\n---\n", "Zip it."])
+      assert AI.complete({:draft, "- export", "en"}) == {:ok, "TITLE: Exports\n---\nZip it."}
+
+      FakeAI.answer(Stream.map(["a", "b"], fn chunk -> Process.sleep(200) && chunk end))
+      assert AI.complete({:assist, "fix", "Hi", "en"}, timeout: 50) == {:error, :timeout}
+
+      FakeAI.answer(Stream.map(["a"], fn _ -> raise "the connection closed" end))
+      assert AI.complete({:assist, "fix", "Hi", "en"}) == {:error, "the connection closed"}
+    end
+
     test "an unknown action is refused" do
       configure()
       assert AI.stream({:assist, "nope", "text", "en"}) == {:error, :unknown_action}

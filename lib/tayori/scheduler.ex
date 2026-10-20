@@ -9,6 +9,11 @@ defmodule Tayori.Scheduler do
   # nil), so that an entry is announced once even while a node takes the
   # scheduler over from another. It wakes at the next scheduled time, when
   # an entry changes, and every minute.
+  #
+  # Each minute, it also starts the scheduled digest of the inbox
+  # (Tayori.Digest) and the email of a period's entries (the :emails
+  # config) when their time has come: the time of the run is kept in the
+  # settings first, then the work goes to Tayori.Jobs.
 
   use GenServer
 
@@ -51,6 +56,15 @@ defmodule Tayori.Scheduler do
     end
   end
 
+  @doc false
+  # Starts what a schedule says is due: the digest of the inbox (the
+  # :digest config) and the email of a period's entries (the :emails
+  # config). The tests run it in their own process.
+  def run_due(%Config{} = config, now \\ DateTime.utc_now()) do
+    Tayori.Digest.tick(config, now)
+    Tayori.Subscribers.tick(config, now)
+  end
+
   @impl GenServer
   def init(config) do
     send(self(), :tick)
@@ -71,6 +85,12 @@ defmodule Tayori.Scheduler do
       announce_due(config)
     rescue
       error -> Logger.error("Tayori could not announce the news: " <> Exception.message(error))
+    end
+
+    try do
+      run_due(config)
+    rescue
+      error -> Logger.error("Tayori could not run its schedules: " <> Exception.message(error))
     end
 
     {:noreply, %{state | timer: Process.send_after(self(), :tick, next_tick(config))}}
