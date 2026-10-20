@@ -80,17 +80,17 @@ defmodule Tayori.Admin.Layouts do
           </.link>
           <nav class="ta-nav" aria-label="Admin">
             <.link navigate={~m"/"} aria-current={@page == :entries && "page"}>
-              <.icon name="newspaper" />Entries
+              <.icon name="newspaper" /><span class="ta-nav-label">Entries</span>
             </.link>
             <.link navigate={~m"/inbox"} aria-current={@page == :inbox && "page"}>
-              <.icon name="inbox" />Inbox
+              <.icon name="inbox" /><span class="ta-nav-label">Inbox</span>
               <span :if={@inbox > 0} class="ta-nav-count" title={"#{@inbox} new"}>{@inbox}</span>
             </.link>
             <.link navigate={~m"/categories"} aria-current={@page == :categories && "page"}>
-              <.icon name="tags" />Categories
+              <.icon name="tags" /><span class="ta-nav-label">Categories</span>
             </.link>
             <.link navigate={~m"/settings"} aria-current={@page == :settings && "page"}>
-              <.icon name="settings" />Settings
+              <.icon name="settings" /><span class="ta-nav-label">Settings</span>
             </.link>
           </nav>
           <div class="ta-bar-actions">

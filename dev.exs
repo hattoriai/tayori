@@ -530,6 +530,18 @@ defmodule TayoriDev.Router do
     )
   end
 
+  # The JSON API for machines (the Automation guide): no session, no CSRF
+  # protection; CI and GitHub prove who they are with a token or a
+  # signature.
+  pipeline :machines do
+    plug :accepts, ["json"]
+  end
+
+  scope "/api/machines" do
+    pipe_through :machines
+    tayori_api("/news", resolver: TayoriDev.Resolver, as: :tayori_machines)
+  end
+
   scope "/admin" do
     pipe_through :browser
 

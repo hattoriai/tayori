@@ -669,8 +669,8 @@ defmodule Tayori.Admin.SettingsLive do
         </dl>
         <p class="ta-hint">
           The <code>:digest</code> option of Tayori sets them:
-          <code>{"digest: [every: {:weekly, :monday}, at: ~T[09:00:00], publish: :draft]"}</code>.
         </p>
+        <pre class="ta-code"><code>{"digest: [every: {:weekly, :monday}, at: ~T[09:00:00], publish: :draft]"}</code></pre>
       </section>
 
       <section :if={Automation.ingest?()} class="ta-subsection" aria-labelledby="automation-api">
