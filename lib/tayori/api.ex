@@ -20,14 +20,16 @@ defmodule Tayori.API do
 
     * `GET /` - the newest entries, the pinned ones first:
       `{"entries": [...], "more": bool, "unread": n, "newAfter": time,
-      "signedIn": bool, "page": path, "features": [...], "emoji": [...],
-      "messages": {...}}`. An entry published after `newAfter` is new to
-      the reader (nil for a visitor). `?before=<id>` gives the entries
-      published before that one, with no pinned ones; `?limit=` up to 50
-      (10); `?category=<key>` the entries of a category; `?q=` those
-      with every word in their title, summary or body.
-    * `GET /unread` - `{"unread": n, "signedIn": bool, "features": [...],
-      "emoji": [...], "messages": {...}}`, cheap enough to ask often.
+      "signedIn": bool, "locale": tag, "page": path, "features": [...],
+      "emoji": [...], "messages": {...}}`. An entry published after
+      `newAfter` is new to the reader (nil for a visitor). `?before=<id>`
+      gives the entries published before that one, with no pinned ones;
+      `?limit=` up to 50 (10); `?category=<key>` the entries of a
+      category; `?q=` those with every word in their title, summary or
+      body.
+    * `GET /unread` - `{"unread": n, "signedIn": bool, "locale": tag,
+      "features": [...], "emoji": [...], "messages": {...}}`, cheap
+      enough to ask often.
     * `POST /seen` - marks the news as seen, now: `{"unread": 0}`.
     * `GET /categories` - `{"categories": [{"key", "name", "color"}]}`,
       in their order, named in the reader's language.
@@ -245,6 +247,7 @@ defmodule Tayori.API do
 
     %{
       signedIn: reader != nil,
+      locale: locale,
       features: features,
       emoji: if(:reactions in features, do: config.reactions, else: []),
       messages: Messages.for_locale(locale)
