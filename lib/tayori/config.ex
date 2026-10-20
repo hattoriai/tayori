@@ -75,13 +75,25 @@ defmodule Tayori.Config do
           label of the prefix (`false`).
     * `:digest` - when the inbox becomes an entry (see `Tayori.Digest`):
         * `:every` - `:manual` (the admin asks), `:ingest` (each time
-          changes come), `{:weekly, day}` (`:monday` ... `:sunday`),
-          `:monthly` (the first day), or `{:days, n}` (`:manual`).
+          changes come), `{:weekly, day}` (`:monday` ... `:sunday`;
+          `:weekly` is Monday), `:monthly` (the first day), or
+          `{:days, n}`, n days after the last (`:manual`).
         * `:at` - the time of day of a scheduled digest, UTC
           (`~T[09:00:00]`).
         * `:publish` - `:draft`, for the admin to read and publish, or
           `:publish`, at once (`:draft`).
-        * `:minimum` - the changes a scheduled digest needs (`1`).
+        * `:minimum` - the changes a scheduled digest needs (`1`): with
+          fewer, they wait for the next.
+        * `:translate` - with AI, the entry in the other `:locales` too,
+          translated by the model (`false`).
+    * `:emails` - when the subscribers get the entries to email (the
+      `:subscriptions` feature; see `Tayori.Subscribers`):
+        * `:every` - `:each`, an email for each entry when it is
+          published, or an email of the entries of a period:
+          `{:weekly, day}` (`:weekly` is Monday), `:monthly` (the first
+          day), or `{:days, n}` (`:each`).
+        * `:at` - the time of day of an email of a period, UTC
+          (`~T[09:00:00]`).
     * `:embed` - the sites of the `:embed` feature (required with it):
         * `:origins` - the origins the JSON API answers, each a scheme
           and a host, with a port if not the default
@@ -109,6 +121,7 @@ defmodule Tayori.Config do
     :oban,
     :inbox,
     :digest,
+    :emails,
     :embed,
     locales: ["en"],
     features: [],
@@ -128,6 +141,7 @@ defmodule Tayori.Config do
           oban: %{name: term(), queue: atom()} | nil,
           inbox: inbox(),
           digest: digest(),
+          emails: emails(),
           embed: %{origins: [String.t(), ...], max_age: pos_integer()} | nil,
           locales: [String.t(), ...],
           features: [feature()],
@@ -152,6 +166,7 @@ defmodule Tayori.Config do
       oban: oban(opts[:oban]),
       inbox: inbox(Keyword.get(opts, :inbox, [])),
       digest: digest(Keyword.get(opts, :digest, [])),
+      emails: emails(Keyword.get(opts, :emails, [])),
       embed: embed(opts[:embed]),
       mailer: opts[:mailer],
       email_from: opts[:email_from],
@@ -281,6 +296,7 @@ defmodule Tayori.Config do
   # An option checked as `new/1` checks it, for a config changed in tests.
   def option(:inbox, value), do: inbox(value)
   def option(:digest, value), do: digest(value)
+  def option(:emails, value), do: emails(value)
   def option(_key, value), do: value
 
   @typedoc "The `:inbox` option, checked."
@@ -297,7 +313,14 @@ defmodule Tayori.Config do
           every: :manual | :ingest | :monthly | {:weekly, atom()} | {:days, pos_integer()},
           at: Time.t(),
           publish: :draft | :publish,
-          minimum: pos_integer()
+          minimum: pos_integer(),
+          translate: boolean()
+        }
+
+  @typedoc "The `:emails` option, checked."
+  @type emails :: %{
+          every: :each | :monthly | {:weekly, atom()} | {:days, pos_integer()},
+          at: Time.t()
         }
 
   @days ~w(monday tuesday wednesday thursday friday saturday sunday)a
@@ -365,11 +388,9 @@ defmodule Tayori.Config do
   end
 
   defp digest(opts) when is_list(opts) do
-    every = Keyword.get(opts, :every, :manual)
+    every = weekly(Keyword.get(opts, :every, :manual))
 
-    unless every in [:manual, :ingest, :monthly] or
-             match?({:weekly, day} when day in @days, every) or
-             match?({:days, n} when is_integer(n) and n > 0, every) do
+    unless every in [:manual, :ingest] or period?(every) do
       raise ArgumentError,
             ":every of :digest must be :manual, :ingest, :monthly, {:weekly, day} or {:days, n}, got: #{inspect(every)}"
     end
@@ -389,11 +410,42 @@ defmodule Tayori.Config do
       raise ArgumentError, ":minimum of :digest must be a positive integer"
     end
 
-    %{every: every, at: at, publish: publish, minimum: minimum}
+    translate = Keyword.get(opts, :translate, false)
+
+    unless is_boolean(translate) do
+      raise ArgumentError, ":translate of :digest must be true or false"
+    end
+
+    %{every: every, at: at, publish: publish, minimum: minimum, translate: translate}
   end
 
   defp digest(other),
     do: raise(ArgumentError, ":digest must be a keyword list, got: #{inspect(other)}")
+
+  defp emails(opts) when is_list(opts) do
+    every = weekly(Keyword.get(opts, :every, :each))
+
+    unless every == :each or period?(every) do
+      raise ArgumentError,
+            ":every of :emails must be :each, {:weekly, day}, :monthly or {:days, n}, got: #{inspect(every)}"
+    end
+
+    at = Keyword.get(opts, :at, ~T[09:00:00])
+    unless match?(%Time{}, at), do: raise(ArgumentError, ":at of :emails must be a Time")
+
+    %{every: every, at: at}
+  end
+
+  defp emails(other),
+    do: raise(ArgumentError, ":emails must be a keyword list, got: #{inspect(other)}")
+
+  defp weekly(:weekly), do: {:weekly, :monday}
+  defp weekly(every), do: every
+
+  defp period?(:monthly), do: true
+  defp period?({:weekly, day}), do: day in @days
+  defp period?({:days, n}), do: is_integer(n) and n > 0
+  defp period?(_other), do: false
 
   defp oban(nil), do: nil
   defp oban(name) when is_atom(name), do: oban(name: name)

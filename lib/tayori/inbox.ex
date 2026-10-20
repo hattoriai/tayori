@@ -103,31 +103,44 @@ defmodule Tayori.Inbox do
   @doc """
   Reads every source of the `:inbox` config, and adds their changes.
   Returns each source's result, by its name: `{:ok, counts}` (as
-  `add_many/2`), or `{:error, reason}`, logged.
+  `add_many/2`), or `{:error, reason}`, logged. With the `:digest`
+  config's `every: :ingest`, new changes start a digest
+  (`Tayori.Digest.after_ingest/1`).
   """
   @spec ingest() :: %{String.t() => {:ok, map()} | {:error, term()}}
   def ingest do
     config = Config.get()
 
-    Map.new(config.inbox.sources, fn {module, opts} ->
-      name = Source.name(module, opts)
+    results =
+      Map.new(config.inbox.sources, fn {module, opts} ->
+        name = Source.name(module, opts)
 
-      result =
-        try do
-          case module.changes(opts) do
-            {:ok, changes} -> {:ok, add_many(changes, source: name)}
-            {:error, reason} -> {:error, reason}
+        result =
+          try do
+            case module.changes(opts) do
+              {:ok, changes} -> {:ok, add_many(changes, source: name)}
+              {:error, reason} -> {:error, reason}
+            end
+          rescue
+            error -> {:error, Exception.message(error)}
           end
-        rescue
-          error -> {:error, Exception.message(error)}
+
+        with {:error, reason} <- result do
+          Logger.warning("Tayori could not read the source #{name}: #{inspect(reason)}")
         end
 
-      with {:error, reason} <- result do
-        Logger.warning("Tayori could not read the source #{name}: #{inspect(reason)}")
-      end
+        {name, result}
+      end)
 
-      {name, result}
+    results
+    |> Enum.map(fn
+      {_name, {:ok, %{added: added}}} -> added
+      _error -> 0
     end)
+    |> Enum.sum()
+    |> Tayori.Digest.after_ingest()
+
+    results
   end
 
   @doc """
