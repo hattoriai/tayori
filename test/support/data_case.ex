@@ -92,6 +92,7 @@ defmodule TayoriTest.DataCase do
 
   @doc "Puts the config of the test with these options changed, and returns it."
   def put_config(%Tayori.Config{} = config, changes) do
+    changes = Enum.map(changes, fn {key, value} -> {key, Tayori.Config.option(key, value)} end)
     config = struct!(config, changes)
     Tayori.Config.put(config)
     config

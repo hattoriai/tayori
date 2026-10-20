@@ -54,6 +54,12 @@ defmodule Tayori.Scheduler do
   @impl GenServer
   def init(config) do
     send(self(), :tick)
+
+    # A deploy's new code may bring new changes (Tayori.Inbox).
+    if config.inbox.ingest_on_start and config.inbox.sources != [] do
+      Task.Supervisor.start_child(Tayori.TaskSupervisor, &Tayori.Inbox.ingest/0)
+    end
+
     {:ok, %{config: config, timer: nil}}
   end
 

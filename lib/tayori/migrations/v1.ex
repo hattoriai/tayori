@@ -134,9 +134,45 @@ defmodule Tayori.Migrations.V1 do
       add :secret, :binary
       timestamps(type: :utc_datetime_usec)
     end
+
+    # The inbox: the changes the app's sources bring (its CHANGELOG.md,
+    # files of news, its CI, GitHub, its own code), before they become
+    # an entry. A source's ref makes reading it again change nothing.
+    create table(:tayori_changes, primary_key: false, prefix: ctx.prefix) do
+      add :id, :binary_id, primary_key: true
+      add :source, :string, size: 32, null: false
+      add :ref, :string, size: 255, null: false
+      add :title, :string, size: 255, null: false
+      add :body, :text
+      add :kind, :string, size: 32
+      add :category, :string, size: 64
+      add :audience, :string, size: 16, null: false, default: "public"
+      add :segments, {:array, :string}, null: false, default: []
+      add :highlight, :boolean, null: false, default: false
+      add :version, :string, size: 64
+      add :url, :string, size: 2048
+      add :author, :string, size: 255
+      add :occurred_at, :utc_datetime_usec, null: false
+      add :state, :string, size: 16, null: false, default: "new"
+
+      add :entry_id,
+          references(:tayori_entries,
+            type: :binary_id,
+            on_delete: :nilify_all,
+            prefix: ctx.prefix
+          )
+
+      add :meta, :map, null: false, default: %{}
+      timestamps(type: :utc_datetime_usec)
+    end
+
+    create unique_index(:tayori_changes, [:source, :ref], prefix: ctx.prefix)
+    create index(:tayori_changes, [:state, :occurred_at], prefix: ctx.prefix)
+    create index(:tayori_changes, [:entry_id], prefix: ctx.prefix)
   end
 
   def down(ctx) do
+    drop table(:tayori_changes, prefix: ctx.prefix)
     drop table(:tayori_settings, prefix: ctx.prefix)
     drop table(:tayori_subscribers, prefix: ctx.prefix)
     drop table(:tayori_dismissals, prefix: ctx.prefix)
