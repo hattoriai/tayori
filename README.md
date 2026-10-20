@@ -206,4 +206,7 @@ Hex, and tags and pushes `v<version>`.
 ## License
 
 MIT, see `LICENSE`. The admin's script has Phoenix, Phoenix LiveView,
-Kotoba (with Lexical) and Koyomi in it; their licences are in `NOTICE`.
+Kotoba (with Lexical) and Koyomi in it. Tayori's icons are hand-picked from
+[Lucide](https://lucide.dev) (ISC, some from Feather, MIT), and the Sumi
+theme carries the Outfit and Cormorant Garamond typefaces (SIL Open Font
+License). Their licences are in `NOTICE`.
