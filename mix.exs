@@ -62,6 +62,9 @@ defmodule Tayori.MixProject do
       # The publication date's picker in the admin.
       {:koyomi, "~> 0.2"},
       {:lazy_html, "~> 0.1", only: :test},
+      # The admin's forms of Ecto changesets; every Phoenix app with Ecto
+      # has it.
+      {:phoenix_ecto, "~> 4.6"},
       {:phoenix, if(@oldest, do: "~> 1.7.14", else: "~> 1.7.14 or ~> 1.8")},
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_reload, "~> 1.6", only: :dev},
@@ -70,7 +73,9 @@ defmodule Tayori.MixProject do
       # The drafts written with AI, with the key an admin gives: any
       # provider ReqLLM knows. Without it, the admin has no AI.
       {:req_llm, "~> 1.6", optional: true},
-      {:telemetry, "~> 1.0"}
+      {:telemetry, "~> 1.0"},
+      # The time zones of the development server's date picker.
+      {:tz, "~> 0.28", only: [:dev, :test]}
     ]
   end
 

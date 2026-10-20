@@ -4,6 +4,7 @@ defmodule Tayori.NewsTest do
   doctest Tayori
   doctest Tayori.Entry
   doctest Tayori.Reader
+  doctest Tayori.Locales
 
   for_each_repo do
     test "a reader sees the published entries, the newest first" do

@@ -1,0 +1,16 @@
+{
+  "name": "tayori",
+  "version": "0.1.0",
+  "license": "MIT",
+  "module": "./priv/static/tayori.esm.js",
+  "main": "./priv/static/tayori.cjs.js",
+  "exports": {
+    ".": {
+      "import": "./priv/static/tayori.esm.js",
+      "require": "./priv/static/tayori.cjs.js"
+    }
+  },
+  "files": [
+    "priv/static"
+  ]
+}

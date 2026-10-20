@@ -140,10 +140,15 @@ defmodule Tayori.Entries do
     config = Config.get()
 
     entry
-    |> Ecto.Changeset.change(published_at: at, announced_at: nil)
+    |> Ecto.Changeset.change(published_at: usec(at), announced_at: nil)
     |> config.repo.update(prefix: config.prefix)
     |> changed()
   end
+
+  # The times are kept to the microsecond; a time read from a form has
+  # whole seconds.
+  defp usec(nil), do: nil
+  defp usec(%DateTime{microsecond: {value, _precision}} = at), do: %{at | microsecond: {value, 6}}
 
   @doc "Deletes an entry and its translations."
   @spec delete(Entry.t()) :: {:ok, Entry.t()} | {:error, Ecto.Changeset.t()}

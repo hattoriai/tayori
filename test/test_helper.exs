@@ -1,4 +1,5 @@
 {:ok, _pid} = Phoenix.PubSub.Supervisor.start_link(name: TayoriTest.PubSub)
+{:ok, _pid} = TayoriTest.Endpoint.start_link()
 
 # The entries in a database: SQLite always, PostgreSQL when it is
 # reachable (TAYORI_TEST_DATABASE_URL, or postgres:postgres@localhost).
