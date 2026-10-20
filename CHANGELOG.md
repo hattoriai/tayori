@@ -65,6 +65,24 @@ The first release.
 - Writing with AI, with the app's own key, kept encrypted by the app's
   Cloak vault (`:vault`) or with its `secret_key_base`: drafts,
   translations, and rewrites of a passage, as Kotoba suggestions.
+- Automation: an inbox of what shipped (`Tayori.Inbox`), from a Keep a
+  Changelog file and a folder of fragments, Changesets' and towncrier's
+  among them (`Tayori.Sources`), read at each deploy; from CI, with a
+  token (`POST <api>/changes`, `mix tayori.ingest`); from GitHub's
+  webhook, signed, for merged pull requests and published releases
+  (`Tayori.GitHub`); and from the app's code. Changes for the team stay
+  out of the news. Digests make entries of it, plain or written by the
+  model, with translations, as drafts or published, when the admin asks,
+  as changes come, or each week, month or n days (`Tayori.Digest`). The
+  emails go for each entry, or as one email of a period (`:emails`). The
+  admin's inbox, the Automation card of Settings, and the changes behind
+  an entry in the editor.
+- An MCP server (`Tayori.MCP`), mounted with Sake in the app's own,
+  beside its other libraries': the news, the inbox and the categories to
+  read; changes to add, entries to draft, write, publish and unpublish,
+  under the admin's own access; screenshots from a browser agent,
+  uploaded once with a URL that lasts ten minutes, as figures in an
+  entry.
 - The words around the news in eight languages (`Tayori.Messages`).
 - `Tayori.Test`, the installer (`mix igniter.install tayori`, which
   mounts the admin and the public page and starts Tayori, with the app's

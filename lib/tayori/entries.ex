@@ -146,16 +146,47 @@ defmodule Tayori.Entries do
   @doc """
   Creates an entry. Options: `:author` - who writes it, a map such as
   `%{"id" => ..., "name" => ...}`.
+
+  A slug made from the title that another entry has takes a number:
+  `exports-2`. A slug given is the entry's, or an error.
   """
   @spec create(map(), keyword()) :: {:ok, Entry.t()} | {:error, Ecto.Changeset.t()}
   def create(attrs, opts \\ []) do
     config = Config.get()
 
-    %Entry{translations: []}
-    |> change(attrs)
-    |> Entry.put_author(opts[:author])
-    |> config.repo.insert(prefix: config.prefix)
+    changeset =
+      %Entry{translations: []}
+      |> change(attrs)
+      |> Entry.put_author(opts[:author])
+
+    given? = (attrs[:slug] || attrs["slug"]) not in [nil, ""]
+
+    changeset
+    |> insert(config, if(given?, do: nil, else: Ecto.Changeset.get_change(changeset, :slug)), 2)
     |> changed()
+  end
+
+  @max_slug_tries 50
+
+  defp insert(changeset, config, base, n) do
+    case config.repo.insert(changeset, prefix: config.prefix) do
+      {:error, failed} when is_binary(base) and n <= @max_slug_tries ->
+        if slug_taken?(failed) do
+          slug = String.slice(base, 0, 150) <> "-#{n}"
+          changeset |> Ecto.Changeset.put_change(:slug, slug) |> insert(config, base, n + 1)
+        else
+          {:error, failed}
+        end
+
+      result ->
+        result
+    end
+  end
+
+  defp slug_taken?(changeset) do
+    Enum.any?(changeset.errors, fn {field, {_, meta}} ->
+      field == :slug and meta[:constraint] == :unique
+    end)
   end
 
   @doc "Updates an entry: its fields, translations and publication time."

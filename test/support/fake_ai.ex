@@ -2,6 +2,12 @@ defmodule TayoriTest.FakeAI do
   @moduledoc """
   The model of the tests: it streams the chunks the test gave it
   (`answer/1`), and tells the test what it was asked.
+
+  With `answer(:writer)`, it writes what it is asked, the same way each
+  time: a digest titled with its first change, summarised with their
+  count and the language, its body a list of their titles; a
+  translation with each part marked with its language (`[pt-PT] ...`).
+  `answer({:writer, fail: locale})` fails the translation into a language.
   """
   @behaviour Tayori.AI
 
@@ -14,7 +20,42 @@ defmodule TayoriTest.FakeAI do
 
     case chunks do
       {:error, reason} -> {:error, reason}
+      :writer -> write(system, prompt, [])
+      {:writer, opts} -> write(system, prompt, opts)
       chunks -> {:ok, chunks}
+    end
+  end
+
+  defp write(system, prompt, opts) do
+    [_, locale] = Regex.run(~r/Write in\s.*?\(([^)]+)\)\./s, system)
+
+    cond do
+      prompt =~ "Write one entry" ->
+        [_, changes] = String.split(prompt, "The changes:\n\n", parts: 2)
+        titles = for [_, title] <- Regex.scan(~r/^- (.+?)(?: \(.*\))?$/m, changes), do: title
+
+        {:ok,
+         [
+           "TITLE: #{hd(titles)}\nSUMMARY: #{length(titles)} changes, in #{locale}.\n",
+           "---\n",
+           Enum.map_join(titles, "\n", &"- #{&1}")
+         ]}
+
+      locale == opts[:fail] ->
+        {:error, :overloaded}
+
+      prompt =~ "Translate this entry" ->
+        [_, entry] = String.split(prompt, "The entry:\n\n", parts: 2)
+        {:ok, %{title: title, summary: summary}, body} = Tayori.AI.parse_header(entry)
+
+        {:ok,
+         [
+           "TITLE: [#{locale}] #{title}\nSUMMARY: [#{locale}] #{summary}\n---\n",
+           "[#{locale}] " <> String.trim(body)
+         ]}
+
+      true ->
+        {:ok, ["OK"]}
     end
   end
 end

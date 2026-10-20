@@ -18,9 +18,13 @@ defmodule Tayori.AI do
 
   The admin can also say what the product is and how it speaks
   ("About your product"), which every request carries.
+
+  Outside the editor, `complete/2` waits for the whole text: a digest
+  writes its entry from the inbox's changes with it (`Tayori.Digest`),
+  a draft unless the `:digest` config says to publish it.
   """
 
-  alias Tayori.{Locales, Settings}
+  alias Tayori.{Categories, Category, Config, Locales, Settings}
 
   @setting "ai"
 
@@ -90,6 +94,8 @@ defmodule Tayori.AI do
     * `{:draft, notes, locale}` - an entry from notes of what shipped (a
       list of changes, commits, pull requests), with a title and a
       summary first (see `parse_header/1`);
+    * `{:digest, changes, locale}` - an entry from changes of the inbox
+      (`Tayori.Change`), in the same form;
     * `{:translate, %{title:, summary:, markdown:}, from, to}` - an entry
       in another language, in the same form;
     * `{:assist, action, text, locale}` - a passage changed by an action of
@@ -101,6 +107,33 @@ defmodule Tayori.AI do
          {:ok, {system, prompt}} <- prompt(task) do
       adapter().stream(settings().model, Settings.secret(@setting), system, prompt)
     end
+  end
+
+  @doc """
+  The whole text of a task (see `stream/1`), for a request that no one
+  watches as it streams. Options: `:timeout`, in milliseconds (two
+  minutes). Returns `{:ok, text}`, or `{:error, reason}`: `:timeout` when
+  the model takes longer.
+  """
+  @spec complete(tuple(), keyword()) :: {:ok, String.t()} | {:error, term()}
+  def complete(task, opts \\ []) do
+    timeout = Keyword.get(opts, :timeout, :timer.minutes(2))
+
+    with {:ok, stream} <- stream(task) do
+      reader = Task.Supervisor.async_nolink(Tayori.TaskSupervisor, fn -> read(stream) end)
+
+      case Task.yield(reader, timeout) || Task.shutdown(reader, :brutal_kill) do
+        {:ok, result} -> result
+        {:exit, reason} -> {:error, reason}
+        nil -> {:error, :timeout}
+      end
+    end
+  end
+
+  defp read(stream) do
+    {:ok, Enum.join(stream)}
+  rescue
+    error -> {:error, Exception.message(error)}
   end
 
   @doc """
@@ -170,6 +203,35 @@ defmodule Tayori.AI do
     )
   end
 
+  defp prompt({:digest, changes, locale}) do
+    ok(
+      system(locale),
+      """
+      Write one entry of the product's news from these changes, which
+      shipped since the last entry.
+
+      Put together the changes that belong together, and lead with those
+      marked as highlights. Say what people can do now, not how it was
+      built: leave out the names in the code, the numbers of tickets and
+      pull requests, and what no one who uses the product would notice.
+      Say only what the changes say.
+
+      Reply in this form, and nothing else:
+
+      TITLE: a title of a few words, in sentence case, of what matters most
+      SUMMARY: one or two sentences for the news panel and the emails
+      ---
+      the body, in Markdown: the highlights first, in a few short
+      paragraphs, then the rest as a list, under a heading for each kind
+      of change when there are several.
+
+      The changes:
+
+      #{changes(changes, locale)}
+      """
+    )
+  end
+
   defp prompt({:translate, %{title: title, summary: summary, markdown: markdown}, from, to}) do
     ok(
       system(to),
@@ -218,6 +280,37 @@ defmodule Tayori.AI do
   defp prompt(_task), do: {:error, :unknown_task}
 
   defp ok(system, prompt), do: {:ok, {system, prompt}}
+
+  # The changes of a digest as the model reads them: what they say, their
+  # category and whether they lead; not their refs, links or authors.
+  defp changes(changes, locale) do
+    categories = Categories.by_key()
+    locales = Config.get().locales
+
+    Enum.map_join(changes, "\n", fn change ->
+      marks =
+        Enum.filter(
+          [
+            change.highlight && "highlight",
+            category_name(categories[change.category], locale, locales)
+          ],
+          & &1
+        )
+
+      marks = if marks == [], do: "", else: " (" <> Enum.join(marks, "; ") <> ")"
+      "- " <> change.title <> marks <> indented(change.body)
+    end)
+  end
+
+  defp indented(body) when is_binary(body) and body != "",
+    do: "\n" <> (body |> String.trim() |> String.replace(~r/^/m, "  "))
+
+  defp indented(_body), do: ""
+
+  defp category_name(%Category{} = category, locale, locales),
+    do: Category.name(category, locale, locales)
+
+  defp category_name(_none, _locale, _locales), do: nil
 
   defp system(locale) do
     about =

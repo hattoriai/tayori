@@ -1,0 +1,24 @@
+{
+  "action": "closed",
+  "number": 1235,
+  "pull_request": {
+    "html_url": "https://github.com/atelier/app/pull/1235",
+    "number": 1235,
+    "state": "closed",
+    "title": "Try a new font for the export",
+    "user": {"login": "hanzo", "id": 101, "type": "User"},
+    "body": "An experiment.",
+    "labels": [],
+    "closed_at": "2026-10-20T09:10:00Z",
+    "merged_at": null,
+    "base": {"label": "atelier:main", "ref": "main", "sha": "77aa"},
+    "merged": false
+  },
+  "repository": {
+    "id": 5001,
+    "name": "app",
+    "full_name": "atelier/app",
+    "default_branch": "main"
+  },
+  "sender": {"login": "hanzo", "id": 101, "type": "User"}
+}

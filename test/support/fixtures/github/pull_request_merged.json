@@ -1,0 +1,37 @@
+{
+  "action": "closed",
+  "number": 1234,
+  "pull_request": {
+    "url": "https://api.github.com/repos/atelier/app/pulls/1234",
+    "html_url": "https://github.com/atelier/app/pull/1234",
+    "number": 1234,
+    "state": "closed",
+    "title": "Exports in two clicks",
+    "user": {"login": "hanzo", "id": 101, "type": "User"},
+    "body": "Closes #1180.\r\n\r\n<!-- What does this change for our users? -->\r\n## Changelog\r\n\r\nZip a whole project, with its files and notes, and get a link by email.\r\n\r\n## Testing\r\n\r\nRan the export on the staging data.\r\n",
+    "labels": [
+      {"id": 1, "name": "changelog:added", "color": "0e8a16"},
+      {"id": 2, "name": "changelog:highlight", "color": "fbca04"},
+      {"id": 3, "name": "changelog:segment:plan:pro", "color": "c5def5"},
+      {"id": 4, "name": "frontend", "color": "ededed"}
+    ],
+    "created_at": "2026-10-18T10:02:11Z",
+    "updated_at": "2026-10-20T08:59:40Z",
+    "closed_at": "2026-10-20T08:59:40Z",
+    "merged_at": "2026-10-20T08:59:40Z",
+    "merge_commit_sha": "9f2c41d0b5a8e7c3d1f6a2b4c8e0d9f7a1b3c5e7",
+    "head": {"label": "atelier:feat/export", "ref": "feat/export", "sha": "4b8e"},
+    "base": {"label": "atelier:main", "ref": "main", "sha": "77aa"},
+    "merged": true,
+    "merged_by": {"login": "sakura", "id": 102, "type": "User"}
+  },
+  "repository": {
+    "id": 5001,
+    "name": "app",
+    "full_name": "atelier/app",
+    "private": true,
+    "html_url": "https://github.com/atelier/app",
+    "default_branch": "main"
+  },
+  "sender": {"login": "sakura", "id": 102, "type": "User"}
+}

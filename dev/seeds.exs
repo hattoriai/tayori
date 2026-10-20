@@ -3,14 +3,16 @@ defmodule TayoriDev.Seeds do
   Atelier's news, the first time the dev server starts: eight entries
   that use every style an entry can hold, with the screenshots and files
   of dev/seed/ stored as Kotoba stores the files of an upload; categories,
-  a cover on some, a pin, an announcement, reactions and views.
+  a cover on some, a pin, an announcement, reactions and views; and a
+  change of GitHub in the inbox, beside those of dev/CHANGELOG.md and
+  dev/news.
 
   The styles Markdown has no syntax for are written as markers and turned
   into Kotoba's own document: `{red|Blocked}` is a text color, and a table
   marked `<!-- header-column -->` gets a header column.
   """
 
-  alias Tayori.{Categories, Entries}
+  alias Tayori.{Categories, Entries, Inbox}
 
   @seed Path.expand("seed", __DIR__)
   @author %{"id" => 1, "name" => "Hattori Hanzo"}
@@ -22,6 +24,7 @@ defmodule TayoriDev.Seeds do
       entries = Enum.map(entries(shots), &entry/1)
       reactions(entries)
       views(entries)
+      inbox()
     end
 
     :ok
@@ -199,6 +202,29 @@ defmodule TayoriDev.Seeds do
     |> Enum.uniq_by(&{&1.entry_id, &1.reader, &1.source, &1.day})
     |> Enum.chunk_every(500)
     |> Enum.each(&config.repo.insert_all(Tayori.View, &1, on_conflict: :nothing))
+  end
+
+  # What GitHub brought since the last entry, for the team only. The
+  # changelog and the fragments come from dev/CHANGELOG.md and dev/news,
+  # the sources of the inbox, read at start.
+  defp inbox do
+    now = DateTime.utc_now()
+    ago = fn hours -> DateTime.add(now, -hours * 3600, :second) end
+
+    changes = [
+      {"github",
+       %{
+         ref: "atelier/app#2291",
+         title: "Move the job queue to the new cluster",
+         body: "Ops only: the workers now run on the new cluster.",
+         audience: "internal",
+         url: "https://github.com/atelier/app/pull/2291",
+         author: "hanzo",
+         occurred_at: ago.(5)
+       }}
+    ]
+
+    for {source, attrs} <- changes, do: {:ok, _} = Inbox.add(attrs, source: source)
   end
 
   # ── The entries ─────────────────────────────────────────────────

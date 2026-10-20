@@ -9,6 +9,12 @@ defmodule Tayori.Jobs do
   database first). Its readers see it on time whatever happens next: what
   follows is only what it sends.
 
+  The schedules go the same way: a digest of the inbox (`Tayori.Digest`),
+  and, with the `:emails` config, the email of a period's entries to
+  each subscriber. A digest is one job at a time: asked for again while
+  one waits, it is the same job, which takes the changes that came
+  meanwhile.
+
   ## With Oban
 
   When the app runs [Oban](https://hexdocs.pm/oban), Tayori gives it the
@@ -28,8 +34,8 @@ defmodule Tayori.Jobs do
   ## Without Oban
 
   Tayori sends them from tasks in the node that announced the entry. A
-  webhook is tried three times, a few seconds apart; an email once. A
-  failure is logged. A node stopped while it sends (a deploy, a crash)
+  webhook is tried three times, a few seconds apart; an email and a
+  digest once. A failure is logged. A node stopped while it sends (a deploy, a crash)
   loses what it had not sent yet: the entry is not sent twice, but some
   subscribers may not get it. For a changelog with subscribers or
   webhooks that matter, run Oban.
@@ -52,6 +58,40 @@ defmodule Tayori.Jobs do
         if(config.notifier, do: [{:notify, entry_id}], else: [])
 
     run(config, jobs)
+  end
+
+  @doc false
+  # Starts a digest of the inbox (Tayori.Digest), from the scheduler or
+  # after changes came: one Oban job, which stays one when asked again
+  # before it runs, or a task.
+  @spec digest(Config.t()) :: :ok
+  def digest(%Config{oban: nil} = config) do
+    start(fn -> try_once(config, :digest) end)
+    :ok
+  end
+
+  def digest(%Config{oban: oban} = config) do
+    check_queue(oban)
+    {:ok, _job} = Oban.insert(oban.name, Tayori.Worker.new(args(:digest), opts(:digest, oban)))
+    :ok
+  rescue
+    error ->
+      Logger.error(
+        "Tayori could not give Oban the digest, and makes it in a task: " <>
+          Exception.message(error)
+      )
+
+      digest(%{config | oban: nil})
+  end
+
+  @doc false
+  # Sends the email of a period's entries (the :emails config), from the
+  # scheduler: the entries are claimed once, then one email goes to each
+  # subscriber.
+  @spec email_digest(Config.t(), DateTime.t()) :: :ok
+  def email_digest(%Config{} = config, since) do
+    {entry_ids, subscriber_ids} = Subscribers.claim_digest(config, since)
+    run(config, Enum.map(subscriber_ids, &{:digest_email, entry_ids, &1}))
   end
 
   defp run(_config, []), do: :ok
@@ -79,15 +119,46 @@ defmodule Tayori.Jobs do
 
   defp args({:notify, entry_id}), do: %{"job" => "notify", "entry_id" => entry_id}
 
+  defp args({:digest_email, entry_ids, subscriber_id}),
+    do: %{"job" => "digest_email", "entry_ids" => entry_ids, "subscriber_id" => subscriber_id}
+
+  defp args(:digest), do: %{"job" => "digest"}
+
   defp opts({:email, _, _}, oban), do: [queue: oban.queue, max_attempts: 5]
   defp opts({:webhook, _, _}, oban), do: [queue: oban.queue, max_attempts: 8]
   defp opts({:notify, _}, oban), do: [queue: oban.queue, max_attempts: 5]
+  defp opts({:digest_email, _, _}, oban), do: [queue: oban.queue, max_attempts: 5]
+
+  # A digest waiting for its turn takes the changes that come meanwhile:
+  # there is no need of another.
+  defp opts(:digest, oban) do
+    [
+      queue: oban.queue,
+      max_attempts: 3,
+      unique: [period: :infinity, keys: [:job], states: [:available, :scheduled, :retryable]]
+    ]
+  end
 
   @doc false
   # Does one job, in an Oban worker or a task.
   @spec perform(Config.t(), map()) :: :ok | {:error, term()} | {:cancel, term()}
   def perform(config, %{"job" => "email", "entry_id" => entry, "subscriber_id" => subscriber}),
     do: Subscribers.email(config, entry, subscriber)
+
+  def perform(config, %{
+        "job" => "digest_email",
+        "entry_ids" => entries,
+        "subscriber_id" => subscriber
+      }),
+      do: Subscribers.email_digest(config, entries, subscriber)
+
+  def perform(_config, %{"job" => "digest"}) do
+    case Tayori.Digest.scheduled() do
+      {:ok, _entry} -> :ok
+      {:error, :nothing} -> :ok
+      {:error, changeset} -> {:cancel, inspect(changeset.errors)}
+    end
+  end
 
   def perform(config, %{"job" => "webhook", "entry_id" => entry, "hook_id" => hook}) do
     case Webhooks.deliver(config, entry, hook) do
@@ -111,7 +182,7 @@ defmodule Tayori.Jobs do
   # -- without Oban ------------------------------------------------------------
 
   defp run_in_tasks(config, jobs) do
-    {emails, others} = Enum.split_with(jobs, &match?({:email, _, _}, &1))
+    {emails, others} = Enum.split_with(jobs, &email?/1)
 
     # The emails one after the other, so that a mailer is not flooded.
     if emails != [] do
@@ -121,6 +192,10 @@ defmodule Tayori.Jobs do
     Enum.each(others, fn job -> start(fn -> try_again(config, job, 1) end) end)
     :ok
   end
+
+  defp email?({:email, _, _}), do: true
+  defp email?({:digest_email, _, _}), do: true
+  defp email?(_job), do: false
 
   defp start(fun), do: Task.Supervisor.start_child(Tayori.TaskSupervisor, fun)
 
@@ -147,6 +222,12 @@ defmodule Tayori.Jobs do
 
   defp failed({:email, _entry_id, subscriber_id}, reason),
     do: Logger.warning("Tayori could not email #{subscriber_id}: #{inspect(reason)}")
+
+  defp failed({:digest_email, _entry_ids, subscriber_id}, reason),
+    do: Logger.warning("Tayori could not email #{subscriber_id}: #{inspect(reason)}")
+
+  defp failed(:digest, reason),
+    do: Logger.warning("Tayori could not make the digest: #{inspect(reason)}")
 
   defp failed({:webhook, _entry_id, hook_id}, reason),
     do: Logger.warning("Tayori could not tell #{Webhooks.name(hook_id)}: #{inspect(reason)}")

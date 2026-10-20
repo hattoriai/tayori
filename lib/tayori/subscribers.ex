@@ -10,6 +10,14 @@ defmodule Tayori.Subscribers do
   everyone (`Tayori.Entry`'s `:email`): a subscriber is an address, not a
   reader of the app, so an entry for some readers is never emailed.
 
+  With the `:emails` config, the entries to email wait, and one email of
+  them goes out on a schedule: `emails: [every: {:weekly, :monday}]`, or
+  `:monthly`, or `{:days, n}`, at the `:at` time of day (UTC). It lists
+  their titles and summaries with links to the public page; a period of
+  one entry sends that entry, as it would alone. A period with none sends
+  nothing. Each entry is sent once, in the first email after it is
+  published (`emailed_at`).
+
   The emails go through the app's own Swoosh mailer (`:mailer`,
   `:email_from` and `:page_url` of `Tayori.Config`).
   """
@@ -19,9 +27,11 @@ defmodule Tayori.Subscribers do
   import Ecto.Changeset
   import Ecto.Query
 
-  alias Tayori.{Config, Entry}
+  alias Tayori.{Config, Digest, Entry}
 
   require Logger
+
+  @setting "email_digest"
 
   @type t :: %__MODULE__{
           id: Ecto.UUID.t() | nil,
@@ -142,17 +152,25 @@ defmodule Tayori.Subscribers do
   def claim_entry(%Config{} = config, entry_id) do
     entry = Tayori.Entries.get(entry_id)
 
-    if (entry && entry.email) and entry.segments == [] and
+    if (entry && entry.email) and entry.segments == [] and each?(config) and
          Config.feature?(config, :subscriptions) and claim(config, entry_id) do
-      from(s in __MODULE__,
-        where: not is_nil(s.confirmed_at),
-        order_by: s.inserted_at,
-        select: s.id
-      )
-      |> config.repo.all(prefix: config.prefix)
+      confirmed(config)
     else
       []
     end
+  end
+
+  # An email for each entry, or one for the entries of a period.
+  defp each?(%Config{emails: %{every: every}}), do: every == :each
+  defp each?(_config), do: true
+
+  defp confirmed(config) do
+    from(s in __MODULE__,
+      where: not is_nil(s.confirmed_at),
+      order_by: s.inserted_at,
+      select: s.id
+    )
+    |> config.repo.all(prefix: config.prefix)
   end
 
   defp claim(config, entry_id) do
@@ -164,6 +182,88 @@ defmodule Tayori.Subscribers do
       )
 
     count == 1
+  end
+
+  @doc false
+  # From the scheduler: sends the email of a period when its time has
+  # come (the :emails config). The run is recorded first, in the
+  # "email_digest" setting, so that the next look does not send it again.
+  # The email takes the entries not emailed yet that were published since
+  # the schedule began: those before were the time of an email each.
+  @spec tick(Config.t(), DateTime.t()) :: :ok
+  def tick(%Config{} = config, now) do
+    if Config.feature?(config, :subscriptions) and not each?(config) do
+      Digest.begin(@setting, now)
+      last = Digest.last_run(@setting, now)
+
+      if DateTime.compare(Digest.next_run(config.emails, last, now), now) != :gt do
+        Digest.record(@setting, now)
+        Tayori.Jobs.email_digest(config, Digest.began(@setting) || last)
+      end
+    end
+
+    :ok
+  end
+
+  @doc false
+  # The time of the next email of a period, or nil when each entry is
+  # sent alone.
+  @spec next_email_at(Config.t(), DateTime.t()) :: DateTime.t() | nil
+  def next_email_at(%Config{} = config, now \\ DateTime.utc_now()) do
+    if each?(config),
+      do: nil,
+      else: Digest.next_run(config.emails, Digest.last_run(@setting, now), now)
+  end
+
+  @doc false
+  # Claims the entries of a period's email (the :emails config): those
+  # published since a time and announced, to email, for everyone, not
+  # emailed yet, each once. Returns their ids, the newest first, and the
+  # confirmed subscribers to send them to; none when there is no entry.
+  @spec claim_digest(Config.t(), DateTime.t()) :: {[Ecto.UUID.t()], [Ecto.UUID.t()]}
+  def claim_digest(%Config{} = config, since) do
+    if Config.feature?(config, :subscriptions) do
+      ids =
+        from(e in Entry,
+          where:
+            e.email == true and is_nil(e.emailed_at) and not is_nil(e.announced_at) and
+              e.published_at > ^since,
+          order_by: [desc: e.published_at],
+          select: {e.id, e.segments}
+        )
+        |> config.repo.all(prefix: config.prefix)
+        |> Enum.filter(fn {_id, segments} -> segments == [] end)
+        |> Enum.map(&elem(&1, 0))
+        |> Enum.filter(&claim(config, &1))
+
+      if ids == [], do: {[], []}, else: {ids, confirmed(config)}
+    else
+      {[], []}
+    end
+  end
+
+  @doc false
+  # Emails the entries of a period to one subscriber: an entry alone as
+  # its own email, several as a list. One who unsubscribed since, or
+  # entries deleted since, are nothing to send.
+  @spec email_digest(Config.t(), [Ecto.UUID.t()], Ecto.UUID.t()) :: :ok | {:error, term()}
+  def email_digest(%Config{} = config, entry_ids, subscriber_id) do
+    with %__MODULE__{confirmed_at: %DateTime{}} = subscriber <-
+           config.repo.get(__MODULE__, subscriber_id, prefix: config.prefix),
+         [_ | _] = entries <- published(entry_ids) do
+      email =
+        case entries do
+          [entry] -> Tayori.Mail.entry(config, entry, subscriber)
+          entries -> Tayori.Mail.digest(config, entries, subscriber)
+        end
+
+      case config.mailer.deliver(email) do
+        {:ok, _} -> :ok
+        {:error, reason} -> {:error, reason}
+      end
+    else
+      _gone -> :ok
+    end
   end
 
   @doc false
@@ -181,6 +281,13 @@ defmodule Tayori.Subscribers do
     else
       _gone -> :ok
     end
+  end
+
+  # The entries still published, in the order of their ids.
+  defp published(entry_ids) do
+    entry_ids
+    |> Enum.map(&Tayori.Entries.get/1)
+    |> Enum.filter(&(&1 && Entry.status(&1) == :published))
   end
 
   defp token, do: 24 |> :crypto.strong_rand_bytes() |> Base.url_encode64(padding: false)

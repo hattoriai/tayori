@@ -7,7 +7,10 @@ defmodule Tayori.Router.API do
   Mount it behind a pipeline that accepts JSON and has the app's session,
   so that the resolver finds the app's user in the conn's assigns. For
   the `:embed` feature, mount it again, behind a pipeline with no session
-  (see `Tayori.Embed`).
+  (see `Tayori.Embed`). For the changes that CI and GitHub send
+  (`Tayori.Ingest`, `Tayori.GitHub`), mount it again behind a pipeline
+  with no session and no CSRF protection (see the
+  [Automation](automation.md) guide).
   """
 
   use PhoenixMountable, otp_app: :tayori, macro: :tayori_api
@@ -40,7 +43,10 @@ defmodule Tayori.Router.API do
     get "/tayori.js", Tayori.API, :asset, as: :script
     get "/tayori.css", Tayori.API, :asset, as: :stylesheet
     get "/tayori-sumi.css", Tayori.API, :asset, as: :sumi_stylesheet
+    post "/changes", Tayori.API.Machines, :changes, as: :changes
+    post "/hooks/github", Tayori.API.Machines, :github, as: :github_hook
     post "/:id/reactions", Tayori.API, :react, as: :reactions
+    post "/uploads/:token", Tayori.API, :upload, as: :upload
     get "/:slug", Tayori.API, :show, as: :entry
     options "/", Tayori.API, :preflight, as: :preflight
     options "/*path", Tayori.API, :preflight, as: :preflight

@@ -67,7 +67,7 @@ defmodule Tayori.Translation do
       :cta_label,
       :cta_url
     ])
-    |> update_change(:title, &String.trim/1)
+    |> update_change(:title, &trim/1)
     |> update_change(:summary, &blank_to_nil/1)
     |> update_change(:seo_title, &blank_to_nil/1)
     |> update_change(:seo_description, &blank_to_nil/1)
@@ -106,6 +106,11 @@ defmodule Tayori.Translation do
        do: [],
        else: [{field, "must be a path of the app, or an http or https address"}]
   end
+
+  defp trim(nil), do: nil
+  defp trim(value), do: String.trim(value)
+
+  defp blank_to_nil(nil), do: nil
 
   defp blank_to_nil(value) do
     case String.trim(value) do

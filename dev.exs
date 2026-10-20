@@ -530,6 +530,18 @@ defmodule TayoriDev.Router do
     )
   end
 
+  # The JSON API for machines (the Automation guide): no session, no CSRF
+  # protection; CI and GitHub prove who they are with a token or a
+  # signature.
+  pipeline :machines do
+    plug :accepts, ["json"]
+  end
+
+  scope "/api/machines" do
+    pipe_through :machines
+    tayori_api("/news", resolver: TayoriDev.Resolver, as: :tayori_machines)
+  end
+
   scope "/admin" do
     pipe_through :browser
 
@@ -681,7 +693,19 @@ Task.async(fn ->
          embed: [origins: ["http://localhost:#{port}", "http://127.0.0.1:#{port}"]],
          mailer: TayoriDev.Mailer,
          email_from: {"Atelier", "news@atelier.test"},
-         page_url: "http://localhost:#{port}/changelog"},
+         page_url: "http://localhost:#{port}/changelog",
+         inbox: [
+           sources: [
+             {Tayori.Sources.Changelog, path: Path.expand("dev/CHANGELOG.md")},
+             {Tayori.Sources.Fragments, path: Path.expand("dev/news")}
+           ],
+           kinds: %{
+             "added" => "new",
+             "feature" => "new",
+             "fixed" => "fixed",
+             "improved" => "improved"
+           }
+         ]},
         TayoriDev.Endpoint
       ] ++ if(watch?, do: [TayoriDev.CSSCopier], else: []),
       strategy: :one_for_one

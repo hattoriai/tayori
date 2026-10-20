@@ -2,7 +2,8 @@ if Code.ensure_loaded?(Oban.Worker) do
   defmodule Tayori.Worker do
     @moduledoc """
     The Oban worker of Tayori: an email to a subscriber, a webhook, or the
-    call to the app's notifier, when an entry is published. Tayori enqueues
+    call to the app's notifier, when an entry is published; a digest of the
+    inbox, or the email of a period's entries, on schedule. Tayori enqueues
     its jobs itself, with the `:oban` option of `Tayori.Config`; see
     `Tayori.Jobs`.
     """

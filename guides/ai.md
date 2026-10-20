@@ -2,8 +2,10 @@
 
 The editor writes with AI, with your own key: a draft from what shipped, a
 translation into another language, and a passage rewritten. The text
-streams into the editor as a suggestion, which you accept or reject. AI
-never publishes, and never changes an entry by itself.
+streams into the editor as a suggestion, which you accept or reject. In the
+editor, AI never publishes and never changes an entry by itself; a
+digest it writes from the inbox is a draft too, unless you set
+`digest: [publish: :publish]` (see the Automation guide).
 
 ## Set it up
 
