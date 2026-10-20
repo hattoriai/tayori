@@ -527,6 +527,11 @@ textarea.ta-input {
   font-family: var(--ta-heading-font);
 }
 
+.ta-panel > .ta-hint + .ta-actions,
+.ta-panel > .ta-field + .ta-actions {
+  margin-top: 0.75rem;
+}
+
 .ta-actions {
   display: flex;
   flex-wrap: wrap;

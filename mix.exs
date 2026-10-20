@@ -148,9 +148,23 @@ defmodule Tayori.MixProject do
         Reference: ["guides/limits.md"]
       ],
       groups_for_modules: [
-        News: [Tayori, Tayori.Entry, Tayori.Translation, Tayori.Reader, Tayori.Resolver],
-        "In the app": [Tayori.Live, Tayori.Components, Tayori.Messages],
-        Mounting: [Tayori.Router, Tayori.Notifier],
+        News: [
+          Tayori,
+          Tayori.Config,
+          Tayori.Entries,
+          Tayori.Entry,
+          Tayori.Translation,
+          Tayori.Reader,
+          Tayori.Resolver
+        ],
+        "In the app": [
+          Tayori.Live,
+          Tayori.Live.State,
+          Tayori.Components,
+          Tayori.Messages,
+          Tayori.Locales
+        ],
+        Mounting: [Tayori.Router, Tayori.API, Tayori.Page, Tayori.Notifier],
         Database: [Tayori.Migration],
         AI: [Tayori.AI],
         Testing: [Tayori.Test]

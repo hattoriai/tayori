@@ -7,8 +7,8 @@ defmodule Tayori.Test do
       import Tayori.Test
 
       test "a Pro customer sees the news for Pro", %{conn: conn} do
-        publish!("Shared boards", segments: ["plan:pro"])
         publish!("Faster search")
+        publish!("Shared boards", segments: ["plan:pro"])
 
         {:ok, view, _html} = conn |> log_in(pro_user()) |> live(~p"/projects")
 
@@ -68,7 +68,7 @@ defmodule Tayori.Test do
   The count of unread entries that the button of a LiveView shows (0 when
   it shows none).
   """
-  @spec unread(LiveViewTest.View.t() | Phoenix.LiveViewTest.Element.t()) :: non_neg_integer()
+  @spec unread(struct()) :: non_neg_integer()
   def unread(view) do
     case view
          |> html()
@@ -84,7 +84,7 @@ defmodule Tayori.Test do
   Opens the panel of a LiveView, as a click on its button does, and
   returns its entries (`entries/1`). It marks the news as seen.
   """
-  @spec open_news(LiveViewTest.View.t()) :: [map()]
+  @spec open_news(struct()) :: [map()]
   def open_news(view) do
     assert LiveViewTest.has_element?(view, ".tayori-button"),
            "Tayori.Test: the LiveView has no news button (Tayori.Components.news_button/1)"
@@ -97,7 +97,7 @@ defmodule Tayori.Test do
   The entries the panel of a LiveView shows, in order: each with its
   `:title`, `:categories`, and whether it is marked `:new`.
   """
-  @spec entries(LiveViewTest.View.t()) :: [
+  @spec entries(struct()) :: [
           %{title: String.t(), categories: [String.t()], new: boolean()}
         ]
   def entries(view) do
@@ -115,7 +115,7 @@ defmodule Tayori.Test do
   end
 
   @doc "Closes the panel of a LiveView."
-  @spec close_news(LiveViewTest.View.t()) :: :ok
+  @spec close_news(struct()) :: :ok
   def close_news(view) do
     view |> LiveViewTest.element("#tayori-panel .tayori-close") |> LiveViewTest.render_click()
     :ok

@@ -78,7 +78,7 @@ defmodule TayoriDev.Seeds do
     if Tayori.Entries.list() == [] do
       entry(
         "Exports in two clicks",
-        ["New"],
+        ["Feature"],
         [],
         -2,
         """
@@ -93,7 +93,7 @@ defmodule TayoriDev.Seeds do
 
       entry(
         "Shared boards for Pro studios",
-        ["New"],
+        ["Feature"],
         ["plan:pro"],
         -1,
         "Pro studios can share a board with a client, read only, with a link.",
@@ -111,7 +111,7 @@ defmodule TayoriDev.Seeds do
 
       entry(
         "Calendar view",
-        ["New"],
+        ["Feature"],
         [],
         nil,
         "A draft: the calendar of a project's due dates.",

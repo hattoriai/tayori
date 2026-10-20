@@ -6,7 +6,7 @@ defmodule Tayori.AI do
 
   The admin chooses the model and gives the key in its Settings: any model
   that [ReqLLM](https://hex.pm/packages/req_llm) knows, such as
-  `anthropic:claude-sonnet-5-5` or `openai:gpt-5`. The key is encrypted
+  `anthropic:claude-sonnet-5-5`, or a model of OpenAI or Google. The key is encrypted
   with the `:secret_key_base` of Tayori's config, kept in the app's
   database, and never shown again. The app needs the dependency:
 

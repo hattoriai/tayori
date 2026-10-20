@@ -41,6 +41,7 @@ defmodule Mix.Tasks.Tayori.Install do
 
   use Mix.Task
 
+  alias Mix.Tasks.Tayori.Gen.Migration
   alias Tayori.Install.Edits
 
   @js "assets/js/app.js"
@@ -126,7 +127,7 @@ defmodule Mix.Tasks.Tayori.Install do
   defp migration(false) do
     if Mix.Project.config()[:app] &&
          Application.get_env(Mix.Project.config()[:app], :ecto_repos, []) != [] do
-      case Mix.Tasks.Tayori.Gen.Migration.run([]) do
+      case Migration.run([]) do
         :created -> :changed
         :unchanged -> :unchanged
       end
