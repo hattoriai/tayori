@@ -13,8 +13,9 @@
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "skipLibCheck": true,
-    "types": ["node"],
+    "types": ["node", "phoenix"],
     "paths": {
+      "phoenix_live_view": ["../deps/phoenix_live_view"],
       "phoenix_mountable": ["../deps/phoenix_mountable"]
     }
   },
