@@ -38,6 +38,11 @@ again; an entry changed after it was published is not.
 Readers see a scheduled entry at its time whatever happens to the
 announcement: what is announced is only what it sends.
 
+The subscribers' email is the exception: with `emails: [every: :each]`,
+the default, it goes with the announcement; with a period (`{:weekly,
+day}`, `:monthly`, `{:days, n}`), the entries wait for one email of the
+period (see [Automation](automation.md#emails)).
+
 ## With Oban, or without
 
 With [Oban](https://hexdocs.pm/oban), give it to Tayori, and each email,

@@ -52,6 +52,8 @@ the hook and one style sheet.
 | In the app | a button with the count of unread entries, a panel with category filters, cards and each entry whole inside it; announcements as a popup, a toast or a banner; live over PubSub, and across tabs |
 | Any frontend | a JSON API (`tayori_api`) and `<tayori-news>`, the same button, panel and announcement; on another origin with the `:embed` feature: CORS for your sites and a signed reader token |
 | Public page | `tayori_page`: the news for everyone, with filters, a search, pinned entries and email subscriptions; a page for each entry with previous and next; Atom and JSON Feed; shared-link cards, JSON-LD and a sitemap; in the reader's language |
+| Automation | an inbox of what shipped: your `CHANGELOG.md` and fragments at each deploy, CI with a token, GitHub's merged pull requests and releases, your code; the team's changes kept out; digests, plain or by the model, when you ask, as changes come, or each week or month; drafts or published; emails each entry or once a period |
+| MCP | `Tayori.MCP`, mounted with Sake beside your app's other servers: an agent reads the news and the inbox, drafts and writes entries with screenshots, and publishes when asked |
 | AI | any model of ReqLLM with your key, kept encrypted; draft, translate, rewrite, shorter, warmer, fix the spelling; suggestions you accept or reject |
 | Words | eight languages (`Tayori.Messages`), your own in the config |
 | Database | PostgreSQL and SQLite, in a migration of your app (`Tayori.Migrations`) |
@@ -164,6 +166,8 @@ For a frontend that Phoenix does not render, mount `tayori_api` and use
 * [The public page](guides/public_page.md): the page, each entry's page, the feeds.
 * [Features](guides/features.md): categories, covers, pinned entries, and the extras you turn on: reactions, announcements, analytics, email subscriptions, webhooks, the embed.
 * [Writing with AI](guides/ai.md): the model, the key, drafts, translations, rewrites.
+* [Automation](guides/automation.md): the inbox, its sources, CI and GitHub, digests, their cadence, the emails.
+* [MCP](guides/mcp.md): the news and the inbox for an agent, with Sake; screenshots in entries.
 * [Notifications](guides/notifications.md): what a publication sends, with Oban or not.
 * [Testing](guides/testing.md): `Tayori.Test`.
 * [Theming](guides/theming.md): the properties, dark mode, the Sumi theme.
