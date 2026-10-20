@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { openLive, publish, unique } from "./support";
 
 test("the admin writes an entry in the editor, publishes it, and the public page has it", async ({ page }) => {
-  const title = unique("Exports in two clicks");
+  const title = unique("Board templates");
   await publish(page, title, "Every project has an Export button.");
 
   await page.getByRole("navigation", { name: "Admin" }).getByRole("link", { name: "Entries" }).click();
