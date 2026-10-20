@@ -18,6 +18,7 @@ defmodule Tayori.Entries do
 
   import Ecto.Query
 
+  alias Kotoba.Nodes.Attachment
   alias Tayori.{Config, Entry, Translation}
 
   @doc """
@@ -209,10 +210,10 @@ defmodule Tayori.Entries do
   of the admin makes it), with its alternative text. Only an image can be
   a cover.
   """
-  @spec put_cover(Entry.t(), Kotoba.Nodes.Attachment.t(), String.t() | nil) ::
+  @spec put_cover(Entry.t(), Attachment.t(), String.t() | nil) ::
           {:ok, Entry.t()} | {:error, Ecto.Changeset.t() | :not_an_image}
-  def put_cover(%Entry{} = entry, %Kotoba.Nodes.Attachment{} = image, alt \\ nil) do
-    if Kotoba.Nodes.Attachment.image?(image) do
+  def put_cover(%Entry{} = entry, %Attachment{} = image, alt \\ nil) do
+    if Attachment.image?(image) do
       put(entry,
         cover: %{
           "url" => image.url,

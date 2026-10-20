@@ -150,20 +150,17 @@ defmodule TayoriDev.Seeds do
     rows =
       table["children"]
       |> Enum.with_index()
-      |> Enum.map(fn {row, r} ->
-        cells =
-          row["children"]
-          |> Enum.with_index()
-          |> Enum.map(fn {cell, c} ->
-            row_bit = if r == 0 and mode == :both, do: 1, else: 0
-            column_bit = if c == 0, do: 2, else: 0
-            %{cell | "headerState" => Bitwise.bor(row_bit, column_bit)}
-          end)
-
-        %{row | "children" => cells}
-      end)
+      |> Enum.map(fn {row, r} -> %{row | "children" => header_cells(row["children"], r, mode)} end)
 
     %{table | "children" => rows}
+  end
+
+  defp header_cells(cells, r, mode) do
+    for {cell, c} <- Enum.with_index(cells) do
+      row_bit = if r == 0 and mode == :both, do: 1, else: 0
+      column_bit = if c == 0, do: 2, else: 0
+      %{cell | "headerState" => Bitwise.bor(row_bit, column_bit)}
+    end
   end
 
   defp reactions(entries) do

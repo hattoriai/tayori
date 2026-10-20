@@ -39,6 +39,7 @@ defmodule Mix.Tasks.Tayori.Install do
   if Code.ensure_loaded?(Igniter) do
     alias Igniter.Libs.Phoenix, as: Phx
     alias Igniter.Project.Application, as: App
+    alias Igniter.Project.Deps
     alias Igniter.Project.Module, as: Mod
 
     @impl PhoenixMountable.Install
@@ -64,7 +65,7 @@ defmodule Mix.Tasks.Tayori.Install do
       # An app with Oban gives it what a publication sends, in its
       # :default queue: see Tayori.Jobs.
       options =
-        if Igniter.Project.Deps.has_dep?(igniter, :oban),
+        if Deps.has_dep?(igniter, :oban),
           do: options ++ [oban: Oban],
           else: options
 

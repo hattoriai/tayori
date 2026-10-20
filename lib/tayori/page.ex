@@ -336,27 +336,31 @@ defmodule Tayori.Page do
       csrf: Plug.CSRFProtection.get_csrf_token()
     }
 
+    meta = entry_meta(conn, config, opts, entry, url, preview?)
+    render(conn, opts, locale, t.seo_title || t.title, meta, url, entry_page(assigns))
+  end
+
+  # The description, Open Graph, Twitter card and JSON-LD of an entry.
+  defp entry_meta(conn, config, opts, entry, url, preview?) do
+    t = entry.translation
     description = t.seo_description || t.summary
     image = image(entry, base_url(conn, opts)) || opts.image
 
-    meta =
-      [
-        %{name: "description", content: description},
-        %{property: "og:type", content: "article"},
-        %{property: "og:title", content: t.seo_title || t.title},
-        %{property: "og:description", content: description},
-        %{property: "og:url", content: url},
-        %{property: "og:image", content: image},
-        %{property: "og:image:alt", content: entry.cover && entry.cover["alt"]},
-        %{
-          property: "article:published_time",
-          content: entry.published_at && DateTime.to_iso8601(entry.published_at)
-        },
-        %{name: "twitter:card", content: if(image, do: "summary_large_image", else: "summary")},
-        %{json_ld: json_ld(entry, url, image, description)}
-      ] ++ languages_meta(config, url) ++ noindex(preview?)
-
-    render(conn, opts, locale, t.seo_title || t.title, meta, url, entry_page(assigns))
+    [
+      %{name: "description", content: description},
+      %{property: "og:type", content: "article"},
+      %{property: "og:title", content: t.seo_title || t.title},
+      %{property: "og:description", content: description},
+      %{property: "og:url", content: url},
+      %{property: "og:image", content: image},
+      %{property: "og:image:alt", content: entry.cover && entry.cover["alt"]},
+      %{
+        property: "article:published_time",
+        content: entry.published_at && DateTime.to_iso8601(entry.published_at)
+      },
+      %{name: "twitter:card", content: if(image, do: "summary_large_image", else: "summary")},
+      %{json_ld: json_ld(entry, url, image, description)}
+    ] ++ languages_meta(config, url) ++ noindex(preview?)
   end
 
   # ── Markup ──────────────────────────────────────────────────────

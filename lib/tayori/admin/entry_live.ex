@@ -11,6 +11,8 @@ defmodule Tayori.Admin.EntryLive do
 
   import Tayori.Admin.Components
 
+  alias Kotoba.Nodes.Attachment
+  alias Phoenix.HTML.Form
   alias Tayori.Admin.Writer
   alias Tayori.{AI, Categories, Config, Entries, Entry, Messages, Resolver, Translation}
 
@@ -108,52 +110,56 @@ defmodule Tayori.Admin.EntryLive do
            )}
         end)
 
-      case result do
-        {:ok, %Kotoba.Nodes.Attachment{} = image} ->
-          if Kotoba.Nodes.Attachment.image?(image) do
-            cover = %{
-              "url" => image.url,
-              "key" => image.key,
-              "width" => image.width,
-              "height" => image.height,
-              "alt" => (socket.assigns.cover || %{})["alt"] || ""
-            }
-
-            {:noreply, assign(socket, :cover, cover)}
-          else
-            {:noreply, put_flash(socket, :error, "A cover is an image: PNG, JPEG, GIF or WebP.")}
-          end
-
-        {:error, _reason} ->
-          {:noreply, put_flash(socket, :error, "The cover could not be stored.")}
-      end
+      {:noreply, put_cover_result(socket, result)}
     else
       {:noreply, socket}
     end
   end
 
-  # Only a published entry has readers to count.
-  defp assign_stats(%{assigns: %{entry: %Entry{id: id} = entry, config: config}} = socket)
-       when is_binary(id) do
-    if Config.feature?(config, :analytics) and published?(entry) do
-      since =
-        Enum.max([Date.add(Date.utc_today(), -29), DateTime.to_date(entry.published_at)], Date)
+  defp put_cover_result(socket, {:ok, %Attachment{} = image}) do
+    if Attachment.image?(image) do
+      cover = %{
+        "url" => image.url,
+        "key" => image.key,
+        "width" => image.width,
+        "height" => image.height,
+        "alt" => (socket.assigns.cover || %{})["alt"] || ""
+      }
 
-      days = Tayori.Views.by_day(id, since)
-
-      by_source =
-        Enum.reduce(days, %{}, fn {_date, sources}, acc ->
-          Map.merge(acc, sources, fn _k, a, b -> a + b end)
-        end)
-
-      totals = Tayori.Views.totals([id])[id] || %{views: 0, readers: 0}
-      assign(socket, :stats, %{totals: totals, days: days, by_source: by_source})
+      assign(socket, :cover, cover)
     else
-      assign(socket, :stats, nil)
+      put_flash(socket, :error, "A cover is an image: PNG, JPEG, GIF or WebP.")
     end
   end
 
+  defp put_cover_result(socket, {:error, _reason}),
+    do: put_flash(socket, :error, "The cover could not be stored.")
+
+  # Only a published entry has readers to count.
+  defp assign_stats(%{assigns: %{entry: %Entry{id: id} = entry, config: config}} = socket)
+       when is_binary(id) do
+    if Config.feature?(config, :analytics) and published?(entry),
+      do: assign(socket, :stats, stats(entry)),
+      else: assign(socket, :stats, nil)
+  end
+
   defp assign_stats(socket), do: assign(socket, :stats, nil)
+
+  # The last 30 days of an entry, or the days since it was published.
+  defp stats(%Entry{id: id} = entry) do
+    since =
+      Enum.max([Date.add(Date.utc_today(), -29), DateTime.to_date(entry.published_at)], Date)
+
+    days = Tayori.Views.by_day(id, since)
+
+    by_source =
+      Enum.reduce(days, %{}, fn {_date, sources}, acc ->
+        Map.merge(acc, sources, fn _k, a, b -> a + b end)
+      end)
+
+    totals = Tayori.Views.totals([id])[id] || %{views: 0, readers: 0}
+    %{totals: totals, days: days, by_source: by_source}
+  end
 
   defp published?(%Entry{published_at: nil}), do: false
 
@@ -432,29 +438,32 @@ defmodule Tayori.Admin.EntryLive do
       changeset
       |> Ecto.Changeset.get_assoc(:translations, :struct)
       |> Enum.with_index()
-      |> Map.new(fn {t, index} ->
-        {Integer.to_string(index),
-         %{
-           "locale" => t.locale,
-           "title" => t.title || "",
-           "summary" => t.summary || "",
-           "body" => if(t.body, do: JSON.encode!(t.body.doc), else: ""),
-           "seo_title" => t.seo_title || "",
-           "seo_description" => t.seo_description || "",
-           "cta_label" => t.cta_label || "",
-           "cta_url" => t.cta_url || ""
-         }}
-      end)
+      |> Map.new(fn {t, index} -> {Integer.to_string(index), translation_params(t)} end)
+
+    field = &(Ecto.Changeset.get_field(changeset, &1) || &2)
 
     %{
-      "slug" => Ecto.Changeset.get_field(changeset, :slug) || "",
-      "categories" => Ecto.Changeset.get_field(changeset, :categories) || [],
-      "segments" => Ecto.Changeset.get_field(changeset, :segments) || [],
-      "announce" => Ecto.Changeset.get_field(changeset, :announce) || "",
-      "announce_until" => Ecto.Changeset.get_field(changeset, :announce_until),
-      "email" => Ecto.Changeset.get_field(changeset, :email) || false,
+      "slug" => field.(:slug, ""),
+      "categories" => field.(:categories, []),
+      "segments" => field.(:segments, []),
+      "announce" => field.(:announce, ""),
+      "announce_until" => field.(:announce_until, nil),
+      "email" => field.(:email, false),
       "translations" => translations
     }
+  end
+
+  defp translation_params(t) do
+    text =
+      Map.new(
+        ~w(title summary seo_title seo_description cta_label cta_url)a,
+        &{to_string(&1), Map.get(t, &1) || ""}
+      )
+
+    Map.merge(text, %{
+      "locale" => t.locale,
+      "body" => if(t.body, do: JSON.encode!(t.body.doc), else: "")
+    })
   end
 
   # Saves the fields, then the status the admin asked for: the status
@@ -563,7 +572,7 @@ defmodule Tayori.Admin.EntryLive do
         present: present_locales(assigns.form),
         read_only: assigns.access != :all,
         features: assigns.config.features,
-        announce: Phoenix.HTML.Form.input_value(assigns.form, :announce),
+        announce: Form.input_value(assigns.form, :announce),
         cover_upload: assigns[:uploads][:tayori_cover]
       )
 
@@ -723,7 +732,7 @@ defmodule Tayori.Admin.EntryLive do
                     maxlength="500"
                     placeholder="A sentence or two for the panel, the cards and the emails"
                     class="ta-summary-input"
-                  >{Phoenix.HTML.Form.normalize_value("textarea", t[:summary].value)}</textarea>
+                  >{Form.normalize_value("textarea", t[:summary].value)}</textarea>
                   <.errors field={t[:summary]} />
                 </div>
                 <div class="ta-field ta-body-field">
@@ -1059,7 +1068,7 @@ defmodule Tayori.Admin.EntryLive do
                   name="entry[email]"
                   value="true"
                  
-                  checked={Phoenix.HTML.Form.normalize_value("checkbox", @form[:email].value)}
+                  checked={Form.normalize_value("checkbox", @form[:email].value)}
                 /> Send it to the subscribers when it is published
               </label>
               <p :if={@entry.emailed_at} class="ta-hint">
