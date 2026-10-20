@@ -192,6 +192,16 @@ defmodule Tayori.MixProject do
     end
   end
 
+  defp build_missing_bundles(_args) do
+    if not Enum.all?(@bundles, &File.exists?/1) do
+      Mix.shell().info("Building the bundles (mix tayori.build)")
+
+      if Mix.shell().cmd("mix tayori.build") != 0 do
+        Mix.raise("mix tayori.build failed")
+      end
+    end
+  end
+
   # The browser tests need their npm packages; `npm ci` runs once.
   defp e2e_deps(_args) do
     unless File.dir?("e2e/node_modules") do
@@ -205,7 +215,9 @@ defmodule Tayori.MixProject do
       # The router embeds the bundles when it compiles, and mix tayori.build
       # compiles Tayori first: in a fresh checkout, empty files let it.
       "tayori.build": [&placeholder_bundles/1, "tayori.build"],
-      dev: "run --no-halt dev.exs",
+      # The bundles are built in a mix of their own when any is missing, so
+      # that this one compiles the router with them.
+      dev: [&build_missing_bundles/1, "run --no-halt dev.exs"],
       "test.e2e": [&e2e_deps/1, "cmd --cd e2e npm test"],
       "test.js": ["cmd --cd assets npm test"],
       # The compile and the asset build run in a child VM, as in Kotoba,

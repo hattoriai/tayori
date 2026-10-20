@@ -172,11 +172,11 @@ has them.
 
 ```sh
 mix deps.get
-mix tayori.build
 mix dev
 ```
 
-`mix dev` starts a development server at http://localhost:4099: Atelier, a
+`mix dev` builds the bundles when they are missing (`mix tayori.build`),
+and starts a development server at http://localhost:4099: Atelier, a
 small app with its news, the admin at `/admin/news` (and in Sumi at
 `/sumi/news`), a LiveView page and a plain page with the news, and the
 public page at `/changelog`. `?as=` chooses who you are: `admin`,
