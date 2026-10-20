@@ -132,17 +132,13 @@ defmodule Tayori.Admin.SettingsLive do
   end
 
   def handle_event("new_token", _params, %{assigns: %{access: :all}} = socket) do
-    case Automation.new_token() do
-      {:ok, token} ->
-        {:noreply,
-         socket
-         |> put_flash(:info, "The token is made. Copy it now.")
-         |> assign(new_token: token, copied: nil)
-         |> load()}
+    {:ok, token} = Automation.new_token()
 
-      {:error, reason} ->
-        {:noreply, put_flash(socket, :error, secret_error(reason))}
-    end
+    {:noreply,
+     socket
+     |> put_flash(:info, "The token is made. Copy it now.")
+     |> assign(new_token: token, copied: nil)
+     |> load()}
   end
 
   def handle_event("revoke_token", _params, %{assigns: %{access: :all}} = socket) do
@@ -673,7 +669,7 @@ defmodule Tayori.Admin.SettingsLive do
         <pre class="ta-code"><code>{"digest: [every: {:weekly, :monday}, at: ~T[09:00:00], publish: :draft]"}</code></pre>
       </section>
 
-      <section :if={Automation.ingest?()} class="ta-subsection" aria-labelledby="automation-api">
+      <section class="ta-subsection" aria-labelledby="automation-api">
         <h3 id="automation-api" class="ta-subheading">
           From your CI
           <span class={["ta-badge", @token? && "ta-badge-on"]}>
@@ -740,7 +736,7 @@ defmodule Tayori.Admin.SettingsLive do
         <.no_api :if={!@api} />
       </section>
 
-      <section :if={Automation.github?()} class="ta-subsection" aria-labelledby="automation-github">
+      <section class="ta-subsection" aria-labelledby="automation-github">
         <h3 id="automation-github" class="ta-subheading">
           GitHub
           <span class={["ta-badge", @github_secret? && "ta-badge-on"]}>
@@ -896,8 +892,6 @@ defmodule Tayori.Admin.SettingsLive do
 
   defp secret_error(:no_secrets),
     do: "Tayori keeps it encrypted: give it a :vault or a :secret_key_base."
-
-  defp secret_error(_reason), do: "It could not be made."
 
   defp snippet(api) do
     """

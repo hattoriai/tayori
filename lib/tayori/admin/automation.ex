@@ -8,8 +8,6 @@ defmodule Tayori.Admin.Automation do
 
   # The ingest endpoint, GitHub's webhook and the digest's status come
   # with modules of their own: the admin shows them when they are there.
-  @compile {:no_warn_undefined, [Tayori.Ingest, Tayori.GitHub, {Tayori.Digest, :status, 0}]}
-
   @setting "inbox"
 
   @doc "The sources of the `:inbox` config: their names, modules and paths."
@@ -112,35 +110,26 @@ defmodule Tayori.Admin.Automation do
 
   defp time(at), do: Calendar.strftime(at, "%H:%M UTC")
 
-  @doc "The digest's status (`Tayori.Digest.status/0`), when Tayori has it."
-  def digest_status do
-    if Code.ensure_loaded?(Tayori.Digest) and function_exported?(Tayori.Digest, :status, 0),
-      do: Tayori.Digest.status()
-  end
-
-  @doc "Whether Tayori takes changes over HTTP, with a token (`Tayori.Ingest`)."
-  def ingest?, do: Code.ensure_loaded?(Tayori.Ingest)
+  @doc "The digest's status (`Tayori.Digest.status/0`)."
+  defdelegate digest_status, to: Tayori.Digest, as: :status
 
   @doc "Whether there is an ingest token."
-  def token?, do: ingest?() and Tayori.Ingest.token?()
+  defdelegate token?, to: Tayori.Ingest
 
   @doc "Makes a new ingest token, in place of the one there is."
-  def new_token, do: Tayori.Ingest.new_token()
+  defdelegate new_token, to: Tayori.Ingest
 
   @doc "Revokes the ingest token."
-  def revoke_token, do: Tayori.Ingest.revoke_token()
-
-  @doc "Whether Tayori takes GitHub's webhook (`Tayori.GitHub`)."
-  def github?, do: Code.ensure_loaded?(Tayori.GitHub)
+  defdelegate revoke_token, to: Tayori.Ingest
 
   @doc "Whether there is a GitHub secret."
-  def secret?, do: github?() and Tayori.GitHub.secret?()
+  defdelegate secret?, to: Tayori.GitHub
 
   @doc "Makes a new GitHub secret, in place of the one there is."
-  def new_secret, do: Tayori.GitHub.new_secret()
+  defdelegate new_secret, to: Tayori.GitHub
 
   @doc "Removes the GitHub secret."
-  def remove_secret, do: Tayori.GitHub.remove_secret()
+  defdelegate remove_secret, to: Tayori.GitHub
 
   @doc """
   The address of a mount of the JSON API: `:embed`, the one the embed's
