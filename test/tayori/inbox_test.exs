@@ -155,11 +155,23 @@ defmodule Tayori.InboxTest do
              every: :manual,
              at: ~T[09:00:00],
              publish: :draft,
-             minimum: 1
+             minimum: 1,
+             translate: false
            }
 
     assert %{every: {:weekly, :monday}, publish: :publish} =
              Tayori.Config.new(base ++ [digest: [every: {:weekly, :monday}, publish: :publish]]).digest
+
+    assert %{every: {:weekly, :monday}} =
+             Tayori.Config.new(base ++ [digest: [every: :weekly]]).digest
+
+    assert Tayori.Config.new(base).emails == %{every: :each, at: ~T[09:00:00]}
+
+    assert Tayori.Config.new(base ++ [emails: [every: :monthly, at: ~T[08:30:00]]]).emails ==
+             %{every: :monthly, at: ~T[08:30:00]}
+
+    assert %{every: {:weekly, :friday}} =
+             Tayori.Config.new(base ++ [emails: [every: {:weekly, :friday}]]).emails
 
     for bad <- [
           [inbox: [sources: [Enum]]],
@@ -168,7 +180,12 @@ defmodule Tayori.InboxTest do
           [digest: [every: :hourly]],
           [digest: [every: {:weekly, :someday}]],
           [digest: [publish: :now]],
-          [digest: [minimum: 0]]
+          [digest: [minimum: 0]],
+          [digest: [translate: "yes"]],
+          [emails: [every: :ingest]],
+          [emails: [every: {:days, 0}]],
+          [emails: [at: "09:00"]],
+          [emails: :weekly]
         ] do
       assert_raise ArgumentError, fn -> Tayori.Config.new(base ++ bad) end
     end
