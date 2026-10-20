@@ -98,10 +98,10 @@ defmodule Tayori.Entries do
     where(
       query,
       [e],
-      like(fragment("lower(?)", e.slug), ^like) or
+      fragment("lower(?) LIKE ? ESCAPE '\\'", e.slug, ^like) or
         e.id in subquery(
           from(t in Translation,
-            where: like(fragment("lower(?)", t.title), ^like),
+            where: fragment("lower(?) LIKE ? ESCAPE '\\'", t.title, ^like),
             select: t.entry_id
           )
         )
