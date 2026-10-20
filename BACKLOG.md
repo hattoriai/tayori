@@ -20,12 +20,6 @@ would need one, and a retention.
 The public page pages by date; it has no search, and no filter of
 categories.
 
-## A connector for <tayori-news> outside the app's origin
-
-The JSON API reads the reader from the app's session, so `<tayori-news>`
-works on the app's own origin. A frontend on another origin needs a
-signed token (`Phoenix.Token`) and CORS.
-
 ## Import from another changelog
 
 Markdown imports through `Kotoba.Content.from_markdown/2` work in a

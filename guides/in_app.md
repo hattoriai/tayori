@@ -79,6 +79,9 @@ const liveSocket = new LiveSocket("/live", Socket, {hooks: {...colocatedHooks, T
 
 Without it, the dates are the day in UTC, in the reader's language.
 
+For a page that LiveView does not render, `<tayori-news>` is the same
+button, panel and announcement (see [Any frontend](any_frontend.md)).
+
 ## Accessibility
 
 The button's name says the count ("What's new, 2 new updates"), and its

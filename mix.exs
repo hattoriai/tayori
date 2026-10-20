@@ -184,7 +184,7 @@ defmodule Tayori.MixProject do
           Tayori.Messages,
           Tayori.Locales
         ],
-        Mounting: [Tayori.Router, Tayori.API, Tayori.Page],
+        Mounting: [Tayori.Router, Tayori.API, Tayori.Embed, Tayori.Page],
         Publishing: [Tayori.Notifier, Tayori.Jobs, Tayori.Worker],
         Database: [Tayori.Migrations],
         AI: [Tayori.AI],
