@@ -11,6 +11,9 @@ defmodule Tayori.Locales do
       iex> Tayori.Locales.name("ja")
       "日本語"
 
+      iex> Tayori.Locales.name("es-ES")
+      "Español"
+
       iex> Tayori.Locales.name("tlh")
       "tlh"
 
@@ -54,7 +57,14 @@ defmodule Tayori.Locales do
     "zh-Hant" => "繁體中文"
   }
 
-  @doc "The name of a language in its own language, or its tag when Tayori does not know it."
+  @doc """
+  The name of a language in its own language: of the locale, else of its
+  language (`es-ES` is Español), else its tag when Tayori does not know it.
+  """
   @spec name(String.t()) :: String.t()
-  def name(locale), do: Map.get(@names, locale, locale)
+  def name(locale) do
+    Map.get_lazy(@names, locale, fn ->
+      Map.get(@names, locale |> String.split(["-", "_"]) |> hd(), locale)
+    end)
+  end
 end
