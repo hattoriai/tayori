@@ -188,14 +188,14 @@ defmodule Tayori.Embed do
     end
   end
 
+  def normalize_origin(_origin), do: :error
+
   defp origin(scheme, {:ok, host}, port) do
     port = if port == URI.default_port(scheme), do: "", else: ":#{port}"
     {:ok, "#{scheme}://#{host}#{port}"}
   end
 
   defp origin(_scheme, :error, _port), do: :error
-
-  def normalize_origin(_origin), do: :error
 
   # A name of letters, digits, dots and dashes, or an IPv6 address: no
   # wildcard.
