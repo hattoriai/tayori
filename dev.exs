@@ -223,7 +223,16 @@ defmodule TayoriDev.HomeLive do
 
   def render(assigns) do
     ~H"""
-    <main style="font-family: system-ui; max-width: 40rem; margin: 3rem auto; line-height: 1.5">
+    <header class="dev-header">
+      <strong>Atelier</strong>
+      <nav>
+        <a href="/plain">Plain page</a>
+        <a href="/changelog">Changelog</a>
+        <Tayori.Components.news_button tayori={@tayori} />
+      </nav>
+    </header>
+    <Tayori.Components.news_panel tayori={@tayori} />
+    <main class="dev-main">
       <h1>Atelier</h1>
       <p>A studio's projects. Its news is written at <a href="/admin/news">/admin/news</a>.</p>
       <p>
@@ -232,8 +241,47 @@ defmodule TayoriDev.HomeLive do
         <a href="/?as=pro">a Pro reader</a>, <a href="/?as=free">a Free reader</a>
         or <a href="/?as=visitor">a visitor</a>.
       </p>
+      <p>
+        The envelope above is the news of this LiveView, <code>Tayori.Components</code>. The
+        <a href="/plain">plain page</a> has <code>&lt;tayori-news&gt;</code>, over the JSON API.
+      </p>
     </main>
     """
+  end
+end
+
+defmodule TayoriDev.PlainController do
+  @moduledoc "A page with no LiveView: the news through <tayori-news> and the JSON API."
+  use Phoenix.Controller, formats: [:html]
+
+  alias Phoenix.HTML.Safe
+
+  def show(conn, _params) do
+    page(conn, """
+    <header class="dev-header">
+      <strong>Atelier</strong>
+      <nav>
+        <a href="/">LiveView page</a>
+        <a href="/changelog">Changelog</a>
+        <tayori-news src="/api/news" page="/changelog"></tayori-news>
+      </nav>
+    </header>
+    <main class="dev-main">
+      <h1>A plain page</h1>
+      <p>This page is not a LiveView: the envelope is &lt;tayori-news&gt;, which reads the JSON API.</p>
+    </main>
+    """)
+  end
+
+  # The page in the root layout of the app, as a template would be.
+  defp page(conn, body) do
+    html(
+      conn,
+      %{conn: conn, inner_content: Phoenix.HTML.raw(body)}
+      |> TayoriDev.Layouts.root()
+      |> Safe.to_iodata()
+      |> IO.iodata_to_binary()
+    )
   end
 end
 
@@ -250,7 +298,15 @@ defmodule TayoriDev.Layouts do
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="csrf-token" content={Phoenix.Controller.get_csrf_token()} />
         <title>Atelier</title>
+        <link rel="stylesheet" href="/deps/kotoba/kotoba.css" />
         <link rel="stylesheet" href="/assets/tayori.css" />
+        <link :if={@conn.query_params["theme"] == "sumi"} rel="stylesheet" href="/assets/tayori-sumi.css" />
+        <style>
+          body { margin: 0; font-family: system-ui; }
+          .dev-header { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1.5rem; border-bottom: 1px solid #ddd; }
+          .dev-header nav { display: flex; gap: 1rem; align-items: center; }
+          .dev-main { max-width: 40rem; margin: 3rem auto; line-height: 1.5; padding: 0 1rem; }
+        </style>
         <script type="importmap">
           {"imports": {
             "phoenix": "/vendor/phoenix/phoenix.mjs",
@@ -263,7 +319,7 @@ defmodule TayoriDev.Layouts do
           import {LiveSocket} from "phoenix_live_view"
           import * as Tayori from "tayori"
           const csrf = document.querySelector("meta[name='csrf-token']").content
-          const liveSocket = new LiveSocket("/live", Socket, {params: {_csrf_token: csrf}, hooks: Tayori.hooks ?? {}})
+          const liveSocket = new LiveSocket("/live", Socket, {params: {_csrf_token: csrf}, hooks: {...Tayori.hooks}})
           liveSocket.connect()
           window.liveSocket = liveSocket
         </script>
@@ -291,6 +347,20 @@ defmodule TayoriDev.Router do
     plug TayoriDev.Who
   end
 
+  # The JSON API with the app's session: the reader is the person of the
+  # session, and POST /seen is checked against the CSRF token.
+  pipeline :api_session do
+    plug :accepts, ["json"]
+    plug :fetch_session
+    plug :protect_from_forgery
+    plug TayoriDev.Who
+  end
+
+  scope "/api" do
+    pipe_through :api_session
+    tayori_api("/news", resolver: TayoriDev.Resolver, page: "/changelog")
+  end
+
   scope "/admin" do
     pipe_through :browser
     tayori_admin("/news", resolver: TayoriDev.Resolver, on_mount: [TayoriDev.Who])
@@ -310,9 +380,14 @@ defmodule TayoriDev.Router do
   scope "/" do
     pipe_through :browser
 
-    live_session :app, on_mount: [TayoriDev.Who] do
+    live_session :app,
+      on_mount: [TayoriDev.Who, {Tayori.Live, resolver: TayoriDev.Resolver, page: "/changelog"}] do
       live "/", TayoriDev.HomeLive
     end
+
+    get "/plain", TayoriDev.PlainController, :show
+    tayori_page("/changelog", title: "Atelier news", resolver: TayoriDev.Resolver)
+    tayori_page("/sumi/changelog", title: "Atelier news", theme: :sumi)
   end
 end
 
@@ -336,6 +411,7 @@ defmodule TayoriDev.Endpoint do
   plug Plug.Static, at: "/assets", from: Path.expand("priv/static", __DIR__)
   plug Plug.Static, at: "/vendor/phoenix", from: {:phoenix, "priv/static"}
   plug Plug.Static, at: "/vendor/phoenix_live_view", from: {:phoenix_live_view, "priv/static"}
+  plug Plug.Static, at: "/deps/kotoba", from: {:kotoba, "priv/static"}
   plug Kotoba.Storage.Local.Plug, at: "/uploads"
 
   plug Plug.Parsers, parsers: [:urlencoded, :multipart, :json], pass: ["*/*"], json_decoder: JSON

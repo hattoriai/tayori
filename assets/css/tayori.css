@@ -1,1 +1,397 @@
-/* Phase 3. */
+/*
+ * Tayori: the news in the app, and the public page.
+ *
+ * Every colour, space, radius and font comes from a --tayori-* custom
+ * property. Set them on .tayori-panel, .tayori-button or higher to theme
+ * the news, or load tayori-sumi.css to map them to the Sumi tokens. The
+ * defaults below have no specificity, so a value set on :root, on an
+ * ancestor or on the elements themselves wins. They are Kotoba's, Koyomi's
+ * and Jumon's own defaults, so that a page with all of them looks like one
+ * thing.
+ *
+ * The defaults are light, and dark under data-theme="dark" (the attribute
+ * of Phoenix's themes) or the class "dark". The bodies of the entries are
+ * Kotoba content (.kotoba-content): kotoba.css styles them, with the same
+ * colours.
+ */
+
+:where(:root) {
+  --tayori-font: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --tayori-heading-font: var(--tayori-font);
+  --tayori-font-size: 0.9375rem;
+  --tayori-small: 0.8125rem;
+  --tayori-line-height: 1.55;
+  --tayori-text: #1f1f23;
+  --tayori-muted: #6b6b76;
+  --tayori-background: #ffffff;
+  --tayori-surface: #f6f6f7;
+  --tayori-border: #d9d9de;
+  --tayori-accent: #2f5bd3;
+  --tayori-accent-text: #ffffff;
+  --tayori-badge: var(--tayori-accent);
+  --tayori-badge-text: var(--tayori-accent-text);
+  --tayori-radius: 12px;
+  --tayori-inner-radius: 6px;
+  --tayori-space: 0.5rem;
+  --tayori-icon-size: 20px;
+  --tayori-panel-width: 26rem;
+  --tayori-shadow: 0 24px 64px -12px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(0, 0, 0, 0.06);
+  --tayori-focus-ring: 0 0 0 2px var(--tayori-background), 0 0 0 4px var(--tayori-accent);
+  --tayori-transition: 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+:where([data-theme="dark"], .dark) {
+  --tayori-text: #ececf1;
+  --tayori-muted: #9a9aa6;
+  --tayori-background: #1b1b1f;
+  --tayori-surface: #26262c;
+  --tayori-border: #34343c;
+  --tayori-accent: #7c9cff;
+  --tayori-accent-text: #0e0e12;
+  --tayori-shadow: 0 24px 64px -12px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+/* The body of an entry is Kotoba content, in the news's colours. */
+.tayori-panel,
+.tayori-page {
+  --kotoba-font: var(--tayori-font);
+  --kotoba-heading-font: var(--tayori-heading-font);
+  --kotoba-text: var(--tayori-text);
+  --kotoba-muted: var(--tayori-muted);
+  --kotoba-background: var(--tayori-background);
+  --kotoba-surface: var(--tayori-surface);
+  --kotoba-border: var(--tayori-border);
+  --kotoba-accent: var(--tayori-accent);
+}
+
+/* The button. */
+
+tayori-news {
+  position: relative;
+  display: inline-block;
+}
+
+.tayori-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tayori-space);
+  padding: 0.375rem;
+  border: 0;
+  border-radius: var(--tayori-inner-radius);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.tayori-button:hover {
+  background: color-mix(in oklab, currentColor 8%, transparent);
+}
+
+.tayori-button:focus-visible,
+.tayori-panel :focus-visible {
+  outline: none;
+  box-shadow: var(--tayori-focus-ring);
+}
+
+.tayori-icon {
+  width: var(--tayori-icon-size);
+  height: var(--tayori-icon-size);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tayori-badge {
+  position: absolute;
+  top: -0.125rem;
+  right: -0.25rem;
+  min-width: 1.125rem;
+  height: 1.125rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: var(--tayori-badge);
+  color: var(--tayori-badge-text);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.125rem;
+  text-align: center;
+}
+
+.tayori-button-label + .tayori-badge,
+.tayori-button-label ~ .tayori-badge {
+  position: static;
+}
+
+/* The panel: fixed to the side of the page. */
+
+.tayori-panel {
+  position: fixed;
+  z-index: 1000;
+  top: 0.75rem;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  width: min(var(--tayori-panel-width), calc(100vw - 1.5rem));
+  border-radius: var(--tayori-radius);
+  background: var(--tayori-background);
+  color: var(--tayori-text);
+  box-shadow: var(--tayori-shadow);
+  font-family: var(--tayori-font);
+  font-size: var(--tayori-font-size);
+  line-height: var(--tayori-line-height);
+  text-align: start;
+  animation: tayori-in var(--tayori-transition);
+}
+
+@keyframes tayori-in {
+  from {
+    opacity: 0;
+    transform: translateX(0.75rem);
+  }
+}
+
+.tayori-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--tayori-border);
+}
+
+.tayori-panel-header h2 {
+  margin: 0;
+  font-family: var(--tayori-heading-font);
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+
+.tayori-close {
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  border-radius: var(--tayori-inner-radius);
+  background: transparent;
+  color: var(--tayori-muted);
+  font-size: 1.375rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tayori-close:hover {
+  background: var(--tayori-surface);
+  color: var(--tayori-text);
+}
+
+.tayori-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.25rem 1.25rem 1rem;
+}
+
+.tayori-panel-footer {
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid var(--tayori-border);
+  font-size: var(--tayori-small);
+}
+
+.tayori-panel-footer a {
+  color: var(--tayori-accent);
+}
+
+/* The entries. */
+
+.tayori-news {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tayori-news > li + li {
+  border-top: 1px solid var(--tayori-border);
+}
+
+.tayori-entry {
+  padding: 1.125rem 0;
+}
+
+.tayori-entry-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+  margin: 0 0 0.375rem;
+  color: var(--tayori-muted);
+  font-size: var(--tayori-small);
+}
+
+.tayori-category,
+.tayori-new {
+  padding: 0.0625rem 0.5rem;
+  border-radius: 999px;
+  background: var(--tayori-surface);
+  font-weight: 500;
+}
+
+.tayori-new {
+  background: var(--tayori-accent);
+  color: var(--tayori-accent-text);
+}
+
+.tayori-entry-title {
+  margin: 0 0 0.5rem;
+  font-family: var(--tayori-heading-font);
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.tayori-entry-title a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.tayori-entry-title a:hover {
+  text-decoration: underline;
+}
+
+.tayori-entry-body {
+  font-size: var(--tayori-font-size);
+}
+
+.tayori-entry-body img,
+.tayori-entry-body video {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--tayori-inner-radius);
+}
+
+.tayori-more {
+  display: block;
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  border: 1px solid var(--tayori-border);
+  border-radius: var(--tayori-inner-radius);
+  background: var(--tayori-background);
+  color: var(--tayori-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.tayori-more:hover {
+  background: var(--tayori-surface);
+}
+
+.tayori-empty {
+  padding: 2rem 0;
+  color: var(--tayori-muted);
+  text-align: center;
+}
+
+/* The public page. */
+
+.tayori-page-body {
+  margin: 0;
+  background: var(--tayori-background);
+  color: var(--tayori-text);
+}
+
+.tayori-page {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: 3rem 1.25rem 4rem;
+  font-family: var(--tayori-font);
+  font-size: 1rem;
+  line-height: var(--tayori-line-height);
+}
+
+.tayori-page-header {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--tayori-border);
+}
+
+.tayori-page h1 {
+  margin: 0 0 0.5rem;
+  font-family: var(--tayori-heading-font);
+  font-size: 2rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.tayori-page .tayori-entry-title {
+  font-size: 1.375rem;
+}
+
+.tayori-page h1.tayori-entry-title {
+  font-size: 2rem;
+}
+
+.tayori-page-links,
+.tayori-page-back {
+  margin: 0;
+  color: var(--tayori-muted);
+  font-size: var(--tayori-small);
+}
+
+.tayori-page-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.tayori-page a {
+  color: var(--tayori-accent);
+}
+
+.tayori-page .tayori-entry-title a {
+  color: inherit;
+}
+
+.tayori-languages {
+  display: inline-flex;
+  gap: 0.75rem;
+}
+
+.tayori-languages a[aria-current] {
+  color: var(--tayori-text);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.tayori-page-more {
+  margin-top: 1.5rem;
+  text-align: center;
+}
+
+@media (forced-colors: active) {
+  .tayori-badge,
+  .tayori-new {
+    border: 1px solid CanvasText;
+  }
+
+  .tayori-panel {
+    border: 1px solid CanvasText;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tayori-panel {
+    animation: none;
+  }
+}
+
+@media (pointer: coarse) {
+  .tayori-button,
+  .tayori-close {
+    min-width: 44px;
+    min-height: 44px;
+    justify-content: center;
+  }
+}

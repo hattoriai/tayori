@@ -12,7 +12,10 @@ defmodule Tayori.Router do
           on_mount: [{MyAppWeb.AdminAuth, :require_admin}]
       end
 
-  See the [Admin](admin.md) guide.
+  `tayori_admin/2` mounts the admin (see the [Admin](admin.md) guide),
+  `tayori_api/2` the news as JSON, for a frontend that Phoenix does not
+  render (see [Any frontend](any_frontend.md)), and `tayori_page/2` the
+  public page and its feeds (see [The public page](public_page.md)).
   """
 
   @admin_opts [:resolver, :on_mount, :csp_nonce_assign_key, :socket_path, :theme, :storage, :as]
@@ -47,7 +50,7 @@ defmodule Tayori.Router do
 
         {session_name, session_opts} = Tayori.Router.__admin__(prefix, opts)
 
-        get "/assets/:asset", Tayori.Admin.Assets, :serve, as: :tayori_admin_asset
+        get "/assets/:asset", Tayori.Assets, :serve, as: :tayori_admin_asset
 
         live_session session_name, session_opts do
           live "/", Tayori.Admin.EntriesLive, :index, as: :tayori_admin
@@ -59,14 +62,121 @@ defmodule Tayori.Router do
     end
   end
 
+  @doc """
+  Mounts the news as JSON at `path` (see `Tayori.API` for the routes).
+  Mount it behind a pipeline with the app's session.
+
+  Options:
+
+    * `:resolver` - the app's `Tayori.Resolver`, which reads the reader
+      from the conn (required).
+    * `:page` - the path of the public page, for the `url` of each entry.
+  """
+  defmacro tayori_api(path, opts \\ []) do
+    quote bind_quoted: [path: path, opts: opts] do
+      private = %{tayori_api: Tayori.Router.__api__(opts)}
+
+      scope path, alias: false, as: false do
+        get "/", Tayori.API, :index, private: private, as: :tayori_api
+        get "/unread", Tayori.API, :unread, private: private, as: :tayori_api
+        post "/seen", Tayori.API, :seen, private: private, as: :tayori_api
+        get "/:slug", Tayori.API, :show, private: private, as: :tayori_api
+      end
+    end
+  end
+
+  @doc """
+  Mounts the public page of the news at `path`, with its entries one by
+  one and its feeds (see `Tayori.Page`).
+
+  Options:
+
+    * `:title` - the title of the page and the feeds ("What's new", in
+      the reader's language).
+    * `:resolver` - the app's `Tayori.Resolver`: a reader it gives sees
+      the entries for them too. Without it, the page shows the entries for
+      everyone.
+    * `:layout` - the app's root layout, `{module, function}`, instead of
+      Tayori's own document.
+    * `:theme` - `:tayori` or `:sumi`, for Tayori's own document (`:tayori`).
+    * `:limit` - the entries of a page (20).
+    * `:url` - the address of the app (`"https://example.com"`), for the
+      links of the feeds, when the conn does not have it (behind a proxy).
+    * `:csp_nonce_assign_key` - the key of `conn.assigns` with the nonce of
+      the app's Content Security Policy, for the style sheet.
+  """
+  defmacro tayori_page(path, opts \\ []) do
+    quote bind_quoted: [path: path, opts: opts] do
+      prefix = Phoenix.Router.scoped_path(__MODULE__, path)
+      private = %{tayori_page: Tayori.Router.__page__(prefix, opts)}
+
+      scope path, alias: false, as: false do
+        get "/", Tayori.Page, :index, private: private, as: :tayori_page
+        get "/feed.xml", Tayori.Page, :atom, private: private, as: :tayori_page
+        get "/feed.json", Tayori.Page, :json, private: private, as: :tayori_page
+        get "/assets/:asset", Tayori.Assets, :serve, as: :tayori_page_asset
+        get "/:slug", Tayori.Page, :show, private: private, as: :tayori_page
+      end
+    end
+  end
+
   @doc false
-  def __admin__(prefix, opts) do
+  def __api__(opts) do
+    check_opts!(:tayori_api, opts, [:resolver, :page])
+
+    %{
+      resolver:
+        Keyword.get(opts, :resolver) ||
+          raise(
+            ArgumentError,
+            "tayori_api needs a :resolver, a module of the Tayori.Resolver behaviour"
+          ),
+      page: opts[:page]
+    }
+  end
+
+  @doc false
+  def __page__(prefix, opts) do
+    check_opts!(:tayori_page, opts, [
+      :title,
+      :resolver,
+      :layout,
+      :theme,
+      :limit,
+      :url,
+      :csp_nonce_assign_key
+    ])
+
+    theme = Keyword.get(opts, :theme, :tayori)
+
+    unless theme in @themes do
+      raise ArgumentError, ":theme of tayori_page must be one of #{inspect(@themes)}"
+    end
+
+    %{
+      prefix: prefix,
+      title: opts[:title],
+      resolver: opts[:resolver],
+      layout: opts[:layout],
+      theme: theme,
+      limit: Keyword.get(opts, :limit, 20),
+      url: opts[:url],
+      csp_nonce_assign_key: opts[:csp_nonce_assign_key]
+    }
+  end
+
+  defp check_opts!(macro, opts, known) do
     Enum.each(Keyword.keys(opts), fn key ->
-      unless key in @admin_opts do
+      unless key in known do
         raise ArgumentError,
-              "unknown option #{inspect(key)} of tayori_admin; the options are: #{inspect(@admin_opts)}"
+              "unknown option #{inspect(key)} of #{macro}; the options are: #{inspect(known)}"
       end
     end)
+  end
+
+  @doc false
+  def __admin__(prefix, opts) do
+    check_opts!(:tayori_admin, opts, @admin_opts)
 
     resolver =
       Keyword.get(opts, :resolver) ||

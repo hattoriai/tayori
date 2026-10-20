@@ -35,6 +35,29 @@ defmodule TayoriTest.Resolver do
   defp reader(_visitor), do: nil
 end
 
+defmodule TayoriTest.NewsLive do
+  @moduledoc "A page of the app, with the news."
+  use Phoenix.LiveView
+
+  def mount(_params, session, socket) do
+    {:ok, Phoenix.Component.assign(socket, :current_reader, session["reader"])}
+  end
+
+  def render(assigns) do
+    ~H"""
+    <Tayori.Components.news_button tayori={@tayori} />
+    <Tayori.Components.news_panel tayori={@tayori} />
+    """
+  end
+end
+
+defmodule TayoriTest.AssignReader do
+  @moduledoc "The app's own on_mount: the reader of the session, in the assigns."
+  def on_mount(:default, _params, session, socket) do
+    {:cont, Phoenix.Component.assign(socket, :current_reader, session["reader"])}
+  end
+end
+
 defmodule TayoriTest.Router do
   @moduledoc "The router of the test endpoint."
   use Phoenix.Router
@@ -48,9 +71,31 @@ defmodule TayoriTest.Router do
     plug :protect_from_forgery
   end
 
+  pipeline :api do
+    plug :accepts, ["json"]
+    plug :fetch_session
+    plug :protect_from_forgery
+  end
+
   scope "/admin" do
     pipe_through :browser
-    tayori_admin("/news", resolver: TayoriTest.Resolver)
+    tayori_admin "/news", resolver: TayoriTest.Resolver
+  end
+
+  scope "/api" do
+    pipe_through :api
+    tayori_api "/news", resolver: TayoriTest.Resolver, page: "/changelog"
+  end
+
+  scope "/" do
+    pipe_through :browser
+
+    live_session :app,
+      on_mount: [TayoriTest.AssignReader, {Tayori.Live, resolver: TayoriTest.Resolver, limit: 2}] do
+      live "/", TayoriTest.NewsLive
+    end
+
+    tayori_page "/changelog", title: "Test news", limit: 2
   end
 end
 

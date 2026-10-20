@@ -5,7 +5,7 @@ defmodule Tayori.Admin.Layouts do
 
   use Phoenix.Component
 
-  alias Tayori.Admin.Assets
+  alias Tayori.Assets
 
   def root(assigns) do
     ~H"""
@@ -23,13 +23,13 @@ defmodule Tayori.Admin.Layouts do
           phx-track-static
           rel="stylesheet"
           nonce={@csp_nonces[:style]}
-          href={@prefix <> "/assets/" <> Assets.name(:css)}
+          href={@prefix <> "/assets/" <> Assets.name(:admin_css)}
         />
         <script
           phx-track-static
           defer
           nonce={@csp_nonces[:script]}
-          src={@prefix <> "/assets/" <> Assets.name(:js)}
+          src={@prefix <> "/assets/" <> Assets.name(:admin_js)}
         >
         </script>
       </head>

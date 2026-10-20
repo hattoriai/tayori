@@ -1,7 +1,7 @@
 defmodule Tayori.AdminTest do
   use TayoriTest.ConnCase
 
-  alias Tayori.Admin.Assets
+  alias Tayori.Assets
 
   describe "access" do
     test "an admin opens the admin", %{conn: conn} do
@@ -170,7 +170,7 @@ defmodule Tayori.AdminTest do
 
   describe "assets" do
     test "the script and the style sheet of this build, cached for good", %{conn: conn} do
-      conn = get(conn, "/admin/news/assets/" <> Assets.name(:css))
+      conn = get(conn, "/admin/news/assets/" <> Assets.name(:admin_css))
       assert conn.status == 200
       assert get_resp_header(conn, "cache-control") == ["public, max-age=31536000, immutable"]
       assert get_resp_header(conn, "content-type") |> hd() =~ "text/css"
@@ -178,7 +178,7 @@ defmodule Tayori.AdminTest do
       conn =
         build_conn()
         |> put_req_header("accept-encoding", "gzip")
-        |> get("/admin/news/assets/" <> Assets.name(:js))
+        |> get("/admin/news/assets/" <> Assets.name(:admin_js))
 
       assert conn.status == 200
       assert get_resp_header(conn, "content-encoding") == ["gzip"]
@@ -192,7 +192,7 @@ defmodule Tayori.AdminTest do
                "https://x/admin/news/assets/admin-00000000000000000000000000000000.js"
              ])
 
-      refute Assets.stale?(["https://x/admin/news/assets/" <> Assets.name(:js), "/app.js"])
+      refute Assets.stale?(["https://x/admin/news/assets/" <> Assets.name(:admin_js), "/app.js"])
     end
   end
 end
