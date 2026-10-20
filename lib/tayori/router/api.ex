@@ -19,7 +19,11 @@ defmodule Tayori.Router.API do
       verify: {:behaviour, Tayori.Resolver},
       doc: "The app's `Tayori.Resolver`, which reads the reader from the conn."
     ],
-    page: [type: :string, doc: "The path of the public page, for the `url` of each entry."]
+    page: [
+      type: :string,
+      doc:
+        "The path or address of the public page, for the `url` of each entry. By default, the `tayori_page` of the same router."
+    ]
   )
 
   routes do

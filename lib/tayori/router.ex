@@ -14,7 +14,7 @@ defmodule Tayori.Router do
 
       scope "/api" do
         pipe_through :api_session
-        tayori_api "/news", resolver: MyAppWeb.TayoriResolver, page: "/changelog"
+        tayori_api "/news", resolver: MyAppWeb.TayoriResolver
       end
 
       scope "/" do
@@ -81,7 +81,7 @@ defmodule Tayori.Router do
     page: [
       type: :string,
       doc:
-        "The path of the public page (`tayori_page/2`), for the admin's links to the entries and their previews."
+        "The path of the public page, for the admin's links to the entries and their previews. By default, the `tayori_page` of the same router."
     ],
     storage: [
       type: :atom,

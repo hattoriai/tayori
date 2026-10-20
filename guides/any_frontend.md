@@ -21,9 +21,12 @@ end
 
 scope "/api" do
   pipe_through :api_session
-  tayori_api "/news", resolver: MyAppWeb.TayoriResolver, page: "/changelog"
+  tayori_api "/news", resolver: MyAppWeb.TayoriResolver
 end
 ```
+
+Each entry's `url` is its page on your `tayori_page` of the same router,
+whole; `page:` gives another (`page: "https://myapp.com/changelog"`).
 
 The routes:
 

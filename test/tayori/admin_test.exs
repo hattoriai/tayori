@@ -128,6 +128,16 @@ defmodule Tayori.AdminTest do
       assert Entry.status(Entries.get!(entry.id)) == :draft
     end
 
+    test "links to the entry on the public page of the same router, with no :page", %{
+      conn: conn
+    } do
+      entry = entry!("Linked", %{published_at: minutes(-1)})
+      {:ok, view, _html} = conn |> as_admin() |> live("/admin/news/#{entry.id}")
+
+      assert has_element?(view, ~s(a[href="/changelog/linked"]), "View on the page")
+      assert has_element?(view, "[data-copy*=\"/changelog/preview/\"]")
+    end
+
     test "schedules at a time with an offset", %{conn: conn} do
       entry = entry!("Later")
       {:ok, view, _html} = conn |> as_admin() |> live("/admin/news/#{entry.id}")

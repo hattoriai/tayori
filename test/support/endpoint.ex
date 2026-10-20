@@ -72,7 +72,7 @@ defmodule TayoriTest.Host do
          scope "/" do
            pipe_through :browser
 
-           tayori_api "/api/news", resolver: TayoriTest.Resolver, page: "/changelog"
+           tayori_api "/api/news", resolver: TayoriTest.Resolver
            tayori_page "/changelog", title: "Test news", limit: 2
 
            # The page with the app's readers, who react and see their entries.

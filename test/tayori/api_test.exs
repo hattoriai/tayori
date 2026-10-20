@@ -39,7 +39,7 @@ defmodule Tayori.APITest do
     assert [
              %{
                "title" => "Everyone",
-               "url" => "/changelog/everyone",
+               "url" => "http://localhost/changelog/everyone",
                "categories" => [%{"key" => "New", "name" => "New", "color" => "gray"}]
              } = e
            ] = body["entries"]
@@ -137,7 +137,8 @@ defmodule Tayori.APITest do
 
     refute Map.has_key?(second, "reactions")
     assert body["signedIn"] == false
-    assert body["page"] == "/changelog"
+    # The tayori_page of the same router, whole.
+    assert body["page"] == "http://localhost/changelog"
     assert body["features"] == []
 
     titles = fn path ->

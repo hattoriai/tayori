@@ -20,7 +20,7 @@ defmodule Tayori.API do
 
     * `GET /` - the newest entries, the pinned ones first:
       `{"entries": [...], "more": bool, "unread": n, "newAfter": time,
-      "signedIn": bool, "locale": tag, "page": path, "features": [...],
+      "signedIn": bool, "locale": tag, "page": url, "features": [...],
       "emoji": [...], "messages": {...}}`. An entry published after
       `newAfter` is new to the reader (nil for a visitor). `?before=<id>`
       gives the entries published before that one, with no pinned ones;
@@ -67,13 +67,14 @@ defmodule Tayori.API do
         "locale": "en",
         "html": "<p>…</p>",
         "text": "…",
-        "url": "/changelog/exports-in-two-clicks",
+        "url": "https://myapp.com/changelog/exports-in-two-clicks",
         "reactions": {"counts": {"🎉": 3}, "mine": ["🎉"]}
       }
 
   `cover` is nil when it has none; `html` is the body as Kotoba renders
   it (escaped, with no HTML of its own); `url` the entry on the public
-  page when the API knows its path (`:page`); `reactions` is there with
+  page, whole, when there is one (the `:page` option, else the
+  `tayori_page` of the same router); `reactions` is there with
   the `:reactions` feature. An announcement is an entry with
   `"announce"` (`"popup"`, `"toast"` or `"banner"`), `"until"` and
   `"cta"` (`{"url", "label"}` or nil). `messages` are the words around
@@ -100,12 +101,29 @@ defmodule Tayori.API do
   @impl Plug
   def init(action), do: action
 
+  # The public page's address, whole, so that its links work from a site
+  # on another origin too.
+  defp page_url(conn) do
+    case Tayori.Router.Page.path_from(conn.assigns.mount) do
+      nil -> nil
+      "http" <> _ = url -> url
+      path -> endpoint_url(conn) <> path
+    end
+  end
+
+  defp endpoint_url(conn) do
+    case conn.private[:phoenix_endpoint] do
+      nil -> ""
+      endpoint -> endpoint.url()
+    end
+  end
+
   @impl Plug
   def call(conn, :preflight), do: preflight(conn)
   def call(conn, :asset), do: asset(Embed.cors(conn))
 
   def call(conn, action) do
-    opts = conn.assigns.mount.options
+    opts = Map.put(conn.assigns.mount.options, :page, page_url(conn))
     conn = Embed.cors(conn)
 
     case reader(conn, opts) do

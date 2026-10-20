@@ -15,7 +15,7 @@ defmodule Tayori.Admin.Auth do
       assign(socket,
         resolver: options.resolver,
         storage: options.storage,
-        page_path: options[:page],
+        page_path: Tayori.Router.Page.path_from(socket.assigns.mount),
         theme: options.theme,
         user: session["user"],
         access: session["access"],

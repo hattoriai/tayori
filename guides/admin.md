@@ -131,8 +131,9 @@ Unpublishing makes it a draft again; publishing it again announces it
 again.
 
 A preview link shows the last saved version of a draft or a scheduled
-entry on the public page, to whoever has it, for a week. It needs
-`tayori_admin`'s `:page` option, the path of your public page:
+entry on the public page, to whoever has it, for a week. The admin finds
+your `tayori_page` in the same router; when the page is elsewhere, give
+its path:
 
 ```elixir
 tayori_admin "/news", resolver: MyAppWeb.TayoriResolver, page: "/changelog"

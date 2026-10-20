@@ -18,6 +18,18 @@ defmodule Tayori.Router.Page do
          "priv/static/tayori-sumi.css"
        ]}
 
+  @doc false
+  # The path of the public page, for the admin's and the API's links: the
+  # mount's `:page`, else the `tayori_page` of the same router.
+  @spec path_from(PhoenixMountable.Mount.t()) :: String.t() | nil
+  def path_from(%PhoenixMountable.Mount{} = mount) do
+    mount.options[:page] ||
+      case PhoenixMountable.Mount.sibling(mount, :tayori_page) do
+        %PhoenixMountable.Mount{path: path} -> path
+        nil -> nil
+      end
+  end
+
   options(
     title: [
       type: :string,

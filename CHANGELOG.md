@@ -46,6 +46,10 @@ and Tayori follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `:default` queue or another (`oban: [name: Oban, queue: :news]`).
   Without it, they are sent from tasks, as `Tayori.Jobs` explains.
   `mix tayori.install` sets it when the app has Oban.
+- The admin and the API find the public page (`tayori_page`) of the same
+  router by themselves; `:page` is for a page elsewhere. The API gives
+  the page's and each entry's address whole, so that they work from
+  another origin.
 - `Tayori.Test.announce!/0` announces the entries whose time has come, in
   the test's process.
 - The JSON API has what the panel has: an entry's cover, categories

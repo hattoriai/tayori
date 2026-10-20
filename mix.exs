@@ -76,7 +76,7 @@ defmodule Tayori.MixProject do
       # has it.
       {:phoenix_ecto, "~> 4.6"},
       # The mounts in the app's router, their assets and the migrations.
-      {:phoenix_mountable, "~> 0.2"},
+      {:phoenix_mountable, "~> 0.2.1"},
       {:igniter, "~> 0.6", optional: true},
       {:phoenix, if(@oldest, do: "~> 1.7.14", else: "~> 1.7.14 or ~> 1.8")},
       {:phoenix_html, "~> 4.1"},
