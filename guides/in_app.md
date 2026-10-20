@@ -25,8 +25,10 @@ end
 * `:limit` - the entries of the panel, and of each "Show more" (10).
 
 The hook handles its own events (`tayori:open`, `tayori:close`,
-`tayori:more`) and the messages of the PubSub before your LiveView sees
-them, so your LiveView needs nothing else.
+`tayori:more`, `tayori:filter`, `tayori:show`, `tayori:back`, and with the
+features on `tayori:react` and `tayori:dismiss`) and the messages of the
+PubSub before your LiveView sees them, so your LiveView needs nothing
+else.
 
 ## The components
 
@@ -41,6 +43,21 @@ the icon:
 
 ```heex
 <Tayori.Components.news_button tayori={@tayori} label class="btn btn-ghost" />
+```
+
+The panel has a chip for each of your categories, and each entry as a
+card: its cover, its categories, its date, its title and summary. A card
+opens its entry in the panel, whole, with a way back to the list; with
+the `:reactions` feature, the reader reacts there. Pinned entries come
+first.
+
+With the `:announcements` feature, put the announcement once in the
+layout too: the newest entry the admin announced, as a popup, a toast or
+a banner, until the reader dismisses it (on every device) or opens it.
+A popup or a toast waits while the panel is open.
+
+```heex
+<Tayori.Components.announcement tayori={@tayori} />
 ```
 
 Your own button can open the panel too:
@@ -83,5 +100,7 @@ Without it, the dates are the day in UTC, in the reader's language.
 
 The button's name says the count ("What's new, 2 new updates"), and its
 `aria-expanded` whether the panel is open. The panel is a non-modal
-dialog, labelled by its heading; Escape and a click outside close it. The
-New mark is text, not only colour.
+dialog, labelled by its heading; Escape and a click outside close it, and
+Escape in an entry goes back to the list. An unread entry has a dot, named
+"New" for screen readers. A popup announcement is a modal dialog, which
+Escape dismisses; a toast or a banner is a status.

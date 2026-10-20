@@ -101,19 +101,48 @@ guide), or in another for the admin alone:
 tayori_admin "/news", resolver: MyAppWeb.TayoriResolver, storage: MyApp.NewsStorage
 ```
 
+## Writing
+
+The editor has the entry's title, summary and body in each language, and
+beside them its cards:
+
+* **Publication**: publish now or at a time, save a draft, copy a preview
+  link (see below), and see the entry on the public page.
+* **Cover**: an optional picture of the entry's own, dropped or picked,
+  with its description for screen readers.
+* **Details**: the end of its address, its categories (Categories, in the
+  admin's bar, has the list), and pinning it.
+* **Audience**: the segments it is for (see [Readers](readers.md)).
+* **Announcement**, **Email** and **Last 30 days**, with those features
+  on (see [Features](features.md)).
+
+Preview shows the entry as your readers will see it: on the public page,
+in the panel, or as its announcement, in the language of the tab.
+
 ## Publishing
 
 An entry is a draft until it is published: now, or at a time picked in
 the admin's own time zone (their browser's, when your app has a time zone
 database such as `tz` or `tzdata`, else UTC). A scheduled entry is
 published at its time, by the node that reaches it first; each entry is
-announced once, to your notifier and to every open page. Unpublishing
-makes it a draft again; publishing it again announces it again.
+announced once, to every open page, and sends what it sends (emails,
+webhooks, your notifier; see [Notifications](notifications.md)).
+Unpublishing makes it a draft again; publishing it again announces it
+again.
+
+A preview link shows the last saved version of a draft or a scheduled
+entry on the public page, to whoever has it, for a week. It needs
+`tayori_admin`'s `:page` option, the path of your public page:
+
+```elixir
+tayori_admin "/news", resolver: MyAppWeb.TayoriResolver, page: "/changelog"
+```
 
 ## The theme
 
 `theme: :sumi` gives the admin the Sumi theme of Hattori AI. Both themes
-follow the system's light and dark.
+follow the system's light and dark, or the admin's choice in the bar's
+appearance menu (light, dark or the system's), kept in their browser.
 
 ## Content Security Policy
 

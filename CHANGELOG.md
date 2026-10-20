@@ -9,6 +9,37 @@ and Tayori follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Categories, managed in the admin: names in each language, a colour, an
+  order; filters in the panel and on the public page, and feeds of one
+  category.
+- A cover for each entry, optional and apart from its body; pinned
+  entries, first in the panel and on the page; a search of the titles,
+  summaries and text; previous and next on each entry's page.
+- Shared links: an SEO title and description of each entry, Open Graph,
+  Twitter cards, `hreflang`, JSON-LD, and a sitemap. Preview links of
+  drafts and scheduled entries, signed, for a week.
+- The public page's `:description`, `:eyebrow` and `:image` options.
+- Opt-in features (`features: [...]` of `Tayori.Config`), each with no
+  route, page or process when it is off:
+  - `:reactions`: emoji reactions, one for each reader and emoji;
+  - `:announcements`: an entry as a popup, a toast or a banner in the
+    app, with a button, until a date, dismissed on every device
+    (`Tayori.Components.announcement/1`);
+  - `:analytics`: the views of each entry by day and by where it was
+    read, with no address, device or cookie kept;
+  - `:subscriptions`: readers subscribe by email on the public page,
+    with double opt-in and one-click unsubscribing, through the app's
+    Swoosh mailer;
+  - `:webhooks`: signed webhooks, Slack and Discord, told of each entry,
+    their addresses and secrets kept encrypted.
+- In the app, an entry opens whole in the panel, with a way back.
+- The admin: categories; a cover, details, audience, announcement, email
+  and statistics beside the editor; a preview of the entry as the page,
+  the panel or its announcement; an entries list with tabs, counts, a
+  search and each entry's views and reactions; settings of the audiences,
+  features, email and integrations; an appearance menu (light, dark or
+  the system's).
+- Icons from Lucide, credited in `NOTICE`.
 - The `:oban` option: with the app's Oban, the emails, webhooks and
   notifier call of a publication are jobs of `Tayori.Worker`, one each,
   retried with Oban's backoff through deploys and crashes, in the
@@ -20,6 +51,9 @@ and Tayori follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- The news, the public page and the admin are redesigned in the style of
+  Hattori AI's libraries, in Tayori's theme or Sumi's, light and dark.
+- An entry's headings in its body stay below its title.
 - Tayori is mounted with [PhoenixMountable](https://hexdocs.pm/phoenix_mountable):
   the admin's script and style sheet are served under the mount as
   `js-<hash>` and `css-<hash>`, and every mount takes PhoenixMountable's

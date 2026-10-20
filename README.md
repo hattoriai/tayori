@@ -158,8 +158,9 @@ For a frontend that Phoenix does not render, mount `tayori_api` and use
 * [In the app](guides/in_app.md): the news in your LiveViews.
 * [Any frontend](guides/any_frontend.md): the JSON API and `<tayori-news>`.
 * [The public page](guides/public_page.md): the page, each entry's page, the feeds.
+* [Features](guides/features.md): categories, covers, pinned entries, and the extras you turn on: reactions, announcements, analytics, email subscriptions, webhooks, the embed.
 * [Writing with AI](guides/ai.md): the model, the key, drafts, translations, rewrites.
-* [Notifications](guides/notifications.md): emails and other messages when an entry is published.
+* [Notifications](guides/notifications.md): what a publication sends, with Oban or not.
 * [Testing](guides/testing.md): `Tayori.Test`.
 * [Theming](guides/theming.md): the properties, dark mode, the Sumi theme.
 * [Known limits](guides/limits.md).
