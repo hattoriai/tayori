@@ -38,6 +38,8 @@ The first release.
   LiveView panel as a web component: the API renders the same
   `Tayori.Components` for it (its `/ui` routes), and the element answers
   their clicks and keys as LiveView would.
+- `scheduler: false`, for an app's tests: no scheduler queries the repo
+  outside a test's sandbox, and `Tayori.Test.announce!/0` announces.
 - The public page (`tayori_page`): filters, a search, pinned entries
   first, each entry's page with the previous and next, Atom and JSON
   feeds (of all or one category), an SEO title and description of each

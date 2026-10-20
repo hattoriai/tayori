@@ -57,8 +57,11 @@ defmodule Tayori do
       {Task.Supervisor, name: Tayori.TaskSupervisor},
       # One scheduler for the cluster: the node that registers it runs it,
       # and another takes over when that node goes down.
-      {PhoenixMountable.Singleton, name: Tayori.Scheduler, child: {Tayori.Scheduler, config}}
+      config.scheduler &&
+        {PhoenixMountable.Singleton, name: Tayori.Scheduler, child: {Tayori.Scheduler, config}}
     ]
+
+    children = Enum.filter(children, & &1)
 
     Supervisor.init(children, strategy: :one_for_one)
   end
