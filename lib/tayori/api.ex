@@ -97,6 +97,7 @@ defmodule Tayori.API do
 
   alias Tayori.{Announcements, Categories, Category, Config, Embed, Entries, Entry}
   alias Tayori.{Messages, Reactions, Reader, Resolver, Views}
+  alias Tayori.Router.Page
 
   @impl Plug
   def init(action), do: action
@@ -104,7 +105,7 @@ defmodule Tayori.API do
   # The public page's address, whole, so that its links work from a site
   # on another origin too.
   defp page_url(conn) do
-    case Tayori.Router.Page.path_from(conn.assigns.mount) do
+    case Page.path_from(conn.assigns.mount) do
       nil -> nil
       "http" <> _ = url -> url
       path -> endpoint_url(conn) <> path
