@@ -7,7 +7,8 @@
 # attachments of the editor in tmp/uploads. The browser tests in e2e/ run
 # against it.
 #
-# The bundles rebuild and the page reloads on a change.
+# The bundles are built first when any is missing, then rebuild and the
+# page reloads on a change.
 #
 # Query params: `as` - who you are: `admin` (the default), `viewer` (the
 # admin read only), `pro`, `free` or `visitor` (a reader of the app).
