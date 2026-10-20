@@ -154,11 +154,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The typecheck reads the types LiveView and PhoenixMountable ship,
+      # from deps/ (assets/tsconfig.json): fetched, not compiled.
+      - uses: erlef/setup-beam@v1
+        id: beam
+        with:
+          version-file: .tool-versions
+          version-type: strict
+
       - uses: actions/setup-node@v4
         with:
           node-version-file: .tool-versions
           cache: npm
           cache-dependency-path: assets/package-lock.json
+
+      - uses: actions/cache@v4
+        with:
+          path: deps
+          key: mix-js-${{ hashFiles('mix.lock') }}
+
+      - run: mix deps.get
 
       - run: npm ci
         working-directory: assets
