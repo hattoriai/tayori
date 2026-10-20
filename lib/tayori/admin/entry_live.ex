@@ -1283,7 +1283,6 @@ defmodule Tayori.Admin.EntryLive do
   defp source_label("page"), do: "Public page"
   defp source_label("widget"), do: "Widget"
   defp source_label("email"), do: "Email"
-  defp source_label("feed"), do: "Feeds"
   defp source_label(other), do: other
 
   defp present_locales(form) do

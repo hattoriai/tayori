@@ -287,9 +287,10 @@ defmodule Tayori.Config do
     end
   end
 
-  # An emoji is a short string with no letters, digits or spaces.
+  # One character as a reader sees it (👍, ❤️, 👨‍👩‍👧, 🇵🇹), with no letters,
+  # digits or spaces.
   defp emoji?(value) do
-    is_binary(value) and value != "" and byte_size(value) <= 16 and
+    is_binary(value) and byte_size(value) <= 64 and String.length(value) == 1 and
       not String.match?(value, ~r/[\p{L}\p{N}\s]/u)
   end
 

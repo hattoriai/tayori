@@ -42,7 +42,10 @@ defmodule Tayori.ConfigTest do
     assert Config.new(@base).reactions == ["👍", "🎉", "❤️", "🚀", "👀"]
     assert Config.new(@base ++ [reactions: ["💯", "🙏🏽", "🏳️‍🌈"]]).reactions == ["💯", "🙏🏽", "🏳️‍🌈"]
 
-    for bad <- [[], ["ok"], ["👍", "a"], ["1"], [" "], [""], [:thumbs], "👍"] do
+    # A family and a flag are one emoji, longer than most in bytes.
+    assert Config.new(@base ++ [reactions: ["👨‍👩‍👧", "🇵🇹"]]).reactions == ["👨‍👩‍👧", "🇵🇹"]
+
+    for bad <- [[], ["ok"], ["👍", "a"], ["1"], [" "], [""], [:thumbs], "👍", ["👍👍"]] do
       assert_raise ArgumentError, ~r/:reactions must be a list of emoji/, fn ->
         Config.new(@base ++ [reactions: bad])
       end

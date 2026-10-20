@@ -15,16 +15,20 @@ defmodule Tayori.Reactions do
   @doc """
   Turns a reaction of the reader on or off, and returns the entry's counts
   and the reader's reactions. An emoji that is not one of the app's is
-  refused.
+  refused, and so is any reaction while the `:reactions` feature is off.
   """
   @spec toggle(Reader.t(), Ecto.UUID.t(), String.t()) ::
-          {:ok, %{counts: map(), mine: [String.t()]}} | {:error, :visitor | :unknown_emoji}
+          {:ok, %{counts: map(), mine: [String.t()]}}
+          | {:error, :visitor | :unknown_emoji | :disabled}
   def toggle(%Reader{id: nil}, _entry_id, _emoji), do: {:error, :visitor}
 
   def toggle(%Reader{id: reader}, entry_id, emoji) do
     config = Config.get()
 
     cond do
+      not Config.feature?(config, :reactions) ->
+        {:error, :disabled}
+
       emoji not in config.reactions ->
         {:error, :unknown_emoji}
 

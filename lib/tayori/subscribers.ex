@@ -59,9 +59,14 @@ defmodule Tayori.Subscribers do
       |> validate_format(:email, ~r/\A[^\s@]+@[^\s@]+\.[^\s@]+\z/, message: "is not an address")
 
     if changeset.valid? do
-      subscriber =
-        config.repo.get_by(__MODULE__, [email: email], prefix: config.prefix) ||
-          config.repo.insert!(changeset, prefix: config.prefix)
+      # Two sign-ups of an address at once make one subscriber.
+      config.repo.insert!(changeset,
+        on_conflict: :nothing,
+        conflict_target: :email,
+        prefix: config.prefix
+      )
+
+      subscriber = config.repo.get_by!(__MODULE__, [email: email], prefix: config.prefix)
 
       if subscriber.confirmed_at == nil, do: send_confirmation(config, subscriber)
 

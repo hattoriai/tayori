@@ -192,6 +192,22 @@ defmodule Tayori.LiveTest do
       assert Tayori.Reactions.totals([entry.id]) == %{}
     end
 
+    test "a reaction is only to an entry the reader has in front of them", %{
+      conn: conn,
+      entry: entry
+    } do
+      hidden = entry!("For Pro", %{published_at: minutes(-1), segments: ["plan:pro"]})
+      {:ok, view, _html} = conn |> as_reader(%{"id" => "u1"}) |> live("/")
+      open(view)
+
+      for id <- [hidden.id, Ecto.UUID.generate(), "not an id"] do
+        render_hook(view, "tayori:react", %{"id" => id, "emoji" => "🚀"})
+      end
+
+      assert Tayori.Reactions.totals([entry.id, hidden.id]) == %{}
+      assert render(view) =~ "Exports"
+    end
+
     test "the cards keep their counts after an entry is opened and closed", %{
       conn: conn,
       entry: entry
@@ -358,7 +374,7 @@ defmodule Tayori.LiveTest do
   end
 
   describe "analytics" do
-    test "the entries read in the panel are counted as panel views", %{
+    test "an entry opened in the panel is a panel view, not one in the list", %{
       conn: conn,
       config: config,
       repo: repo
@@ -378,7 +394,7 @@ defmodule Tayori.LiveTest do
 
       {:ok, view, _html} = live(build_conn(), "/")
       open(view)
-      assert Tayori.Views.totals([exports.id]) == %{exports.id => %{views: 3, readers: 1}}
+      assert Tayori.Views.totals([exports.id]) == %{exports.id => %{views: 1, readers: 1}}
     end
   end
 end

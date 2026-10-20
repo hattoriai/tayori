@@ -154,7 +154,6 @@ defmodule Tayori.Live do
       |> Map.put(:categories, Tayori.Categories.by_key())
       |> load()
 
-    track(state, state.entries)
     {:halt, put_state(socket, state)}
   end
 
@@ -217,7 +216,8 @@ defmodule Tayori.Live do
   defp handle_event("tayori:react", %{"id" => id, "emoji" => emoji}, socket) do
     state = socket.assigns.tayori
 
-    if :reactions in state.features and state.reader do
+    # Only an entry the reader has in front of them: the id is the client's.
+    if :reactions in state.features && state.reader && shown?(state, id) do
       _ = Tayori.Reactions.toggle(state.reader, id, emoji)
       {:halt, put_state(socket, reactions(state))}
     else
@@ -327,6 +327,12 @@ defmodule Tayori.Live do
     end
   end
 
+  defp shown?(state, id) do
+    Enum.any?(state.entries, &(&1.id == id)) or (state.entry != nil and state.entry.id == id)
+  end
+
+  # An entry is read in the panel when it is opened there, not when its
+  # card is in the list.
   defp track(state, entries) do
     if :analytics in state.features do
       for entry <- entries, do: Tayori.Views.track(state.reader, entry.id, "panel")

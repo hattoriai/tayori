@@ -56,7 +56,9 @@ closes it. Put `Tayori.Components.announcement/1` in your layout (see
 ## Analytics
 
 `:analytics`. The views of each entry, by day and by where it was read:
-the panel, the public page, `<tayori-news>`, an email or a feed. The admin
+opened in the panel or in `<tayori-news>`, on the public page, or from an
+email's link. A feed is not counted: a feed reader fetches it whether or
+not anyone reads it. The admin
 shows each entry's views and readers on its list, and the last 30 days of
 a published entry beside the editor.
 

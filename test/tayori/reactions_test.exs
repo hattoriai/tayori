@@ -32,8 +32,13 @@ defmodule Tayori.ReactionsTest do
       assert Reactions.for_entries(%Reader{id: "ada"}, [entry.id]) == {%{}, %{}}
     end
 
+    test "no reaction while the feature is off", %{config: config, entry: entry} do
+      put_config(config, features: [])
+      assert {:error, :disabled} = Reactions.toggle(%Reader{id: "ada"}, entry.id, "👍")
+    end
+
     test "the emoji are the app's own", %{config: config, entry: entry} do
-      put_config(config, reactions: ["💯"])
+      put_config(config, features: [:reactions], reactions: ["💯"])
 
       assert {:error, :unknown_emoji} = Reactions.toggle(%Reader{id: "ada"}, entry.id, "👍")
       assert {:ok, %{mine: ["💯"]}} = Reactions.toggle(%Reader{id: "ada"}, entry.id, "💯")

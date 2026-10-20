@@ -31,18 +31,18 @@ defmodule Tayori.ViewsTest do
     } do
       put_config(config, features: [:analytics])
 
-      :ok = Views.track(nil, entry.id, "feed")
-      :ok = Views.track(Reader.visitor(), entry.id, "feed")
+      :ok = Views.track(nil, entry.id, "page")
+      :ok = Views.track(Reader.visitor(), entry.id, "page")
       :ok = Views.track(Reader.visitor("pt-PT"), entry.id, "widget")
 
       assert Views.totals([entry.id]) == %{entry.id => %{views: 3, readers: 0}}
 
-      assert [%View{reader: "", source: "feed", count: 2}, %View{reader: "", source: "widget"}] =
+      assert [%View{reader: "", source: "page", count: 2}, %View{reader: "", source: "widget"}] =
                repo.all(View) |> Enum.sort_by(& &1.source)
     end
 
     test "a source is one of the places an entry is read", %{entry: entry} do
-      assert Views.sources() == ~w(panel page widget email feed)
+      assert Views.sources() == ~w(panel page widget email)
 
       assert_raise FunctionClauseError, fn ->
         Views.track(%Reader{id: "ada"}, entry.id, "billboard")

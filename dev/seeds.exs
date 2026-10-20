@@ -184,7 +184,7 @@ defmodule TayoriDev.Seeds do
           entry.published_at,
           DateTime.compare(entry.published_at, DateTime.utc_now()) == :lt,
           days_ago <- 0..min(29, max(0, Date.diff(today, DateTime.to_date(entry.published_at)))),
-          {source, weight} <- [{"panel", 9}, {"page", 4}, {"email", 2}, {"feed", 1}],
+          {source, weight} <- [{"panel", 9}, {"page", 4}, {"email", 2}, {"widget", 1}],
           reader <- ["", "seed:#{rem(days_ago * 7 + i, 23)}"] do
         %{
           entry_id: entry.id,

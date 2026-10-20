@@ -51,3 +51,9 @@ The element asks the count every few minutes; it has no socket. See
 The model's answer is a suggestion; it can be wrong. Tayori asks it never
 to invent a detail, and puts nothing in an entry the admin did not
 accept.
+
+## Search on SQLite
+
+The search ignores case. On SQLite it does so for ASCII letters only:
+"ação" finds "ação" and "Ação" only where the accented letters have the
+same case. PostgreSQL has no such limit.

@@ -8,14 +8,16 @@ defmodule Tayori.Views do
   device, no cookie.
 
   The sources are `"panel"` (the app's news panel), `"page"` (the public
-  page), `"widget"` (`<tayori-news>`), `"email"` and `"feed"`.
+  page), `"widget"` (`<tayori-news>`) and `"email"` (a link of an email).
+  A feed is not counted: a feed reader fetches it whether or not anyone
+  reads it.
   """
 
   import Ecto.Query
 
   alias Tayori.{Config, Reader, View}
 
-  @sources ~w(panel page widget email feed)
+  @sources ~w(panel page widget email)
 
   @doc "The places an entry can be read."
   @spec sources() :: [String.t()]
