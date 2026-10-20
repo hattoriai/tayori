@@ -58,7 +58,15 @@ What every tool keeps to:
 `Tayori.MCP` compiles only when your app depends on Sake:
 
 ```elixir
-{:sake, "~> 0.4"}
+{:sake, "~> 0.4.3"}
+```
+
+If Tayori was already compiled without it, compile Tayori again, or
+`Tayori.MCP` stays missing (Sake then says `mount needs a Sake.Server,
+got Tayori.MCP`):
+
+```sh
+mix deps.compile tayori --force
 ```
 
 ### 2. Say who may use it

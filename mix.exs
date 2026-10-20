@@ -76,8 +76,8 @@ defmodule Tayori.MixProject do
       # has it.
       {:phoenix_ecto, "~> 4.6"},
       # The mounts in the app's router, their assets and the migrations.
-      # 0.2.2 finds the callbacks of a definition not loaded yet.
-      {:phoenix_mountable, "~> 0.2.2"},
+      # 0.2.3 compiles the installer in an app without Igniter.
+      {:phoenix_mountable, "~> 0.2.3"},
       {:igniter, "~> 0.6", optional: true},
       {:phoenix, if(@oldest, do: "~> 1.7.14", else: "~> 1.7.14 or ~> 1.8")},
       {:phoenix_html, "~> 4.1"},
@@ -96,13 +96,11 @@ defmodule Tayori.MixProject do
       {:oban, "~> 2.19", optional: true},
       {:telemetry, "~> 1.0"},
       # The time zones of the development server's date picker.
-      {:tz, "~> 0.28", only: [:dev, :test]}
-    ] ++ sake()
+      {:tz, "~> 0.28", only: [:dev, :test]},
+      # The MCP server, Tayori.MCP, mounted in the app's own.
+      {:sake, "~> 0.4.3", optional: true}
+    ]
   end
-
-  # The MCP server (Tayori.MCP), for an app that serves one with Sake.
-  # Sake needs Phoenix 1.8: the oldest versions go without it.
-  defp sake, do: if(@oldest, do: [], else: [{:sake, "~> 0.4", optional: true}])
 
   defp description do
     "Product news for Phoenix: a changelog with an admin to write it, news in the app for LiveView and any frontend, a public page and feeds, and drafts written with AI."

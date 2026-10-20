@@ -325,6 +325,8 @@ defmodule Tayori.Config do
   def option(:digest, value), do: digest(value)
   def option(:emails, value), do: emails(value)
   def option(:mcp, value), do: mcp(value)
+  def option(:oban, %{name: _, queue: _} = oban), do: oban
+  def option(:oban, value), do: oban(value)
   def option(_key, value), do: value
 
   @typedoc "The `:inbox` option, checked."
