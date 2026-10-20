@@ -84,7 +84,7 @@ defmodule Tayori.JobsTest do
 
     test "an entry not to email makes no email job", %{config: config, repo: repo} do
       oban = oban_of(repo)
-      config = subscriptions(config, oban: oban)
+      subscriptions(config, oban: oban)
       subscriber!("ada@example.com")
 
       entry!("Quiet", %{published_at: minutes(-1)})
