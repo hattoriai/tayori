@@ -388,6 +388,8 @@ defmodule Tayori.AdminInboxTest do
       assert has_element?(view, "#automation", "No sources yet")
       assert html =~ "Tayori.Sources.Changelog, path: {:my_app, &quot;priv/CHANGELOG.md&quot;}"
       assert has_element?(view, "#automation .ta-facts", "When you ask")
+      # The digest says when it ran last.
+      assert has_element?(view, "#automation .ta-facts div", ~r/Last\s*Never/)
       assert has_element?(view, "#automation .ta-facts", "A draft, for you to read and publish.")
       assert has_element?(view, "#automation .ta-facts", "Nothing new for the public")
       refute has_element?(view, "#automation button", "Read now")
