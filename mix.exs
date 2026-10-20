@@ -159,7 +159,9 @@ defmodule Tayori.MixProject do
         "guides/testing.md",
         "guides/theming.md",
         "guides/limits.md",
-        "CHANGELOG.md"
+        "CHANGELOG.md",
+        "CONTRIBUTING.md",
+        "SECURITY.md"
       ],
       groups_for_extras: [
         Guides: [

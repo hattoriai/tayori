@@ -16,7 +16,7 @@ the tests is in the README, under [Development](README.md#development).
   [SECURITY.md](SECURITY.md).
 
 Search the open and closed issues first: the idea may already be planned,
-or turned down for a reason given there. [BACKLOG.md](BACKLOG.md) has the
+or turned down for a reason given there. [BACKLOG.md](https://github.com/hattoriai/tayori/blob/main/BACKLOG.md) has the
 known gaps.
 
 ## When a pull request needs an issue first
@@ -99,4 +99,4 @@ rest.
 ## License
 
 By contributing, you agree that your contribution is released under the
-MIT License of the project (see [LICENSE](LICENSE)).
+MIT License of the project (see [LICENSE](https://github.com/hattoriai/tayori/blob/main/LICENSE)).
