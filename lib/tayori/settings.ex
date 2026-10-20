@@ -1,9 +1,10 @@
 defmodule Tayori.Settings do
   @moduledoc false
   # The settings the admin keeps in the app's database (tayori_settings):
-  # a value as a map, and a secret, encrypted with a key derived from the
-  # :secret_key_base of Tayori's config. The secret is never shown again:
-  # the admin can replace it or remove it.
+  # a value as a map, and a secret, encrypted by the app's Cloak vault
+  # (the :vault of Tayori's config), else with a key derived from its
+  # :secret_key_base. The secret is never shown again: the admin can
+  # replace it or remove it.
 
   alias Plug.Crypto.{KeyGenerator, MessageEncryptor}
   alias Tayori.Config
@@ -73,18 +74,41 @@ defmodule Tayori.Settings do
     config.repo.get(Setting, key, prefix: config.prefix)
   end
 
-  @doc "Whether secrets can be kept: the config has a :secret_key_base."
+  @doc "Whether secrets can be kept: the config has a :vault or a :secret_key_base."
   def secrets? do
-    Config.get().secret_key_base != nil
+    config = Config.get()
+    config.vault != nil or config.secret_key_base != nil
+  end
+
+  # The app's Cloak vault: its own keys, ciphers and rotation. Tayori
+  # calls the functions every Cloak.Vault has, so it does not depend on
+  # Cloak.
+  defp encrypt!(%Config{vault: vault}, plain) when vault != nil do
+    case vault.encrypt(plain) do
+      {:ok, encrypted} ->
+        encrypted
+
+      {:error, error} ->
+        raise ArgumentError, "the vault did not encrypt the secret: #{inspect(error)}"
+    end
   end
 
   defp encrypt!(%Config{secret_key_base: nil}, _plain) do
-    raise ArgumentError, "Tayori keeps no secret without the :secret_key_base option"
+    raise ArgumentError, "Tayori keeps no secret without the :vault or :secret_key_base option"
   end
 
   defp encrypt!(config, plain) do
     {secret, sign} = keys(config)
     MessageEncryptor.encrypt(plain, secret, sign)
+  end
+
+  defp decrypt(%Config{vault: vault}, encrypted) when vault != nil do
+    case vault.decrypt(encrypted) do
+      {:ok, plain} -> {:ok, plain}
+      _error -> :error
+    end
+  rescue
+    _ -> :error
   end
 
   defp decrypt(%Config{secret_key_base: nil}, _encrypted), do: :error

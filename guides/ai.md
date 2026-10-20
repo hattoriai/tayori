@@ -14,20 +14,34 @@ Anthropic, OpenAI, Google and many others:
 {:req_llm, "~> 1.6"}
 ```
 
-and Tayori needs your app's `secret_key_base`, to keep the key encrypted:
+and Tayori needs a way to keep the key encrypted: your app's
+[Cloak](https://hex.pm/packages/cloak) vault, if it has one, or its
+`secret_key_base`:
 
 ```elixir
+# With the vault of cloak_ecto: your keys, your ciphers, your rotation.
+{Tayori, repo: MyApp.Repo, pubsub: MyApp.PubSub, vault: MyApp.Vault}
+
+# Without Cloak: a key derived from the secret_key_base.
 {Tayori, repo: MyApp.Repo, pubsub: MyApp.PubSub, secret_key_base: secret_key_base}
 ```
+
+The vault is any `Cloak.Vault`: Tayori calls its `encrypt/1` and
+`decrypt/1`, and does not depend on Cloak. Start the vault before Tayori
+in your supervision tree.
 
 Then, in the admin's Settings:
 
 * **Model** - the provider and the model, as ReqLLM names them:
   `anthropic:claude-sonnet-5-5`, or `openai:<model>`, `google:<model>`.
-* **API key** - your key with that provider. It is encrypted with a key
-  derived from your `secret_key_base` (AES-GCM, `Plug.Crypto`), kept in
-  `tayori_settings`, and never shown again: you can replace it or remove
-  it. A new `secret_key_base` makes it unreadable; give it again.
+* **API key** - your key with that provider. It is encrypted by your
+  vault, else with a key derived from your `secret_key_base` (AES-GCM,
+  `Plug.Crypto`), kept in `tayori_settings`, and never shown again: you
+  can replace it or remove it. With a vault, its key rotation covers it
+  (`cloak_ecto`'s `mix cloak.migrate.ecto` does not know Tayori's table:
+  save the key again in the Settings after a rotation that retires the old
+  key); without one, a new `secret_key_base` makes it unreadable, and you
+  give the key again.
 * **About your product** - what it is, who uses it, and how it speaks.
   Every request carries it.
 

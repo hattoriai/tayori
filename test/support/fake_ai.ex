@@ -18,3 +18,18 @@ defmodule TayoriTest.FakeAI do
     end
   end
 end
+
+defmodule TayoriTest.Vault do
+  @moduledoc """
+  A vault with the functions of a Cloak.Vault, for the tests: a tag, and
+  the text reversed and encoded.
+  """
+
+  def encrypt(plain), do: {:ok, "vault:" <> Base.encode64(String.reverse(plain))}
+
+  def decrypt("vault:" <> encoded) do
+    with {:ok, reversed} <- Base.decode64(encoded), do: {:ok, String.reverse(reversed)}
+  end
+
+  def decrypt(_other), do: {:error, :not_this_vault}
+end

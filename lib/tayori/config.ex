@@ -18,8 +18,12 @@ defmodule Tayori.Config do
     * `:repo` - the app's Ecto repo, where the entries are (required).
     * `:pubsub` - the app's `Phoenix.PubSub`, on which the app's pages
       hear of a new entry as it is published (required).
-    * `:secret_key_base` - the secret the AI key of the admin is encrypted
-      with. Without it, the admin cannot keep a key, and has no AI.
+    * `:vault` - the app's `Cloak.Vault` (`MyApp.Vault`), which encrypts
+      the AI key of the admin with the app's own keys, and rotates them
+      with the app's other secrets. Without it, `:secret_key_base`.
+    * `:secret_key_base` - the secret the AI key is encrypted with when
+      there is no `:vault`. With neither, the admin cannot keep a key, and
+      has no AI.
     * `:locales` - the languages the entries are written in, the first the
       one every entry has (`["en"]`).
     * `:prefix` - the schema of the tables, in PostgreSQL.
@@ -28,12 +32,13 @@ defmodule Tayori.Config do
   """
 
   @enforce_keys [:repo, :pubsub]
-  defstruct [:repo, :pubsub, :secret_key_base, :prefix, :notifier, locales: ["en"]]
+  defstruct [:repo, :pubsub, :secret_key_base, :vault, :prefix, :notifier, locales: ["en"]]
 
   @type t :: %__MODULE__{
           repo: module(),
           pubsub: atom(),
           secret_key_base: String.t() | nil,
+          vault: module() | nil,
           prefix: String.t() | nil,
           notifier: module() | nil,
           locales: [String.t(), ...]
@@ -62,6 +67,7 @@ defmodule Tayori.Config do
       repo: repo,
       pubsub: pubsub,
       secret_key_base: secret,
+      vault: opts[:vault],
       prefix: opts[:prefix],
       notifier: opts[:notifier],
       locales: locales

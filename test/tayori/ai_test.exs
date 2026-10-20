@@ -39,7 +39,26 @@ defmodule Tayori.AITest do
       refute AI.configured?()
     end
 
-    test "with no secret_key_base, there is no AI", %{config: config} do
+    test "the app's Cloak vault encrypts the key, before the secret_key_base", %{config: config} do
+      Tayori.Config.put(%{config | vault: TayoriTest.Vault})
+      configure()
+
+      stored = TayoriTest.SQLiteRepo.one!(from(s in "tayori_settings", select: s.secret))
+      assert stored == "vault:" <> Base.encode64(String.reverse("sk-test-123"))
+      assert Settings.secret("ai") == "sk-test-123"
+      assert AI.configured?()
+
+      # A vault alone is enough.
+      Tayori.Config.put(%{config | vault: TayoriTest.Vault, secret_key_base: nil})
+      assert AI.available?()
+      assert Settings.secret("ai") == "sk-test-123"
+
+      # A key the vault cannot read is no key.
+      Tayori.Config.put(config)
+      assert Settings.secret("ai") == nil
+    end
+
+    test "with no vault and no secret_key_base, there is no AI", %{config: config} do
       Tayori.Config.put(%{config | secret_key_base: nil})
       refute AI.available?()
       assert AI.stream({:assist, "fix", "Hi", "en"}) == {:error, :not_configured}

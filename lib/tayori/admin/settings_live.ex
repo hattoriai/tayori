@@ -94,8 +94,9 @@ defmodule Tayori.Admin.SettingsLive do
             dependencies.
           </p>
           <p :if={not Tayori.Settings.secrets?()}>
-            Tayori keeps the key encrypted with a secret: give it the app's
-            <code>secret_key_base</code> (the <code>:secret_key_base</code> option of Tayori).
+            Tayori keeps the key encrypted: give it your Cloak vault (the
+            <code>:vault</code> option of Tayori), or the app's <code>secret_key_base</code>
+            (the <code>:secret_key_base</code> option).
           </p>
         </div>
 

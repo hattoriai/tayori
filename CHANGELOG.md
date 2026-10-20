@@ -31,7 +31,8 @@ The first release: the changelog.
   feeds.
 - Each entry announced once when it is published, to the open pages and
   to the app's `Tayori.Notifier`.
-- Writing with AI, with the app's own key, kept encrypted: drafts,
+- Writing with AI, with the app's own key, kept encrypted by the app's
+  Cloak vault (`:vault`) or with its `secret_key_base`: drafts,
   translations, and rewrites of a passage, as Kotoba suggestions.
 - The words around the news in eight languages (`Tayori.Messages`).
 - `Tayori.Test`, `mix tayori.install`, and the themes `tayori.css` and
