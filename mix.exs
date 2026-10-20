@@ -76,9 +76,8 @@ defmodule Tayori.MixProject do
       # has it.
       {:phoenix_ecto, "~> 4.6"},
       # The mounts in the app's router, their assets and the migrations.
-      # Main, for the callbacks of a definition not loaded yet
-      # (hattoriai/phoenix_mountable#3); back to Hex when it is released.
-      {:phoenix_mountable, github: "hattoriai/phoenix_mountable", branch: "main"},
+      # 0.2.2 finds the callbacks of a definition not loaded yet.
+      {:phoenix_mountable, "~> 0.2.2"},
       {:igniter, "~> 0.6", optional: true},
       {:phoenix, if(@oldest, do: "~> 1.7.14", else: "~> 1.7.14 or ~> 1.8")},
       {:phoenix_html, "~> 4.1"},

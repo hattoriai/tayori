@@ -38,12 +38,19 @@ The first release.
   LiveView panel as a web component: the API renders the same
   `Tayori.Components` for it (its `/ui` routes), and the element answers
   their clicks and keys as LiveView would.
+- `scheduler: false`, for an app's tests: no scheduler queries the repo
+  outside a test's sandbox, and `Tayori.Test.announce!/0` announces.
 - The public page (`tayori_page`): filters, a search, pinned entries
   first, each entry's page with the previous and next, Atom and JSON
   feeds (of all or one category), an SEO title and description of each
   entry, Open Graph, Twitter cards, `hreflang`, JSON-LD and a sitemap,
   and preview links of drafts and scheduled entries, signed, for a week.
-  The admin and the API find it in the same router by themselves.
+  The admin and the API find it in the same router by themselves. In
+  the app's own layout (`:layout`), which gets the page's language,
+  description, canonical address and its tags rendered
+  (`Tayori.Page.head/1`); its title, description and eyebrow by locale;
+  for a visitor, the app's own choice of language
+  (`Tayori.Resolver.resolve_locale/1`) before the browser's.
 - Opt-in features (`features: [...]` of `Tayori.Config`), each with no
   route, page or process when it is off:
   - `:reactions`: emoji reactions, one for each reader and emoji;

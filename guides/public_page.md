@@ -53,8 +53,54 @@ in your own layout instead:
 tayori_page "/changelog", layout: {MyAppWeb.Layouts, :root}
 ```
 
-Your root layout then gets `@inner_content`, `@conn` and `@page_title`,
-and your page loads `tayori.css` and `kotoba.css` itself.
+Your layout then gets:
+
+* `@inner_content` - the page;
+* `@conn` and `@page_title`;
+* `@locale` - the page's language, for `<html lang>`;
+* `@description` and `@canonical` - the page's description and address;
+* `@feed` - the path of the Atom feed;
+* `@meta` - the tags of shared links and search engines, as maps;
+* `@head` - the same tags rendered, with the canonical link, the
+  languages, an entry's JSON-LD and the feed's link
+  (`Tayori.Page.head/1`).
+
+So a layout for the page is your own document with `@head` in it, and
+the class `tayori-page` on the element that holds the page, which gives
+it Tayori's type and colours:
+
+```heex
+<!DOCTYPE html>
+<html lang={@locale}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{@page_title} · MyApp</title>
+    {@head}
+    <link rel="stylesheet" href={~p"/assets/css/app.css"} />
+  </head>
+  <body>
+    <MyAppWeb.Layouts.header />
+    <main class="tayori-page">{@inner_content}</main>
+    <MyAppWeb.Layouts.footer />
+  </body>
+</html>
+```
+
+Your style sheet then imports `tayori.css` and `kotoba.css`, and sets
+the `--tayori-*` properties to your own tokens (see
+[Theming](theming.md)):
+
+```css
+@import "../../deps/kotoba/priv/static/kotoba.css";
+@import "../../deps/tayori/priv/static/tayori.css";
+
+.tayori-page {
+  --tayori-font: var(--font-body);
+  --tayori-title-font: var(--font-display);
+  --tayori-accent: var(--color-accent);
+}
+```
 
 ## Search and filters
 
@@ -85,6 +131,18 @@ published, and is not indexed.
 * `:description` - a line under the title, and the description of the
   page for search engines and shared links.
 * `:eyebrow` - a short line above the title: your app's name, say.
+
+  These three are a string, or a map of a locale to a string, for a page
+  in more than one language:
+
+  ```elixir
+  tayori_page "/changelog",
+    title: %{"en" => "Changelog", "pt-PT" => "Novidades"},
+    description: %{"en" => "What we ship.", "pt-PT" => "O que fazemos."}
+  ```
+
+  The page takes the reader's locale's, else one of the same language,
+  else that of the first of your locales the map has.
 * `:image` - the picture of a shared link to the page, and of an entry
   with no cover (an absolute URL).
 * `:resolver` - your `Tayori.Resolver`, for the entries of a reader.

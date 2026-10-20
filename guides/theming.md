@@ -26,10 +26,16 @@ gives it the news's colours, and `kotoba.css` styles it.
 | Property | Default | Use |
 | --- | --- | --- |
 | `--tayori-font` | the system's | the text |
-| `--tayori-heading-font` | `--tayori-font` | the titles |
-| `--tayori-font-size` | `0.9375rem` | the text of the panel |
-| `--tayori-small` | `0.8125rem` | dates, categories |
-| `--tayori-line-height` | `1.55` | |
+| `--tayori-title-font` | `--tayori-font` | the titles |
+| `--tayori-mono` | the system's | code |
+| `--tayori-font-size` | `1rem` | the text |
+| `--tayori-small` | `0.875rem` | dates, categories |
+| `--tayori-tiny` | `0.75rem` | the smallest |
+| `--tayori-line-height` | `1.6` | |
+| `--tayori-weight` | `400` | the text |
+| `--tayori-title-weight` | `600` | the titles |
+| `--tayori-title-tracking` | `-0.015em` | the titles |
+| `--tayori-title-line-height` | `1.25` | the titles |
 
 ### Colours
 
@@ -39,21 +45,29 @@ gives it the news's colours, and `kotoba.css` styles it.
 | `--tayori-muted` | `#6b6b76` | dates, hints |
 | `--tayori-background` | `#ffffff` | the panel, the page |
 | `--tayori-surface` | `#f6f6f7` | categories, hovers |
+| `--tayori-canvas` | `#f6f6f7` | behind the cards |
 | `--tayori-border` | `#d9d9de` | lines |
-| `--tayori-accent` | `#2f5bd3` | links, the New mark |
+| `--tayori-rule` | `#ececef` | the rules between entries |
+| `--tayori-accent` | `#2f5bd3` | links, buttons |
 | `--tayori-accent-text` | `#ffffff` | text on the accent |
-| `--tayori-badge`, `--tayori-badge-text` | the accent | the count on the button |
+| `--tayori-attention`, `--tayori-attention-text` | the accent | the count on the button, the New mark |
+| `--tayori-danger`, `--tayori-success` | | errors, confirmations |
+| `--tayori-gray`, `--tayori-red`, `--tayori-orange`, `--tayori-amber`, `--tayori-green`, `--tayori-teal`, `--tayori-blue`, `--tayori-purple`, `--tayori-pink` | | the colours of the categories |
 
 ### Shape and space
 
 | Property | Default | Use |
 | --- | --- | --- |
-| `--tayori-radius` | `12px` | the panel |
-| `--tayori-inner-radius` | `6px` | buttons, images |
+| `--tayori-radius` | `6px` | buttons, inputs |
+| `--tayori-radius-inner` | `4px` | small things |
+| `--tayori-radius-card` | `10px` | cards |
+| `--tayori-radius-panel` | `12px` | the panel |
+| `--tayori-radius-media` | `8px` | covers, images |
 | `--tayori-space` | `0.5rem` | |
-| `--tayori-icon-size` | `20px` | the button's icon |
-| `--tayori-panel-width` | `26rem` | |
-| `--tayori-shadow` | | the panel |
+| `--tayori-icon-size` | `18px` | the icons |
+| `--tayori-panel-width` | `27rem` | |
+| `--tayori-page-width` | `46rem` | the column of the public page |
+| `--tayori-shadow`, `--tayori-shadow-card`, `--tayori-shadow-panel` | | |
 | `--tayori-focus-ring` | | the focus |
 
 ## Dark mode
