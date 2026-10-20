@@ -114,6 +114,15 @@ defmodule Tayori.PageTest do
     end
   end
 
+  test "a visitor gets the app's language, unless ?lang= says another", %{conn: conn} do
+    conn = with_session(conn, %{"locale" => "pt_PT"})
+    assert conn |> page("/news") |> attribute("html", "lang") == ["pt-PT"]
+    assert conn |> page("/news?lang=en") |> attribute("html", "lang") == ["en"]
+
+    # The page without the resolver does not ask the app.
+    assert conn |> page("/changelog") |> attribute("html", "lang") == ["en"]
+  end
+
   test "localized/2 picks the locale, its language, then the app's first" do
     texts = %{"en" => "News", "pt-PT" => "Novidades"}
 

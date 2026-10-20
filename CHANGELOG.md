@@ -46,7 +46,9 @@ The first release.
   The admin and the API find it in the same router by themselves. In
   the app's own layout (`:layout`), which gets the page's language,
   description, canonical address and its tags rendered
-  (`Tayori.Page.head/1`); its title, description and eyebrow by locale.
+  (`Tayori.Page.head/1`); its title, description and eyebrow by locale;
+  for a visitor, the app's own choice of language
+  (`Tayori.Resolver.resolve_locale/1`) before the browser's.
 - Opt-in features (`features: [...]` of `Tayori.Config`), each with no
   route, page or process when it is off:
   - `:reactions`: emoji reactions, one for each reader and emoji;

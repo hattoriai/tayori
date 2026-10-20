@@ -67,7 +67,7 @@ defmodule Tayori.Page do
     opts = Map.put(mount.options, :mount, mount)
     conn = fetch_query_params(conn)
     reader = opts.resolver && Resolver.reader(opts.resolver, conn)
-    locale = API.locale(conn, reader)
+    locale = API.locale(conn, reader, opts.resolver)
     opts = localize(opts, locale)
     handle(action, conn, reader, reader || Reader.visitor(locale), locale, opts)
   end

@@ -65,6 +65,17 @@ defmodule Tayori.Resolver do
   JSON API and the public page) or from a LiveView socket (`Tayori.Live`,
   after the app's own `on_mount` hooks, so `socket.assigns` has the app's
   user). Nil is a visitor.
+
+  ## The language of a visitor
+
+  The public page and the JSON API speak the reader's language; for a
+  visitor, the request's `?lang=`, else the browser's. An app that keeps
+  its own choice of language (a cookie, the session, its locale plug)
+  says it with `c:resolve_locale/1`, which then comes before the
+  browser's:
+
+      @impl true
+      def resolve_locale(_conn), do: Gettext.get_locale(MyAppWeb.Gettext)
   """
 
   @type user :: term()
@@ -93,7 +104,15 @@ defmodule Tayori.Resolver do
   @doc "The reader of a request or a LiveView, or nil for a visitor."
   @callback resolve_reader(Plug.Conn.t() | Phoenix.LiveView.Socket.t()) :: Tayori.Reader.t() | nil
 
-  @optional_callbacks author: 1, segments: 0, resolve_reader: 1
+  @doc """
+  The language the app speaks to the request, or nil: for a visitor of
+  the public page and the JSON API, after `?lang=` and before the
+  browser's `Accept-Language`. A locale of the app's that the entries are
+  not written in takes one of the same language, else the first.
+  """
+  @callback resolve_locale(Plug.Conn.t()) :: String.t() | nil
+
+  @optional_callbacks author: 1, segments: 0, resolve_reader: 1, resolve_locale: 1
 
   @doc false
   def author(resolver, user) do
@@ -120,6 +139,16 @@ defmodule Tayori.Resolver do
     if exports?(resolver, :resolve_reader, 1) do
       case resolver.resolve_reader(conn_or_socket) do
         %Tayori.Reader{} = reader -> reader
+        nil -> nil
+      end
+    end
+  end
+
+  @doc false
+  def locale(resolver, conn) do
+    if exports?(resolver, :resolve_locale, 1) do
+      case resolver.resolve_locale(conn) do
+        locale when is_binary(locale) -> String.replace(locale, "_", "-")
         nil -> nil
       end
     end

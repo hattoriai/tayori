@@ -19,6 +19,10 @@ defmodule TayoriTest.Resolver do
     [{"Plan", [{"plan:free", "Free"}, {"plan:pro", "Pro"}]}, {"role:owner", "Owners"}]
   end
 
+  # The app's own choice of language, for a visitor.
+  @impl true
+  def resolve_locale(conn), do: Plug.Conn.get_session(conn, "locale")
+
   @impl true
   def resolve_reader(%Plug.Conn{} = conn), do: reader(Plug.Conn.get_session(conn, "reader"))
   def resolve_reader(%{assigns: assigns}), do: reader(assigns[:current_reader])
