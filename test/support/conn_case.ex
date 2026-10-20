@@ -11,7 +11,7 @@ defmodule TayoriTest.ConnCase do
       import Plug.Conn
       import Phoenix.ConnTest
       import Phoenix.LiveViewTest
-      import TayoriTest.DataCase, only: [entry!: 1, entry!: 2, minutes: 1]
+      import TayoriTest.DataCase, only: [entry!: 1, entry!: 2, minutes: 1, put_config: 2]
       import TayoriTest.ConnCase
 
       alias Tayori.{Entries, Entry, Reader}
