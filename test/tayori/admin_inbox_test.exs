@@ -373,7 +373,7 @@ defmodule Tayori.AdminInboxTest do
       html = render_async(view)
       assert html =~ "changelog: 1 new, 0 already in."
       assert html =~ "missing: not read"
-      assert html =~ "Exports in two clicks."
+      assert html =~ "Exports in two clicks"
 
       {:ok, _view, html} = conn |> as_admin() |> live("/admin/news/settings")
       assert html =~ "1 new, 0 already in"

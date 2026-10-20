@@ -131,7 +131,6 @@ defmodule Tayori.GitHubTest do
 
       assert %{
                title: "Exports in two clicks: zip a project with its files",
-               body: "Exports in two clicks: zip a project with its files.",
                kind: "added",
                version: "v1.4.0",
                url: "https://github.com/atelier/app/releases/tag/v1.4.0",
@@ -139,6 +138,7 @@ defmodule Tayori.GitHubTest do
                occurred_at: "2026-10-20T09:31:12Z"
              } = added
 
+      refute Map.has_key?(added, :body)
       assert "atelier/app@v1.4.0/" <> _hash = added.ref
       assert %{title: "Dates showed a day early in Auckland", kind: "fixed"} = fixed
       refute added.ref == fixed.ref
@@ -151,7 +151,8 @@ defmodule Tayori.GitHubTest do
       assert {:ok, [first, %{title: "Fewer clicks"}]} =
                GitHub.handle("release", with_body.("- Faster exports.\n- Fewer clicks."))
 
-      assert first.body == "Faster exports."
+      assert first.title == "Faster exports"
+      refute Map.has_key?(first, :body)
       refute Map.has_key?(first, :kind)
 
       assert {:ok, [%{ref: "atelier/app@v1.4.0", title: "1.4.0", body: "A quieter release."}]} =

@@ -67,24 +67,38 @@ defmodule Tayori.Source do
   end
 
   @doc false
-  # The title of a change from its Markdown: its first heading, or the
-  # first sentence of its first line, without the marks.
-  @spec title(String.t()) :: String.t()
-  def title(markdown) do
-    line =
-      markdown
-      |> String.split("\n", trim: true)
-      |> Enum.map(&String.trim/1)
-      |> Enum.find("", &(&1 != ""))
-      |> String.replace(~r/^#+\s*/, "")
-
-    sentence =
-      case Regex.run(~r/^(.+?[.!?])(\s|$)/u, line) do
-        [_, sentence, _] -> sentence
-        nil -> line
+  # The title of a change from its Markdown, and what is left of it for
+  # the body: its first heading, or the first sentence of its first
+  # paragraph, without the marks. A body that was only its title is nil.
+  @spec title_and_body(String.t()) :: {String.t(), String.t() | nil}
+  def title_and_body(markdown) do
+    [first | rest] =
+      case markdown |> String.trim() |> String.split(~r/\n\s*\n/, parts: 2) do
+        [""] -> [""]
+        blocks -> blocks
       end
 
-    sentence
+    {title, left} =
+      case Regex.run(~r/\A#+\s*(.*?)\s*(?:\n(.*))?\z/s, first) do
+        [_, heading | left] -> {heading, Enum.join(left)}
+        nil -> sentence(first |> String.split("\n") |> Enum.map_join(" ", &String.trim/1))
+      end
+
+    body =
+      [left | rest] |> Enum.map(&String.trim/1) |> Enum.reject(&(&1 == "")) |> Enum.join("\n\n")
+
+    {clean(title), if(body == "", do: nil, else: body)}
+  end
+
+  defp sentence(paragraph) do
+    case Regex.run(~r/\A(.+?[.!?])(?:\s+(.*))?\z/su, paragraph) do
+      [_, sentence | left] -> {sentence, Enum.join(left)}
+      nil -> {paragraph, ""}
+    end
+  end
+
+  defp clean(title) do
+    title
     |> String.replace(~r/\[([^\]]*)\]\([^)]*\)/u, "\\1")
     |> String.replace(~r/[*_`~]/u, "")
     |> String.trim()

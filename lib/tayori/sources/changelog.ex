@@ -16,7 +16,7 @@ defmodule Tayori.Sources.Changelog do
 
   The change's `:version` is the release's (`1.4.0`), its `:kind` the
   section's (`added`, `fixed`, ...), its `:occurred_at` the release's
-  date, its `:body` the item, and its `:title` the item's first sentence.
+  date, its `:title` the item's first sentence, and its `:body` the rest.
   An item can say more about itself in a comment that ends it,
   `<!-- audience: internal -->` or `<!-- category: api, highlight -->`.
 
@@ -134,11 +134,12 @@ defmodule Tayori.Sources.Changelog do
   # An item's own words about itself, in a comment at its end.
   defp change(%{body: body} = item) do
     {body, notes} = notes(body)
+    {title, rest} = Source.title_and_body(body)
 
     %{
       ref: "#{item.version || "unreleased"}/#{Source.hash(body)}",
-      title: Source.title(body),
-      body: body,
+      title: title,
+      body: rest,
       kind: item.kind,
       version: item.version,
       occurred_at: item.date

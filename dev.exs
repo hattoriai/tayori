@@ -693,7 +693,19 @@ Task.async(fn ->
          embed: [origins: ["http://localhost:#{port}", "http://127.0.0.1:#{port}"]],
          mailer: TayoriDev.Mailer,
          email_from: {"Atelier", "news@atelier.test"},
-         page_url: "http://localhost:#{port}/changelog"},
+         page_url: "http://localhost:#{port}/changelog",
+         inbox: [
+           sources: [
+             {Tayori.Sources.Changelog, path: Path.expand("dev/CHANGELOG.md")},
+             {Tayori.Sources.Fragments, path: Path.expand("dev/news")}
+           ],
+           kinds: %{
+             "added" => "new",
+             "feature" => "new",
+             "fixed" => "fixed",
+             "improved" => "improved"
+           }
+         ]},
         TayoriDev.Endpoint
       ] ++ if(watch?, do: [TayoriDev.CSSCopier], else: []),
       strategy: :one_for_one

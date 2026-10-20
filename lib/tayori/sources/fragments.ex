@@ -92,13 +92,19 @@ defmodule Tayori.Sources.Fragments do
     {front, body} = split(String.replace(text, "\r\n", "\n"))
     body = String.trim(body)
     {known, meta} = Map.split(front, @keys)
-    title = blank(known["title"]) || (body != "" && Source.title(body)) || nil
+
+    {title, body} =
+      cond do
+        title = blank(known["title"]) -> {title, body}
+        body != "" -> Source.title_and_body(body)
+        true -> {nil, body}
+      end
 
     if title do
       %{
         ref: name,
         title: title,
-        body: if(body == "", do: nil, else: body),
+        body: if(body in [nil, ""], do: nil, else: body),
         kind: blank(known["kind"]) || blank(known["type"]) || towncrier_kind(name),
         category: blank(known["category"]),
         audience: blank(known["audience"]),

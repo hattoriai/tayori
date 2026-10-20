@@ -4,8 +4,8 @@ defmodule TayoriDev.Seeds do
   that use every style an entry can hold, with the screenshots and files
   of dev/seed/ stored as Kotoba stores the files of an upload; categories,
   a cover on some, a pin, an announcement, reactions and views; and a
-  few changes in the inbox, as a changelog, fragments and GitHub bring
-  them.
+  change of GitHub in the inbox, beside those of dev/CHANGELOG.md and
+  dev/news.
 
   The styles Markdown has no syntax for are written as markers and turned
   into Kotoba's own document: `{red|Blocked}` is a text color, and a table
@@ -204,49 +204,14 @@ defmodule TayoriDev.Seeds do
     |> Enum.each(&config.repo.insert_all(Tayori.View, &1, on_conflict: :nothing))
   end
 
-  # What shipped since the last entry, waiting in the inbox: from the
-  # changelog, from news fragments, from GitHub; one for the team only,
-  # one to lead with.
+  # What GitHub brought since the last entry, for the team only. The
+  # changelog and the fragments come from dev/CHANGELOG.md and dev/news,
+  # the sources of the inbox, read at start.
   defp inbox do
     now = DateTime.utc_now()
     ago = fn hours -> DateTime.add(now, -hours * 3600, :second) end
 
     changes = [
-      {"changelog",
-       %{
-         ref: "2.5.0/comments-on-boards",
-         title: "Comments on whole boards",
-         body: "Leave a comment on a board, not only on a card. Everyone on the board sees it.",
-         kind: "added",
-         category: "new",
-         version: "2.5.0",
-         highlight: true,
-         occurred_at: ago.(30)
-       }},
-      {"changelog",
-       %{
-         ref: "2.5.0/slow-search",
-         title: "Search no longer stalls on long boards",
-         kind: "fixed",
-         version: "2.5.0",
-         occurred_at: ago.(29)
-       }},
-      {"fragments",
-       %{
-         ref: "csv-import.md",
-         title: "Import a CSV into a board",
-         body: "Drop a **CSV** file on a board: each row becomes a card, each column a field.",
-         kind: "feature",
-         category: "new",
-         occurred_at: ago.(20)
-       }},
-      {"fragments",
-       %{
-         ref: "dark-mode-print.md",
-         title: "Printing in dark mode prints on white",
-         kind: "improved",
-         occurred_at: ago.(12)
-       }},
       {"github",
        %{
          ref: "atelier/app#2291",

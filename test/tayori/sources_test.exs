@@ -38,10 +38,12 @@ defmodule Tayori.SourcesTest do
       assert exports.version == "1.4.0"
       assert exports.kind == "added"
       assert exports.title == "Exports in two clicks: zip a project"
-      assert exports.body =~ "Then get a link by email."
+      assert exports.body == "Then get a link by email."
       assert exports.occurred_at == ~U[2026-10-20 00:00:00Z]
 
-      assert search.body == "Search inside PDFs,\nacross every project."
+      # A body that was only its title is none.
+      assert search.title == "Search inside PDFs, across every project"
+      assert search.body == nil
       assert search.category == "improved"
       assert search.highlight
 
@@ -108,6 +110,7 @@ defmodule Tayori.SourcesTest do
     test "no frontmatter: the title from the body; towncrier's kind from the name" do
       change = Fragments.parse("## Faster search\n\nResults as you type.\n", "1234.feature.md")
       assert change.title == "Faster search"
+      assert change.body == "Results as you type."
       assert change.kind == "feature"
 
       assert Fragments.parse("Fixed the dates.", "2.bugfix.md").kind == "bugfix"
@@ -128,6 +131,7 @@ defmodule Tayori.SourcesTest do
         )
 
       assert change.title == "Add the timeline view"
+      refute Map.has_key?(change, :body)
       assert change.meta == %{"@atelier/web" => "minor"}
       refute Map.has_key?(change, :kind)
     end
