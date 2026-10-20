@@ -104,7 +104,11 @@ defmodule Tayori.InboxTest do
     test "ingest reads every source, again and again", %{config: config} do
       dir = Path.join(System.tmp_dir!(), "tayori-#{System.unique_integer([:positive])}")
       File.mkdir_p!(Path.join(dir, "news"))
-      File.write!(Path.join(dir, "news/exports.md"), "---\nkind: added\n---\nExports in two clicks.")
+
+      File.write!(
+        Path.join(dir, "news/exports.md"),
+        "---\nkind: added\n---\nExports in two clicks."
+      )
 
       File.write!(Path.join(dir, "CHANGELOG.md"), """
       ## [1.0.0] - 2026-10-01
