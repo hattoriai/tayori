@@ -689,6 +689,41 @@ tayori-news {
   margin-bottom: 0;
 }
 
+/* An entry's own headings stay below its title: a heading 1 in the body
+   is a section, not a second title. Smaller still in the panel. */
+.tayori-entry-body :is(h1, h2, h3, h4) {
+  font-family: var(--tayori-title-font);
+  letter-spacing: var(--tayori-title-tracking);
+}
+
+.tayori-entry-body h1 {
+  font-size: 1.375em;
+}
+
+.tayori-entry-body h2 {
+  font-size: 1.1875em;
+}
+
+.tayori-entry-body h3 {
+  font-size: 1.0625em;
+}
+
+.tayori-entry-body h4 {
+  font-size: 1em;
+}
+
+.tayori-panel .tayori-entry-body h1 {
+  font-size: 1.1875em;
+}
+
+.tayori-panel .tayori-entry-body h2 {
+  font-size: 1.0625em;
+}
+
+.tayori-panel .tayori-entry-body h3 {
+  font-size: 1em;
+}
+
 /* Screenshots and films in an entry: the width of the text, framed. */
 .tayori-entry-body figure.kotoba-attachment {
   margin: 1.5rem 0;
