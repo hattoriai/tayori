@@ -42,6 +42,7 @@ defmodule TayoriTest.NewsLive do
     ~H"""
     <Tayori.Components.news_button tayori={@tayori} />
     <Tayori.Components.news_panel tayori={@tayori} />
+    <Tayori.Components.announcement tayori={@tayori} />
     """
   end
 end
@@ -57,7 +58,8 @@ defmodule TayoriTest.Host do
   @moduledoc """
   The app of the tests: the admin mounted with its definition, the API and
   the public page with the macros `import Tayori.Router` gives, as an app
-  writes them, and a LiveView of the app's own with the news.
+  writes them (the page twice: for everyone, and with the app's readers),
+  and a LiveView of the app's own with the news and its announcement.
   """
 
   use PhoenixMountable.TestHost,
@@ -72,6 +74,14 @@ defmodule TayoriTest.Host do
 
            tayori_api "/api/news", resolver: TayoriTest.Resolver, page: "/changelog"
            tayori_page "/changelog", title: "Test news", limit: 2
+
+           # The page with the app's readers, who react and see their entries.
+           tayori_page "/news",
+             as: :readers_page,
+             resolver: TayoriTest.Resolver,
+             limit: 2,
+             description: "What we ship.",
+             image: "https://cdn.test/news.png"
 
            live_session :app,
              on_mount: [

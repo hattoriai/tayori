@@ -170,17 +170,22 @@ defmodule Tayori.Webhooks do
           []
         end
 
-    case Req.post(hook["url"],
-           body: json,
-           headers: headers,
-           retry: false,
-           receive_timeout: 10_000
+    case Req.post(
+           hook["url"],
+           [body: json, headers: headers, retry: false, receive_timeout: 10_000] ++
+             req_options()
          ) do
       {:ok, %{status: status}} when status in 200..299 -> :ok
       {:ok, %{status: status}} -> {:error, {:status, status}}
       {:error, reason} -> {:error, reason}
     end
   end
+
+  @doc false
+  # More options of Req.post, for Tayori's own tests only (a Req.Test
+  # plug): `config :tayori, :req_options, plug: {Req.Test, Tayori.Webhooks}`.
+  # Not an option of Tayori: an app never sets it.
+  def req_options, do: Application.get_env(:tayori, :req_options, [])
 
   # The message of each kind of place. With no entry, a test.
   defp payload(config, %{"kind" => "webhook"}, entry) do

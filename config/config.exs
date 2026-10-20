@@ -68,6 +68,9 @@ if config_env() == :test do
 
   config :tayori, TayoriTest.Mailer, adapter: Swoosh.Adapters.Test
 
+  # The webhooks go to the stubs of the tests (Req.Test), never out.
+  config :tayori, :req_options, plug: {Req.Test, Tayori.Webhooks}
+
   # A forgotten version of Tayori.Migrations fails the tests.
   config :phoenix_mountable, pending_migrations: :raise
 end

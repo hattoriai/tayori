@@ -37,7 +37,8 @@ defmodule Tayori.Query do
 
   @doc """
   The entries whose title, summary or body, in any language, has every
-  word of a search.
+  word of a search. The escape of `%` and `_` is said in the query:
+  SQLite has no escape character by default.
   """
   def search(query, blank) when blank in [nil, ""], do: query
 
@@ -55,9 +56,9 @@ defmodule Tayori.Query do
         e.id in subquery(
           from(t in Tayori.Translation,
             where:
-              like(fragment("lower(?)", t.title), ^like) or
-                like(fragment("lower(coalesce(?, ''))", t.summary), ^like) or
-                like(fragment("lower(coalesce(?, ''))", t.text), ^like),
+              fragment("lower(?) LIKE ? ESCAPE '\\'", t.title, ^like) or
+                fragment("lower(coalesce(?, '')) LIKE ? ESCAPE '\\'", t.summary, ^like) or
+                fragment("lower(coalesce(?, '')) LIKE ? ESCAPE '\\'", t.text, ^like),
             select: t.entry_id
           )
         )

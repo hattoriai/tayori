@@ -1130,8 +1130,10 @@ defmodule Tayori.Admin.EntryLive do
     messages = Messages.for_locale(assigns.language)
     categories = Map.new(assigns.categories, &{&1.key, &1})
 
+    # The state of a page with the panel closed: a popup or a toast hides
+    # while the panel is open.
     state = %Tayori.Live.State{
-      open: true,
+      open: false,
       entries: [entry],
       announcement: entry,
       categories: categories,

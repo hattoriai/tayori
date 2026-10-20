@@ -3,6 +3,10 @@
 Application.put_env(:tayori, :ai_adapter, TayoriTest.FakeAI)
 {:ok, _pid} = TayoriTest.Host.start()
 
+# As Tayori.init/1 does, which the tests do not start: the admin's session
+# needs Tayori.Router loaded (see there).
+Code.ensure_loaded!(Tayori.Router)
+
 # The entries in a database: SQLite always, PostgreSQL when it is
 # reachable (TAYORI_TEST_DATABASE_URL, or postgres:postgres@localhost).
 File.mkdir_p!(Path.expand("../tmp", __DIR__))

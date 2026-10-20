@@ -168,12 +168,14 @@ defmodule Tayori.Page do
     config = Config.get()
     {:ok, body, conn} = read_form(conn)
 
-    with true <- Config.feature?(config, :reactions),
+    with {:feature, true} <- {:feature, Config.feature?(config, :reactions)},
          %Reader{} <- signed_in,
          %Entry{} = entry <- Tayori.entry(reader, conn.path_params["slug"]) do
       _ = Tayori.Reactions.toggle(signed_in, entry.id, body["emoji"] || "")
       redirect_back(conn, body["return"], base_path(conn) <> "/" <> entry.slug)
     else
+      # A feature that is off has no route (Tayori.Config).
+      {:feature, false} -> not_found(conn)
       _ -> redirect_back(conn, body["return"], base_path(conn))
     end
   end
@@ -194,22 +196,26 @@ defmodule Tayori.Page do
   end
 
   defp handle(:confirm, conn, _signed_in, _reader, _locale, _opts) do
-    with true <- Config.feature?(Config.get(), :subscriptions),
+    with {:feature, true} <- {:feature, Config.feature?(Config.get(), :subscriptions)},
          {:ok, _subscriber} <- Tayori.Subscribers.confirm(conn.path_params["token"]) do
       redirect_to(conn, base_path(conn) <> "?notice=confirmed")
     else
+      {:feature, false} -> not_found(conn)
       _ -> redirect_to(conn, base_path(conn) <> "?notice=invalid")
     end
   end
 
   defp handle(:unsubscribe, conn, _signed_in, _reader, _locale, _opts) do
-    if Config.feature?(Config.get(), :subscriptions),
-      do: Tayori.Subscribers.unsubscribe(conn.path_params["token"])
+    if Config.feature?(Config.get(), :subscriptions) do
+      Tayori.Subscribers.unsubscribe(conn.path_params["token"])
 
-    # The one-click unsubscribe of an email client posts, and wants no page.
-    if conn.method == "POST",
-      do: conn |> send_resp(200, "") |> halt(),
-      else: redirect_to(conn, base_path(conn) <> "?notice=unsubscribed")
+      # The one-click unsubscribe of an email client posts, and wants no page.
+      if conn.method == "POST",
+        do: conn |> send_resp(200, "") |> halt(),
+        else: redirect_to(conn, base_path(conn) <> "?notice=unsubscribed")
+    else
+      not_found(conn)
+    end
   end
 
   defp handle(:sitemap, conn, _signed_in, _reader, locale, opts) do
