@@ -343,10 +343,10 @@ defmodule Tayori.AdminInboxTest do
       assert Entries.list() == []
     end
 
-    test "reads the sources now, and keeps what they gave", %{conn: conn, config: config} do
-      dir = Path.join(System.tmp_dir!(), "tayori-#{System.unique_integer([:positive])}")
+    @tag :tmp_dir
+    test "reads the sources now, and keeps what they gave",
+         %{conn: conn, config: config, tmp_dir: dir} do
       File.mkdir_p!(dir)
-      on_exit(fn -> File.rm_rf!(dir) end)
 
       File.write!(Path.join(dir, "CHANGELOG.md"), """
       # Changelog

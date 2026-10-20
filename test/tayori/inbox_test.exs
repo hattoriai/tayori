@@ -101,8 +101,8 @@ defmodule Tayori.InboxTest do
       assert Inbox.get("nope") == nil
     end
 
-    test "ingest reads every source, again and again", %{config: config} do
-      dir = Path.join(System.tmp_dir!(), "tayori-#{System.unique_integer([:positive])}")
+    @tag :tmp_dir
+    test "ingest reads every source, again and again", %{config: config, tmp_dir: dir} do
       File.mkdir_p!(Path.join(dir, "news"))
 
       File.write!(

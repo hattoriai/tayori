@@ -66,8 +66,8 @@ defmodule Tayori.SourcesTest do
       assert hd(refs) =~ ~r{^1\.4\.0/}
     end
 
-    test "a file, by its path", %{} do
-      dir = Path.join(System.tmp_dir!(), "tayori-#{System.unique_integer([:positive])}")
+    @tag :tmp_dir
+    test "a file, by its path", %{tmp_dir: dir} do
       File.mkdir_p!(dir)
       File.write!(Path.join(dir, "CHANGELOG.md"), @changelog)
 
@@ -136,8 +136,8 @@ defmodule Tayori.SourcesTest do
       refute Map.has_key?(change, :kind)
     end
 
-    test "a folder: its .md files, not its README" do
-      dir = Path.join(System.tmp_dir!(), "tayori-#{System.unique_integer([:positive])}")
+    @tag :tmp_dir
+    test "a folder: its .md files, not its README", %{tmp_dir: dir} do
       File.mkdir_p!(Path.join(dir, "old"))
       File.write!(Path.join(dir, "README.md"), "How to write a fragment.")
       File.write!(Path.join(dir, "a.md"), "Exports.")

@@ -85,8 +85,9 @@ defmodule Tayori.CadenceTest do
       assert [%{state: "drafted"}] = Inbox.list()
     end
 
-    test "ingest starts it when a source brought something new", %{config: config, repo: repo} do
-      dir = Path.join(System.tmp_dir!(), "tayori-#{System.unique_integer([:positive])}")
+    @tag :tmp_dir
+    test "ingest starts it when a source brought something new",
+         %{config: config, repo: repo, tmp_dir: dir} do
       File.mkdir_p!(dir)
       File.write!(Path.join(dir, "exports.md"), "Exports in two clicks.")
 
