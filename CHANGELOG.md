@@ -50,7 +50,7 @@ The first release.
   description, canonical address and its tags rendered
   (`Tayori.Page.head/1`); its title, description and eyebrow by locale;
   for a visitor, the app's own choice of language
-  (`Tayori.Resolver.resolve_locale/1`) before the browser's.
+  (`c:Tayori.Resolver.resolve_locale/1`) before the browser's.
 - Opt-in features (`features: [...]` of `Tayori.Config`), each with no
   route, page or process when it is off:
   - `:reactions`: emoji reactions, one for each reader and emoji;
