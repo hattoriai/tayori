@@ -103,10 +103,10 @@ defmodule Tayori.Test do
   def entries(view) do
     view
     |> html()
-    |> LazyHTML.query("#tayori-panel .tayori-entry")
+    |> LazyHTML.query("#tayori-panel .tayori-card")
     |> Enum.map(fn entry ->
       %{
-        title: entry |> LazyHTML.query(".tayori-entry-title") |> LazyHTML.text() |> String.trim(),
+        title: entry |> LazyHTML.query(".tayori-card-title") |> LazyHTML.text() |> String.trim(),
         categories:
           entry |> LazyHTML.query(".tayori-category") |> Enum.map(&String.trim(LazyHTML.text(&1))),
         new: entry |> LazyHTML.query(".tayori-new") |> Enum.any?()

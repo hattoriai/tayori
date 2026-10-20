@@ -168,7 +168,7 @@ defmodule Tayori.AITest do
         })
 
       {:ok, view, _html} = live(conn, "/admin/news/#{entry.id}")
-      view |> element("button", "+ Português (Portugal)") |> render_click()
+      view |> element(".ta-add-language", "Português (Portugal)") |> render_click()
       view |> element("button", "Write with AI") |> render_click()
 
       FakeAI.answer(["TITLE: Exportações\nSUMMARY: \n---\nCada **projeto**."])

@@ -52,6 +52,16 @@ defmodule Tayori.Router do
        css: [
          {:kotoba, "priv/static/kotoba.css"},
          {:koyomi, "priv/static/koyomi.css"},
+         "priv/static/tayori.css",
+         "priv/static/tayori-admin.css"
+       ],
+       sumi: [
+         {:kotoba, "priv/static/kotoba.css"},
+         {:kotoba, "priv/static/kotoba-sumi.css"},
+         {:koyomi, "priv/static/koyomi.css"},
+         {:koyomi, "priv/static/koyomi-sumi.css"},
+         "priv/static/tayori.css",
+         "priv/static/tayori-sumi.css",
          "priv/static/tayori-admin.css"
        ],
        js: "priv/static/tayori-admin.js"}
@@ -68,6 +78,11 @@ defmodule Tayori.Router do
       default: :tayori,
       doc: "The admin's theme: Tayori's own, or Sumi's."
     ],
+    page: [
+      type: :string,
+      doc:
+        "The path of the public page (`tayori_page/2`), for the admin's links to the entries and their previews."
+    ],
     storage: [
       type: :atom,
       doc:
@@ -78,6 +93,7 @@ defmodule Tayori.Router do
   routes do
     live "/", Tayori.Admin.EntriesLive, :index
     live "/new", Tayori.Admin.EntryLive, :new
+    live "/categories", Tayori.Admin.CategoriesLive, :index
     live "/settings", Tayori.Admin.SettingsLive, :index
     live "/:id", Tayori.Admin.EntryLive, :edit
   end

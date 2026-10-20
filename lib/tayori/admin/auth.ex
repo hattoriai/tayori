@@ -15,6 +15,8 @@ defmodule Tayori.Admin.Auth do
       assign(socket,
         resolver: options.resolver,
         storage: options.storage,
+        page_path: options[:page],
+        theme: options.theme,
         user: session["user"],
         access: session["access"],
         time_zone: time_zone(socket),

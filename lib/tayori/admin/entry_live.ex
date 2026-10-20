@@ -1,8 +1,10 @@
 defmodule Tayori.Admin.EntryLive do
   @moduledoc false
   # Writes an entry: its title, summary and body in each language (the
-  # body in Kotoba's editor, with attachments), its categories and
-  # segments, and when it is published.
+  # body in Kotoba's editor, with attachments), its cover, categories and
+  # audience, and when it is published; with the features on, how it is
+  # announced in the app and whether it is emailed. The preview shows the
+  # entry as it is in the form, as readers will see it.
 
   use Phoenix.LiveView, layout: false
   use PhoenixMountable.Path, mountable: Tayori.Router
@@ -10,9 +12,10 @@ defmodule Tayori.Admin.EntryLive do
   import Tayori.Admin.Components
 
   alias Tayori.Admin.Writer
-  alias Tayori.{AI, Entries, Entry, Resolver, Translation}
+  alias Tayori.{AI, Categories, Config, Entries, Entry, Messages, Resolver, Translation}
 
   @accept ~w(.png .jpg .jpeg .gif .webp .pdf .mp4 .webm)
+  @cover_accept ~w(.png .jpg .jpeg .gif .webp)
   @max_file_size 25_000_000
 
   @impl true
@@ -35,11 +38,19 @@ defmodule Tayori.Admin.EntryLive do
         now: DateTime.utc_now(),
         ai: socket.assigns.access == :all and AI.configured?(),
         ai_open: false,
-        writers: %{}
+        writers: %{},
+        categories: Categories.list(),
+        mode: :write,
+        preview_as: :page,
+        cover: entry.cover,
+        pinned: entry.pinned_at != nil,
+        copied: false
       )
       |> assign_form(Entries.change(entry))
       |> assign_schedule(entry.published_at)
+      |> assign_stats()
       |> allow_uploads(locales)
+      |> allow_cover()
 
     {:ok, socket}
   end
@@ -71,6 +82,75 @@ defmodule Tayori.Admin.EntryLive do
     end)
   end
 
+  # The cover: one image, stored as Kotoba stores the files of the body.
+  defp allow_cover(%{assigns: %{access: :all}} = socket) do
+    allow_upload(socket, :tayori_cover,
+      accept: @cover_accept,
+      max_file_size: @max_file_size,
+      max_entries: 1,
+      auto_upload: true,
+      progress: &handle_cover/3
+    )
+  end
+
+  defp allow_cover(socket), do: socket
+
+  def handle_cover(:tayori_cover, upload, socket) do
+    if upload.done? do
+      opts = if socket.assigns.storage, do: [storage: socket.assigns.storage], else: []
+
+      result =
+        consume_uploaded_entry(socket, upload, fn %{path: path} ->
+          {:ok,
+           Kotoba.Attachments.store(
+             path,
+             [name: upload.client_name, content_type: upload.client_type] ++ opts
+           )}
+        end)
+
+      case result do
+        {:ok, %Kotoba.Nodes.Attachment{} = image} ->
+          if Kotoba.Nodes.Attachment.image?(image) do
+            cover = %{
+              "url" => image.url,
+              "key" => image.key,
+              "width" => image.width,
+              "height" => image.height,
+              "alt" => (socket.assigns.cover || %{})["alt"] || ""
+            }
+
+            {:noreply, assign(socket, :cover, cover)}
+          else
+            {:noreply, put_flash(socket, :error, "A cover is an image: PNG, JPEG, GIF or WebP.")}
+          end
+
+        {:error, _reason} ->
+          {:noreply, put_flash(socket, :error, "The cover could not be stored.")}
+      end
+    else
+      {:noreply, socket}
+    end
+  end
+
+  defp assign_stats(%{assigns: %{entry: %Entry{id: id}, config: config}} = socket)
+       when is_binary(id) do
+    if Config.feature?(config, :analytics) do
+      days = Tayori.Views.by_day(id, Date.add(Date.utc_today(), -29))
+
+      by_source =
+        Enum.reduce(days, %{}, fn {_date, sources}, acc ->
+          Map.merge(acc, sources, fn _k, a, b -> a + b end)
+        end)
+
+      totals = Tayori.Views.totals([id])[id] || %{views: 0, readers: 0}
+      assign(socket, :stats, %{totals: totals, days: days, by_source: by_source})
+    else
+      assign(socket, :stats, nil)
+    end
+  end
+
+  defp assign_stats(socket), do: assign(socket, :stats, nil)
+
   # The upload names are made from the configured languages, never from a
   # request, so they are a short, known list of atoms.
   defp upload_name(locales, locale) do
@@ -91,7 +171,7 @@ defmodule Tayori.Admin.EntryLive do
 
   @impl true
   def handle_event("validate", %{"entry" => params} = all, socket) do
-    socket = consume_all(socket)
+    socket = socket |> consume_all() |> put_cover_alt(all)
 
     changeset =
       socket.assigns.entry |> Entries.change(normalize(params)) |> Map.put(:action, :validate)
@@ -100,6 +180,27 @@ defmodule Tayori.Admin.EntryLive do
      socket
      |> assign_form(changeset)
      |> assign(:schedule, to_form(Map.get(all, "schedule", %{}), as: :schedule))}
+  end
+
+  def handle_event("mode", %{"mode" => mode}, socket) when mode in ["write", "preview"] do
+    {:noreply, assign(socket, :mode, String.to_existing_atom(mode))}
+  end
+
+  def handle_event("preview_as", %{"as" => as}, socket)
+      when as in ["page", "panel", "announcement"] do
+    {:noreply, assign(socket, :preview_as, String.to_existing_atom(as))}
+  end
+
+  def handle_event("remove_cover", _params, %{assigns: %{access: :all}} = socket) do
+    {:noreply, assign(socket, :cover, nil)}
+  end
+
+  def handle_event("pinned", _params, %{assigns: %{access: :all}} = socket) do
+    {:noreply, update(socket, :pinned, &(!&1))}
+  end
+
+  def handle_event("copied", _params, socket) do
+    {:noreply, assign(socket, :copied, true)}
   end
 
   def handle_event("language", %{"locale" => locale}, socket) do
@@ -130,7 +231,7 @@ defmodule Tayori.Admin.EntryLive do
   end
 
   def handle_event("save", %{"entry" => params} = all, %{assigns: %{access: :all}} = socket) do
-    socket = consume_all(socket)
+    socket = socket |> consume_all() |> put_cover_alt(all)
     attrs = normalize(params)
 
     case save(socket, attrs, all["intent"], schedule_time(all)) do
@@ -138,9 +239,15 @@ defmodule Tayori.Admin.EntryLive do
         socket =
           socket
           |> put_flash(:info, message)
-          |> assign(entry: entry, now: DateTime.utc_now())
+          |> assign(
+            entry: entry,
+            now: DateTime.utc_now(),
+            cover: entry.cover,
+            pinned: entry.pinned_at != nil
+          )
           |> assign_form(Entries.change(entry))
           |> assign_schedule(entry.published_at)
+          |> assign_stats()
 
         if socket.assigns.live_action == :new do
           {:noreply, push_navigate(socket, to: ~m"/#{entry.id}")}
@@ -322,7 +429,11 @@ defmodule Tayori.Admin.EntryLive do
            "locale" => t.locale,
            "title" => t.title || "",
            "summary" => t.summary || "",
-           "body" => if(t.body, do: JSON.encode!(t.body.doc), else: "")
+           "body" => if(t.body, do: JSON.encode!(t.body.doc), else: ""),
+           "seo_title" => t.seo_title || "",
+           "seo_description" => t.seo_description || "",
+           "cta_label" => t.cta_label || "",
+           "cta_url" => t.cta_url || ""
          }}
       end)
 
@@ -330,6 +441,9 @@ defmodule Tayori.Admin.EntryLive do
       "slug" => Ecto.Changeset.get_field(changeset, :slug) || "",
       "categories" => Ecto.Changeset.get_field(changeset, :categories) || [],
       "segments" => Ecto.Changeset.get_field(changeset, :segments) || [],
+      "announce" => Ecto.Changeset.get_field(changeset, :announce) || "",
+      "announce_until" => Ecto.Changeset.get_field(changeset, :announce_until),
+      "email" => Ecto.Changeset.get_field(changeset, :email) || false,
       "translations" => translations
     }
   end
@@ -348,10 +462,26 @@ defmodule Tayori.Admin.EntryLive do
       end
 
     with {:ok, saved} <- saved,
+         {:ok, saved} <- put_cover(saved, socket.assigns.cover),
+         {:ok, saved} <- put_pinned(saved, socket.assigns.pinned),
          {:ok, saved, message} <- apply_intent(saved, intent, at) do
       {:ok, Entries.get!(saved.id), message}
     end
   end
+
+  # The cover's description is a field of the entry's form.
+  defp put_cover_alt(%{assigns: %{cover: %{} = cover}} = socket, %{"cover_alt" => alt})
+       when is_binary(alt),
+       do: assign(socket, :cover, Map.put(cover, "alt", String.slice(alt, 0, 300)))
+
+  defp put_cover_alt(socket, _params), do: socket
+
+  defp put_cover(%Entry{cover: cover} = entry, cover), do: {:ok, entry}
+  defp put_cover(entry, cover), do: Entries.put_cover_map(entry, cover)
+
+  defp put_pinned(%Entry{pinned_at: nil} = entry, true), do: Entries.pin(entry)
+  defp put_pinned(%Entry{pinned_at: %DateTime{}} = entry, false), do: Entries.unpin(entry)
+  defp put_pinned(entry, _pinned), do: {:ok, entry}
 
   defp apply_intent(entry, "publish", at) do
     now = DateTime.utc_now()
@@ -377,13 +507,11 @@ defmodule Tayori.Admin.EntryLive do
 
   defp schedule_time(_params), do: nil
 
-  # The categories are typed as one line, separated by commas.
+  # The categories and segments are checkboxes, with an empty value so
+  # that none checked is a value too.
   defp normalize(params) do
     params
-    |> Map.update("categories", [], fn
-      text when is_binary(text) -> String.split(text, ",")
-      list when is_list(list) -> list
-    end)
+    |> Map.put_new("categories", [])
     |> Map.put_new("segments", [])
   end
 
@@ -424,18 +552,43 @@ defmodule Tayori.Admin.EntryLive do
       assign(assigns,
         status: Entry.status(assigns.entry, assigns.now),
         present: present_locales(assigns.form),
-        read_only: assigns.access != :all
+        read_only: assigns.access != :all,
+        features: assigns.config.features,
+        announce: Phoenix.HTML.Form.input_value(assigns.form, :announce),
+        cover_upload: assigns[:uploads][:tayori_cover]
       )
 
     ~H"""
-    <.page page={:entries} flash={@flash}>
-      <div class="ta-toolbar">
-        <h1>
-          <.link navigate={~m"/"} class="ta-back" aria-label="Entries">←</.link>
-          {if @entry.id, do: "Edit entry", else: "New entry"}
-        </h1>
-        <div class="ta-toolbar-actions">
+    <.page page={:entries} flash={@flash} access={@access} wide>
+      <div class="ta-heading ta-editor-heading">
+        <div class="ta-heading-title">
+          <.link navigate={~m"/"} class="ta-icon-button" aria-label="Entries">
+            <.icon name="arrow-left" />
+          </.link>
+          <h1>{if @entry.id, do: "Edit entry", else: "New entry"}</h1>
           <.status :if={@entry.id} entry={@entry} now={@now} />
+        </div>
+        <div class="ta-heading-actions">
+          <div class="ta-segmented" role="tablist" aria-label="Write or preview">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={to_string(@mode == :write)}
+              phx-click="mode"
+              phx-value-mode="write"
+            >
+              <.icon name="pencil" />Write
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={to_string(@mode == :preview)}
+              phx-click="mode"
+              phx-value-mode="preview"
+            >
+              <.icon name="eye" />Preview
+            </button>
+          </div>
           <button
             :if={@ai}
             type="button"
@@ -444,12 +597,12 @@ defmodule Tayori.Admin.EntryLive do
             aria-expanded={to_string(@ai_open)}
             aria-controls="ai-panel"
           >
-            Write with AI
+            <.icon name="sparkles" />Write with AI
           </button>
         </div>
       </div>
 
-      <section :if={@ai and @ai_open} id="ai-panel" class="ta-panel ta-ai" aria-label="Write with AI">
+      <section :if={@ai and @ai_open} id="ai-panel" class="ta-card ta-ai" aria-label="Write with AI">
         <form id="ai-draft" phx-submit="ai_draft">
           <div class="ta-field">
             <label for="ai-notes">What shipped</label>
@@ -463,7 +616,7 @@ defmodule Tayori.Admin.EntryLive do
           </div>
           <div class="ta-actions">
             <button type="submit" class="ta-button ta-primary" disabled={@writers != %{}}>
-              Draft in {Tayori.Locales.name(@language)}
+              <.icon name="sparkles" />Draft in {Tayori.Locales.name(@language)}
             </button>
             <button
               :if={@language != hd(@config.locales)}
@@ -472,9 +625,11 @@ defmodule Tayori.Admin.EntryLive do
               phx-click="ai_translate"
               disabled={@writers != %{}}
             >
-              Translate from {Tayori.Locales.name(hd(@config.locales))}
+              <.icon name="languages" />Translate from {Tayori.Locales.name(hd(@config.locales))}
             </button>
-            <span :if={@writers != %{}} class="ta-hint" role="status">Writing…</span>
+            <span :if={@writers != %{}} class="ta-hint ta-busy" role="status">
+              <.icon name="loader-circle" class="ta-spin" />Writing…
+            </span>
           </div>
           <p class="ta-hint">
             The text comes into the editor as a suggestion: accept it, or reject it.
@@ -488,9 +643,9 @@ defmodule Tayori.Admin.EntryLive do
         id="entry-form"
         phx-change="validate"
         phx-submit="save"
-        class="ta-editor"
+        class={["ta-editor", @mode == :preview && "ta-previewing"]}
       >
-        <fieldset disabled={@read_only} class="ta-editor-main">
+        <div class="ta-editor-main">
           <div :if={length(@config.locales) > 1} class="ta-languages" role="tablist">
             <button
               :for={locale <- @present}
@@ -510,60 +665,135 @@ defmodule Tayori.Admin.EntryLive do
               phx-click="add_language"
               phx-value-locale={locale}
             >
-              + {Tayori.Locales.name(locale)}
+              <.icon name="plus" />{Tayori.Locales.name(locale)}
             </button>
           </div>
 
-          <.errors field={@form[:translations]} />
+          <.preview
+            :if={@mode == :preview}
+            form={@form}
+            entry={@entry}
+            cover={@cover}
+            pinned={@pinned}
+            language={@language}
+            categories={@categories}
+            config={@config}
+            preview_as={@preview_as}
+          />
 
-          <.inputs_for :let={t} field={@form[:translations]}>
-            <section
-              class="ta-translation"
-              hidden={t[:locale].value != @language}
-              aria-label={Tayori.Locales.name(t[:locale].value)}
-            >
-              <input type="hidden" name={t[:locale].name} value={t[:locale].value} />
-              <.input field={t[:title]} label="Title" maxlength="255" />
-              <.input
-                field={t[:summary]}
-                type="textarea"
-                label="Summary"
-                rows="2"
-                maxlength="500"
-                hint="One or two sentences for the news panel and the emails. Optional."
-              />
-              <div class="ta-field">
-                <label id={"#{editor_id(t[:locale].value)}-label"}>Body</label>
-                <Kotoba.Components.kotoba
-                  id={editor_id(t[:locale].value)}
-                  field={t[:body]}
-                  label_id={"#{editor_id(t[:locale].value)}-label"}
-                  features={Translation.features()}
-                  uploads={assigns[:uploads][upload_name(@config.locales, t[:locale].value)]}
-                  placeholder="What changed, and why it matters to your people"
-                  readonly={@read_only}
-                  assist={if @ai, do: AI.actions()}
-                />
-              </div>
-              <label
-                :if={not @read_only and t[:locale].value != hd(@config.locales)}
-                class="ta-remove-language"
+          <fieldset disabled={@read_only} class="ta-writing" hidden={@mode == :preview}>
+            <.errors field={@form[:translations]} />
+
+            <.inputs_for :let={t} field={@form[:translations]}>
+              <section
+                class="ta-translation"
+                hidden={t[:locale].value != @language}
+                aria-label={Tayori.Locales.name(t[:locale].value)}
               >
-                <input
-                  type="checkbox"
-                  name="entry[translations_drop][]"
-                  value={t.index}
-                  class="ta-visually-hidden"
-                /> Remove the {Tayori.Locales.name(t[:locale].value)} version
-              </label>
-            </section>
-          </.inputs_for>
-          <input type="hidden" name="entry[translations_drop][]" />
-        </fieldset>
+                <input type="hidden" name={t[:locale].name} value={t[:locale].value} />
+                <div class="ta-field ta-title-field">
+                  <label for={t[:title].id} class="ta-visually-hidden">Title</label>
+                  <input
+                    type="text"
+                    id={t[:title].id}
+                    name={t[:title].name}
+                    value={t[:title].value}
+                    maxlength="255"
+                    placeholder="Title"
+                    class="ta-title-input"
+                    autocomplete="off"
+                  />
+                  <.errors field={t[:title]} />
+                </div>
+                <div class="ta-field ta-summary-field">
+                  <label for={t[:summary].id} class="ta-visually-hidden">Summary</label>
+                  <textarea
+                    id={t[:summary].id}
+                    name={t[:summary].name}
+                    rows="2"
+                    maxlength="500"
+                    placeholder="A sentence or two for the panel, the cards and the emails"
+                    class="ta-summary-input"
+                  >{Phoenix.HTML.Form.normalize_value("textarea", t[:summary].value)}</textarea>
+                  <.errors field={t[:summary]} />
+                </div>
+                <div class="ta-field ta-body-field">
+                  <label id={"#{editor_id(t[:locale].value)}-label"} class="ta-visually-hidden">
+                    Body
+                  </label>
+                  <Kotoba.Components.kotoba
+                    id={editor_id(t[:locale].value)}
+                    field={t[:body]}
+                    label_id={"#{editor_id(t[:locale].value)}-label"}
+                    features={Translation.features()}
+                    uploads={assigns[:uploads][upload_name(@config.locales, t[:locale].value)]}
+                    placeholder="What changed, and why it matters to your people. Drop screenshots in."
+                    readonly={@read_only}
+                    assist={if @ai, do: AI.actions()}
+                  />
+                </div>
+
+                <details
+                  :if={:announcements in @features and @announce not in [nil, ""]}
+                  class="ta-more"
+                  open
+                >
+                  <summary><.icon name="megaphone" />The announcement's button</summary>
+                  <div class="ta-more-body ta-grid-2">
+                    <.input
+                      field={t[:cta_label]}
+                      label="Label"
+                      maxlength="80"
+                      placeholder="Try it"
+                    />
+                    <.input
+                      field={t[:cta_url]}
+                      label="Address"
+                      placeholder="/projects/new or https://…"
+                      hint="A path of the app, or an https address."
+                    />
+                  </div>
+                </details>
+
+                <details class="ta-more">
+                  <summary><.icon name="globe" />Search engines and shared links</summary>
+                  <div class="ta-more-body">
+                    <.input
+                      field={t[:seo_title]}
+                      label="Title"
+                      maxlength="255"
+                      hint="When not the entry's title."
+                    />
+                    <.input
+                      field={t[:seo_description]}
+                      type="textarea"
+                      rows="2"
+                      label="Description"
+                      maxlength="500"
+                      hint="When not the summary. About 150 characters show."
+                    />
+                  </div>
+                </details>
+
+                <label
+                  :if={not @read_only and t[:locale].value != hd(@config.locales)}
+                  class="ta-remove-language"
+                >
+                  <input
+                    type="checkbox"
+                    name="entry[translations_drop][]"
+                    value={t.index}
+                    class="ta-visually-hidden"
+                  /><.icon name="trash-2" />Remove the {Tayori.Locales.name(t[:locale].value)} version
+                </label>
+              </section>
+            </.inputs_for>
+            <input type="hidden" name="entry[translations_drop][]" />
+          </fieldset>
+        </div>
 
         <aside class="ta-editor-side">
-          <section :if={not @read_only} class="ta-panel" aria-labelledby="publish-heading">
-            <h2 id="publish-heading">Publication</h2>
+          <.card :if={not @read_only} title="Publication" icon="send" id="publication">
             <p :if={@status == :published} class="ta-hint">
               Published <.time at={@entry.published_at} />. Saving changes it for its readers;
               it is not announced again.
@@ -590,7 +820,7 @@ defmodule Tayori.Admin.EntryLive do
                 value="publish"
                 class="ta-button ta-primary"
               >
-                {publish_label(@schedule)}
+                <.icon name="send" />{publish_label(@schedule)}
               </button>
               <button
                 type="submit"
@@ -610,30 +840,136 @@ defmodule Tayori.Admin.EntryLive do
                 Unpublish
               </button>
             </div>
-          </section>
-
-          <fieldset disabled={@read_only} class="ta-panel">
-            <legend>Details</legend>
-            <.input
-              field={@form[:slug]}
-              label="Address"
-              hint="The end of its address on the public page. Made from the title when empty."
-            />
-            <div class="ta-field">
-              <label for="entry_categories">Categories</label>
-              <input
-                type="text"
-                id="entry_categories"
-                name="entry[categories]"
-                value={Enum.join(@form[:categories].value || [], ", ")}
-                placeholder="New, Improved, Fixed"
-                class="ta-input"
-              />
-              <p class="ta-hint">Separated by commas.</p>
+            <div :if={@entry.id && @page_path} class="ta-links">
+              <a
+                :if={@status == :published}
+                href={@page_path <> "/" <> @entry.slug}
+                target="_blank"
+                rel="noopener"
+              >
+                <.icon name="external-link" />View on the page
+              </a>
+              <button
+                type="button"
+                class="ta-link-button"
+                id="preview-link"
+                phx-hook="TayoriCopy"
+                data-copy={preview_url(@socket, @page_path, @entry)}
+                phx-click="copied"
+              >
+                <.icon name={if @copied, do: "check", else: "link"} />
+                {if @copied, do: "Preview link copied", else: "Copy a preview link"}
+              </button>
             </div>
-            <div :if={@segment_groups != []} class="ta-field">
-              <span class="ta-label">For</span>
-              <p class="ta-hint">Everyone, unless you choose who it is for.</p>
+            <p :if={@entry.id && @page_path} class="ta-hint">
+              Anyone with the link sees the last saved version, for a week.
+            </p>
+          </.card>
+
+          <.card title="Cover" icon="image" id="cover">
+            <:aside>
+              <span class="ta-optional">Optional</span>
+            </:aside>
+            <div :if={@cover} class="ta-cover">
+              <img src={@cover["url"]} alt="" />
+              <div :if={not @read_only} class="ta-cover-actions">
+                <label class="ta-button ta-small" for={@cover_upload && @cover_upload.ref}>
+                  <.icon name="refresh-cw" />Replace
+                </label>
+                <button type="button" class="ta-button ta-small ta-quiet" phx-click="remove_cover">
+                  <.icon name="trash-2" />Remove
+                </button>
+              </div>
+            </div>
+            <label
+              :if={!@cover and not @read_only}
+              class="ta-dropzone"
+              for={@cover_upload && @cover_upload.ref}
+              phx-drop-target={@cover_upload && @cover_upload.ref}
+            >
+              <.icon name="upload" />
+              <span><strong>Add a cover</strong> or drop an image here</span>
+              <span class="ta-hint">At the top of the entry, on its card and on shared links. 16:9 looks best.</span>
+            </label>
+            <.live_file_input
+              :if={@cover_upload}
+              upload={@cover_upload}
+              class="ta-visually-hidden"
+            />
+            <p
+              :for={entry <- (@cover_upload && @cover_upload.entries) || []}
+              class="ta-hint"
+            >
+              <.icon name="loader-circle" class="ta-spin" />Uploading {entry.client_name}… {entry.progress}%
+            </p>
+            <div :if={@cover && not @read_only} class="ta-field">
+              <label for="cover-alt-input">Description</label>
+              <input
+                id="cover-alt-input"
+                name="cover_alt"
+                value={@cover["alt"]}
+                class="ta-input"
+                maxlength="300"
+                placeholder="What the image shows, for those who cannot see it"
+                phx-debounce="300"
+              />
+            </div>
+          </.card>
+
+          <.card title="Details" icon="tag" id="details">
+            <fieldset disabled={@read_only}>
+              <.input
+                field={@form[:slug]}
+                label="Address"
+                hint="The end of its address on the public page. Made from the title when empty."
+              />
+              <div class="ta-field">
+                <span class="ta-label">Categories</span>
+                <input type="hidden" name="entry[categories][]" value="" />
+                <div :if={@categories != []} class="ta-category-picks">
+                  <label
+                    :for={category <- @categories}
+                    class="ta-category-pick"
+                    data-color={category.color}
+                  >
+                    <input
+                      type="checkbox"
+                      name="entry[categories][]"
+                      value={category.key}
+                     
+                      checked={category.key in (@form[:categories].value || [])}
+                    />
+                    <span class="tayori-dot"></span>
+                    {Tayori.Category.name(category, nil, @config.locales)}
+                  </label>
+                </div>
+                <p class="ta-hint">
+                  <span :if={@categories == []}>No categories yet.</span>
+                  <.link navigate={~m"/categories"}>Manage the categories</.link>
+                </p>
+              </div>
+              <button
+                type="button"
+                class="ta-switch"
+                role="switch"
+                aria-checked={to_string(@pinned)}
+                phx-click="pinned"
+              >
+                <span class="ta-switch-track"><span class="ta-switch-thumb"></span></span>
+                <span>
+                  <strong>Pin it</strong>
+                  <span class="ta-hint">Pinned entries come first, in the app and on the page.</span>
+                </span>
+              </button>
+            </fieldset>
+          </.card>
+
+          <.card title="Audience" icon="users" id="audience">
+            <fieldset disabled={@read_only}>
+              <p class="ta-audience-summary">
+                <.icon name={if (@form[:segments].value || []) == [], do: "globe", else: "lock"} />
+                <span>{audience_summary(@form[:segments].value || [], @segment_groups)}</span>
+              </p>
               <input type="hidden" name="entry[segments][]" value="" />
               <div :for={{group, segments} <- @segment_groups} class="ta-segments">
                 <span :if={group} class="ta-segment-group">{group}</span>
@@ -642,22 +978,117 @@ defmodule Tayori.Admin.EntryLive do
                     type="checkbox"
                     name="entry[segments][]"
                     value={segment}
+                   
                     checked={segment in (@form[:segments].value || [])}
                   />
                   {label}
                 </label>
               </div>
-            </div>
-          </fieldset>
+              <p class="ta-hint ta-source">
+                <span :if={@segment_groups != []}>
+                  These groups come from your app: its <code>{inspect(@resolver)}.segments/0</code>,
+                  and each reader's own from <code>resolve_reader/1</code>.
+                </span>
+                <span :if={@segment_groups == []}>
+                  Every entry is for everyone. To write for some of your people (a plan, a role),
+                  give <code>{inspect(@resolver)}</code> a <code>segments/0</code>.
+                </span>
+                <.link navigate={~m"/settings#audiences"}>How audiences work</.link>
+              </p>
+            </fieldset>
+          </.card>
 
-          <section :if={@entry.id && not @read_only} class="ta-panel ta-danger-zone">
+          <.card
+            :if={:announcements in @features}
+            title="Announcement"
+            icon="megaphone"
+            id="announcement"
+          >
+            <fieldset disabled={@read_only}>
+              <div class="ta-choices" role="radiogroup" aria-label="Announce it as">
+                <label
+                  :for={
+                    {value, label, icon} <- [
+                      {"", "None", "x"},
+                      {"popup", "Popup", "app-window"},
+                      {"toast", "Toast", "message-square"},
+                      {"banner", "Banner", "panel-top"}
+                    ]
+                  }
+                  class="ta-choice"
+                >
+                  <input
+                    type="radio"
+                    name="entry[announce]"
+                    value={value}
+                   
+                    checked={(@announce || "") == value}
+                  />
+                  <.icon name={icon} />{label}
+                </label>
+              </div>
+              <div :if={@announce not in [nil, ""]} class="ta-field">
+                <label id="announce-until-label">Until</label>
+                <Koyomi.Components.datetime_picker
+                  field={@form[:announce_until]}
+                  label_id="announce-until-label"
+                  time_zone={@time_zone}
+                  locale={@locale}
+                  rules={[min: :today]}
+                />
+                <p class="ta-hint">Empty: until the next announcement. Readers can dismiss it.</p>
+              </div>
+            </fieldset>
+          </.card>
+
+          <.card :if={:subscriptions in @features} title="Email" icon="mail" id="email">
+            <fieldset disabled={@read_only or @entry.emailed_at != nil}>
+              <input type="hidden" name="entry[email]" value="false" />
+              <label class="ta-check">
+                <input
+                  type="checkbox"
+                  name="entry[email]"
+                  value="true"
+                 
+                  checked={Phoenix.HTML.Form.normalize_value("checkbox", @form[:email].value)}
+                /> Send it to the subscribers when it is published
+              </label>
+              <p :if={@entry.emailed_at} class="ta-hint">
+                Sent <.time at={@entry.emailed_at} />.
+              </p>
+              <p :if={(@form[:segments].value || []) != []} class="ta-hint ta-warning">
+                <.icon name="info" />An entry for some readers is never emailed: subscribers are addresses, not readers.
+              </p>
+            </fieldset>
+          </.card>
+
+          <.card :if={@stats} title="Last 30 days" icon="chart-column" id="stats">
+            <dl class="ta-stats">
+              <div><dt>Views</dt><dd>{@stats.totals.views}</dd></div>
+              <div><dt>Readers</dt><dd>{@stats.totals.readers}</dd></div>
+            </dl>
+            <div class="ta-sparkline" aria-hidden="true">
+              <span
+                :for={{_date, sources} <- @stats.days}
+                style={"--h: #{bar_height(sources, @stats.days)}"}
+              >
+              </span>
+            </div>
+            <ul class="ta-sources">
+              <li :for={{source, n} <- Enum.sort_by(@stats.by_source, &(-elem(&1, 1)))}>
+                <span>{source_label(source)}</span><span>{n}</span>
+              </li>
+            </ul>
+          </.card>
+
+          <section :if={@entry.id && not @read_only} class="ta-danger-zone">
             <button
               type="button"
               phx-click="delete"
               data-confirm="Delete this entry, in every language? This cannot be undone."
-              class="ta-button ta-danger"
+              class="ta-button ta-danger ta-quiet"
             >
-              Delete entry
+              <.icon name="trash-2" />Delete entry
             </button>
           </section>
         </aside>
@@ -665,6 +1096,175 @@ defmodule Tayori.Admin.EntryLive do
     </.page>
     """
   end
+
+  attr :form, :any, required: true
+  attr :entry, Entry, required: true
+  attr :cover, :map, default: nil
+  attr :pinned, :boolean, default: false
+  attr :language, :string, required: true
+  attr :categories, :list, required: true
+  attr :config, :any, required: true
+  attr :preview_as, :atom, required: true
+
+  # The entry as it is in the form, as readers will see it.
+  defp preview(assigns) do
+    entry = preview_entry(assigns)
+    messages = Messages.for_locale(assigns.language)
+    categories = Map.new(assigns.categories, &{&1.key, &1})
+
+    state = %Tayori.Live.State{
+      open: true,
+      entries: [entry],
+      announcement: entry,
+      categories: categories,
+      messages: messages,
+      locale: assigns.language,
+      locales: assigns.config.locales,
+      features: assigns.config.features,
+      emoji: assigns.config.reactions
+    }
+
+    assigns =
+      assign(assigns, preview: entry, messages: messages, map: categories, state: state)
+
+    ~H"""
+    <div class="ta-preview">
+      <div class="ta-preview-bar">
+        <div class="ta-segmented ta-small" role="tablist" aria-label="Preview as">
+          <button
+            :for={
+              {as, label, icon} <- [
+                {:page, "Page", "newspaper"},
+                {:panel, "Panel", "panel-right"},
+                {:announcement, "Announcement", "megaphone"}
+              ]
+            }
+            :if={as != :announcement or :announcements in @config.features}
+            type="button"
+            role="tab"
+            aria-selected={to_string(@preview_as == as)}
+            phx-click="preview_as"
+            phx-value-as={as}
+          >
+            <.icon name={icon} />{label}
+          </button>
+        </div>
+        <span class="ta-hint">As your readers see it, in {Tayori.Locales.name(@language)}.</span>
+      </div>
+
+      <div :if={@preview_as == :page} class="ta-preview-stage tayori-page tayori-preview">
+        <div class="tayori-shell">
+          <article class="tayori-article">
+            <Tayori.Components.entry
+              entry={@preview}
+              messages={@messages}
+              categories={@map}
+              locales={@config.locales}
+              heading="h1"
+            />
+          </article>
+        </div>
+      </div>
+
+      <div :if={@preview_as == :panel} class="ta-preview-stage ta-preview-panel tayori-preview">
+        <div class="tayori-panel tayori-panel-static">
+          <header class="tayori-panel-header">
+            <h2>{@messages["title"]}</h2>
+          </header>
+          <div class="tayori-panel-body">
+            <ol class="tayori-cards">
+              <li>
+                <Tayori.Components.card
+                  entry={@preview}
+                  messages={@messages}
+                  categories={@map}
+                  locales={@config.locales}
+                  new
+                />
+              </li>
+            </ol>
+          </div>
+        </div>
+        <div class="tayori-panel tayori-panel-static">
+          <header class="tayori-panel-header">
+            <h2>{@messages["title"]}</h2>
+          </header>
+          <div class="tayori-panel-body">
+            <Tayori.Components.entry
+              entry={@preview}
+              messages={@messages}
+              categories={@map}
+              locales={@config.locales}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div
+        :if={@preview_as == :announcement}
+        class="ta-preview-stage ta-preview-announcement tayori-preview"
+      >
+        <p :if={@preview.announce == nil} class="ta-hint">
+          Choose how to announce it, in the Announcement card, to see it here.
+        </p>
+        <Tayori.Components.announcement :if={@preview.announce} tayori={@state} />
+      </div>
+    </div>
+    """
+  end
+
+  defp preview_entry(assigns) do
+    entry = Ecto.Changeset.apply_changes(assigns.form.source)
+
+    translation =
+      Enum.find(entry.translations, &(&1.locale == assigns.language)) ||
+        List.first(entry.translations) || %Translation{title: ""}
+
+    translation = %{
+      translation
+      | title: if(translation.title in [nil, ""], do: "Untitled", else: translation.title)
+    }
+
+    %{
+      entry
+      | translation: translation,
+        cover: assigns.cover,
+        pinned_at: if(assigns.pinned, do: DateTime.utc_now()),
+        published_at: entry.published_at || DateTime.utc_now(),
+        id: entry.id || "preview"
+    }
+  end
+
+  defp preview_url(socket, page_path, %Entry{id: id}) when is_binary(id) do
+    page_path <> "/preview/" <> Tayori.Page.preview_token(socket, id)
+  end
+
+  defp preview_url(_socket, _page_path, _entry), do: nil
+
+  defp audience_summary([], _groups),
+    do: "Everyone: in the app, on the public page and in the feeds."
+
+  defp audience_summary(segments, groups) do
+    labels =
+      for {_group, list} <- groups, {segment, label} <- list, segment in segments, do: label
+
+    "Only " <>
+      Enum.join(labels, ", ") <>
+      ", in the app. It is not on the public page, in the feeds or in the emails."
+  end
+
+  defp bar_height(sources, days) do
+    max = days |> Enum.map(fn {_d, s} -> Enum.sum(Map.values(s)) end) |> Enum.max(fn -> 0 end)
+    total = Enum.sum(Map.values(sources))
+    if max == 0, do: "0%", else: "#{round(total / max * 100)}%"
+  end
+
+  defp source_label("panel"), do: "In the app"
+  defp source_label("page"), do: "Public page"
+  defp source_label("widget"), do: "Widget"
+  defp source_label("email"), do: "Email"
+  defp source_label("feed"), do: "Feeds"
+  defp source_label(other), do: other
 
   defp present_locales(form) do
     form.source

@@ -51,6 +51,40 @@ defmodule Tayori.Entries do
     |> config.repo.preload(:translations, prefix: config.prefix)
   end
 
+  @doc "The number of entries of each status, for the admin's tabs."
+  @spec counts() :: %{
+          all: integer(),
+          draft: integer(),
+          scheduled: integer(),
+          published: integer()
+        }
+  def counts do
+    config = Config.get()
+    now = DateTime.utc_now()
+
+    {draft, scheduled, published} =
+      from(e in Entry,
+        select:
+          {sum(fragment("CASE WHEN ? IS NULL THEN 1 ELSE 0 END", e.published_at)),
+           sum(fragment("CASE WHEN ? > ? THEN 1 ELSE 0 END", e.published_at, ^now)),
+           sum(fragment("CASE WHEN ? <= ? THEN 1 ELSE 0 END", e.published_at, ^now))}
+      )
+      |> config.repo.one(prefix: config.prefix)
+
+    [draft, scheduled, published] = Enum.map([draft, scheduled, published], &to_int/1)
+
+    %{
+      all: draft + scheduled + published,
+      draft: draft,
+      scheduled: scheduled,
+      published: published
+    }
+  end
+
+  defp to_int(nil), do: 0
+  defp to_int(%Decimal{} = n), do: Decimal.to_integer(n)
+  defp to_int(n) when is_integer(n), do: n
+
   defp with_status(query, nil, _now), do: query
   defp with_status(query, :draft, _now), do: where(query, [e], is_nil(e.published_at))
   defp with_status(query, :scheduled, now), do: where(query, [e], e.published_at > ^now)
@@ -180,6 +214,14 @@ defmodule Tayori.Entries do
     else
       {:error, :not_an_image}
     end
+  end
+
+  @doc false
+  # The admin's cover: a map it made from an image it stored.
+  def put_cover_map(%Entry{} = entry, nil), do: remove_cover(entry)
+
+  def put_cover_map(%Entry{} = entry, %{"url" => url} = cover) when is_binary(url) do
+    put(entry, cover: Map.take(cover, ["url", "key", "width", "height", "alt"]))
   end
 
   @doc "Changes the alternative text of an entry's cover."

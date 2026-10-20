@@ -1,14 +1,18 @@
 /*
- * Tayori in the Sumi theme.
+ * Tayori in the Sumi theme: ink on paper, one blade orange for what needs
+ * attention (the unread count, what is new), hairlines instead of
+ * shadows, nearly square corners, Outfit for the words and Cormorant
+ * Garamond for the titles.
  *
- * Load this file after tayori.css. It gives every --tayori-* property a
- * Sumi value, in this order, as kotoba-sumi.css, koyomi-sumi.css and
- * jumon-sumi.css do:
+ * Load this file after tayori.css (and kotoba-sumi.css after kotoba.css,
+ * for the bodies of the entries). It gives every --tayori-* property a
+ * Sumi value, in this order:
  *
  *   1. the Sumi tokens of the page: --font-body, --font-display,
- *      --color-sumi-blade, --sumi-text-muted, and the theme colours of the
- *      Sumi daisyUI themes (--color-base-100, -200, -300,
- *      --color-base-content, --color-primary-content, --radius-box);
+ *      --color-sumi-blade, --color-sumi-ink, --sumi-text-muted, and the
+ *      theme colours of the Sumi daisyUI themes (--color-base-100, -200,
+ *      -300, --color-base-content, --color-success, --color-error,
+ *      --radius-box);
  *   2. the short --sumi-* names (--sumi-font, --sumi-display, --sumi-ink,
  *      --sumi-paper, --sumi-surface, --sumi-line, --sumi-muted,
  *      --sumi-accent, --sumi-accent-ink, --sumi-radius), for a page that
@@ -16,12 +20,15 @@
  *   3. the Sumi palette below, so that the news looks like Sumi on a page
  *      with no Sumi tokens.
  *
- * Dark and light: on a page with the Sumi themes, the news follows them
- * (their colours change with data-theme). Without them, the built-in
- * palette follows the data-theme attribute ("dark" or "light") first, then
- * prefers-color-scheme. Sumi keeps the blade for what needs attention:
- * the count of unread entries and the New mark.
+ * Dark and light: the palette follows the data-theme attribute ("dark" or
+ * "light") first, then prefers-color-scheme. It is resolved again on every
+ * element with a data-theme attribute.
+ *
+ * The fonts come with the file (Latin subset, SIL Open Font License 1.1),
+ * so that a strict font-src needs no change.
  */
+
+/* @tayori-sumi-fonts */
 
 /* The Sumi palette, light. */
 :root,
@@ -29,18 +36,27 @@
   --tayori-sumi-base-100: oklch(96% 0.01 85);
   --tayori-sumi-base-200: oklch(93% 0.012 85);
   --tayori-sumi-base-300: oklch(89% 0.014 80);
+  --tayori-sumi-canvas: oklch(94.5% 0.012 85);
+  --tayori-sumi-card: oklch(97.5% 0.008 85);
   --tayori-sumi-content: oklch(15% 0.003 270);
   --tayori-sumi-muted: oklch(15% 0.003 270 / 0.62);
+  --tayori-sumi-success: oklch(55% 0.16 155);
+  --tayori-sumi-error: oklch(55% 0.22 25);
+  --tayori-sumi-hairline: rgb(10 10 11 / 0.12);
 }
 
-/* The Sumi palette, dark: data-theme="dark", or a dark preference on a page
-   that does not ask for light. */
+/* The Sumi palette, dark. */
 [data-theme="dark"] {
   --tayori-sumi-base-100: oklch(12% 0.003 270);
   --tayori-sumi-base-200: oklch(16% 0.004 270);
   --tayori-sumi-base-300: oklch(22% 0.005 270);
+  --tayori-sumi-canvas: oklch(10% 0.003 270);
+  --tayori-sumi-card: oklch(14% 0.004 270);
   --tayori-sumi-content: oklch(95% 0.012 85);
   --tayori-sumi-muted: oklch(95% 0.012 85 / 0.55);
+  --tayori-sumi-success: oklch(62% 0.14 155);
+  --tayori-sumi-error: oklch(62% 0.2 25);
+  --tayori-sumi-hairline: rgb(245 240 232 / 0.1);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -48,53 +64,122 @@
     --tayori-sumi-base-100: oklch(12% 0.003 270);
     --tayori-sumi-base-200: oklch(16% 0.004 270);
     --tayori-sumi-base-300: oklch(22% 0.005 270);
+    --tayori-sumi-canvas: oklch(10% 0.003 270);
+    --tayori-sumi-card: oklch(14% 0.004 270);
     --tayori-sumi-content: oklch(95% 0.012 85);
     --tayori-sumi-muted: oklch(95% 0.012 85 / 0.55);
+    --tayori-sumi-success: oklch(62% 0.14 155);
+    --tayori-sumi-error: oklch(62% 0.2 25);
+    --tayori-sumi-hairline: rgb(245 240 232 / 0.1);
   }
 }
 
 /* The mapping. */
 :root,
 [data-theme] {
-  /* Type: Outfit for the text, Cormorant Garamond for the titles. */
+  /* Type */
   --tayori-font: var(--font-body, var(--sumi-font, "Outfit", system-ui, sans-serif));
-  --tayori-heading-font: var(--font-display, var(--sumi-display, "Cormorant Garamond", Georgia, serif));
+  --tayori-title-font: var(--font-display, var(--sumi-display, "Cormorant Garamond", Georgia, serif));
+  --tayori-font-size: 1rem;
+  --tayori-small: 0.875rem;
+  --tayori-tiny: 0.75rem;
+  --tayori-line-height: 1.65;
+  --tayori-weight: 300;
+  --tayori-title-weight: 400;
+  --tayori-title-tracking: -0.01em;
+  --tayori-title-line-height: 1.1;
 
   /* Colours */
   --tayori-text: var(--color-base-content, var(--sumi-ink, var(--tayori-sumi-content)));
   --tayori-muted: var(--sumi-text-muted, var(--sumi-muted, var(--tayori-sumi-muted)));
   --tayori-background: var(--color-base-100, var(--sumi-paper, var(--tayori-sumi-base-100)));
   --tayori-surface: var(--color-base-200, var(--sumi-surface, var(--tayori-sumi-base-200)));
+  --tayori-canvas: var(--sumi-canvas, var(--tayori-sumi-canvas));
   --tayori-border: var(--color-base-300, var(--sumi-line, var(--tayori-sumi-base-300)));
-  --tayori-accent: var(--color-sumi-blade, var(--sumi-accent, #e84a1c));
-  --tayori-accent-text: var(--color-primary-content, var(--sumi-accent-ink, oklch(98% 0.005 85)));
-  --tayori-badge: var(--color-sumi-blade, var(--sumi-accent, #e84a1c));
-  --tayori-badge-text: var(--color-primary-content, var(--sumi-accent-ink, oklch(98% 0.005 85)));
-  --tayori-focus-ring: 0 0 0 2px var(--tayori-background), 0 0 0 4px var(--color-sumi-blade, var(--sumi-accent, #e84a1c));
+  --tayori-rule: color-mix(in oklab, var(--tayori-border) 75%, var(--tayori-background));
+  --tayori-accent: var(--color-base-content, var(--sumi-ink, var(--tayori-sumi-content)));
+  --tayori-accent-text: var(--color-base-100, var(--sumi-paper, var(--tayori-sumi-base-100)));
+  --tayori-attention: var(--color-sumi-blade, var(--sumi-accent, #e84a1c));
+  /* Ink on the blade: paper on blade is 3.7:1, ink about 5:1. */
+  --tayori-attention-text: var(--sumi-accent-ink, #0a0a0b);
+  --tayori-success: color-mix(in oklab, var(--color-success, var(--tayori-sumi-success)) 85%, var(--tayori-text));
+  --tayori-danger: color-mix(in oklab, var(--color-error, var(--tayori-sumi-error)) 85%, var(--tayori-text));
 
-  /* The panel: paper, with a shadow of ink. */
-  --tayori-radius: var(--radius-box, var(--sumi-radius, 0.375rem));
-  --tayori-inner-radius: calc(var(--radius-box, var(--sumi-radius, 0.375rem)) * 0.75);
-  --tayori-shadow: 0 24px 64px -16px color-mix(in oklab, var(--color-sumi-ink, #0a0a0b) 40%, transparent), 0 0 0 1px var(--color-base-300, var(--sumi-line, var(--tayori-sumi-base-300)));
+  /* Shape and depth: nearly square, hairlines rather than shadows. */
+  --tayori-radius: var(--radius-box, var(--sumi-radius, 0.25rem));
+  --tayori-radius-inner: 0.125rem;
+  --tayori-radius-card: var(--radius-box, var(--sumi-radius, 0.25rem));
+  --tayori-radius-panel: 0.375rem;
+  --tayori-radius-media: 0.125rem;
+  --tayori-icon-size: 16px;
+  --tayori-shadow: 0 8px 24px color-mix(in oklab, var(--tayori-sumi-content) 18%, transparent),
+    0 0 0 1px var(--tayori-sumi-hairline);
+  --tayori-shadow-card: none;
+  --tayori-shadow-panel: 0 24px 64px -16px color-mix(in oklab, #0a0a0b 38%, transparent),
+    0 0 0 1px var(--tayori-sumi-hairline);
+  --tayori-focus-ring: 0 0 0 2px var(--tayori-background), 0 0 0 4px var(--tayori-attention);
+  --tayori-backdrop: color-mix(in oklab, #0a0a0b 40%, transparent);
+
+  /* The categories, in muted inks. */
+  --tayori-gray: oklch(55% 0.01 270);
+  --tayori-red: oklch(55% 0.17 28);
+  --tayori-orange: #e84a1c;
+  --tayori-amber: oklch(64% 0.13 75);
+  --tayori-green: oklch(52% 0.11 155);
+  --tayori-teal: oklch(54% 0.08 195);
+  --tayori-blue: oklch(50% 0.12 250);
+  --tayori-purple: oklch(50% 0.12 300);
+  --tayori-pink: oklch(58% 0.13 355);
 }
 
-/* The titles in Cormorant are set larger, and lighter, as Sumi sets them. */
-.tayori-entry-title,
-.tayori-panel-header h2,
-.tayori-page h1 {
-  font-weight: 500;
-  letter-spacing: 0.005em;
+/* The page's title is the banner's: Cormorant Light, set tight. */
+.tayori-page-title {
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  line-height: 1;
 }
 
-.tayori-entry-title {
-  font-size: 1.3125rem;
+.tayori-article .tayori-entry-title,
+.tayori-timeline .tayori-entry-title {
+  font-weight: 400;
+  letter-spacing: -0.015em;
 }
 
-.tayori-page .tayori-entry-title {
-  font-size: 1.625rem;
+.tayori-eyebrow {
+  letter-spacing: 0.22em;
 }
 
-.tayori-page h1,
-.tayori-page h1.tayori-entry-title {
-  font-size: 2.5rem;
+/* Chips are ink when pressed, never blade. */
+.tayori-chip[aria-pressed="true"],
+.tayori-chip[aria-current="page"] {
+  border-color: var(--tayori-text);
+  background: var(--tayori-text);
+  color: var(--tayori-background);
+}
+
+/* A card is a sheet of paper on the canvas, edged with a hairline. */
+.tayori-card {
+  border-color: var(--tayori-rule);
+}
+
+.tayori-card:hover {
+  border-color: var(--tayori-border);
+  background: var(--tayori-background);
+}
+
+.tayori-panel-footer,
+.tayori-subscribe-card {
+  background: var(--tayori-surface);
+}
+
+/* The banner of an announcement is ink, with a blade mark. */
+.tayori-announcement-banner .tayori-announcement-eyebrow {
+  background: var(--tayori-attention);
+  color: var(--tayori-attention-text);
+}
+
+/* Small text in the blade is darker, to read on paper. */
+.tayori-new,
+.tayori-announcement-eyebrow {
+  color: color-mix(in oklab, var(--tayori-attention) 82%, var(--tayori-text));
 }

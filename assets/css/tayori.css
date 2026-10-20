@@ -1,43 +1,76 @@
 /*
- * Tayori: the news in the app, and the public page.
+ * Tayori: the news in the app, the public page, and the entry pages.
  *
  * Every colour, space, radius and font comes from a --tayori-* custom
- * property. Set them on .tayori-panel, .tayori-button or higher to theme
- * the news, or load tayori-sumi.css to map them to the Sumi tokens. The
- * defaults below have no specificity, so a value set on :root, on an
- * ancestor or on the elements themselves wins. They are Kotoba's, Koyomi's
- * and Jumon's own defaults, so that a page with all of them looks like one
- * thing.
+ * property. Set them on :root, on .tayori-panel, .tayori-page or any
+ * ancestor to theme the news, or load tayori-sumi.css to map them to the
+ * Sumi tokens. The defaults below have no specificity, so any value the
+ * app sets wins. They are Kotoba's, Koyomi's and Jumon's own defaults, so
+ * that a page with all of them looks like one thing.
  *
- * The defaults are light, and dark under data-theme="dark" (the attribute
- * of Phoenix's themes) or the class "dark". The bodies of the entries are
- * Kotoba content (.kotoba-content): kotoba.css styles them, with the same
- * colours.
+ * Light by default; dark under data-theme="dark" (Phoenix's themes) or
+ * the class "dark". The public page also follows the reader's system
+ * (.tayori-auto). The bodies of the entries are Kotoba content
+ * (.kotoba-content), in the same colours.
  */
 
 :where(:root) {
   --tayori-font: system-ui, -apple-system, "Segoe UI", sans-serif;
-  --tayori-heading-font: var(--tayori-font);
-  --tayori-font-size: 0.9375rem;
-  --tayori-small: 0.8125rem;
-  --tayori-line-height: 1.55;
+  --tayori-title-font: var(--tayori-font);
+  --tayori-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --tayori-font-size: 1rem;
+  --tayori-small: 0.875rem;
+  --tayori-tiny: 0.75rem;
+  --tayori-line-height: 1.6;
+  --tayori-weight: 400;
+  --tayori-title-weight: 600;
+  --tayori-title-tracking: -0.015em;
+  --tayori-title-line-height: 1.25;
+
   --tayori-text: #1f1f23;
   --tayori-muted: #6b6b76;
   --tayori-background: #ffffff;
   --tayori-surface: #f6f6f7;
+  --tayori-canvas: #f6f6f7;
   --tayori-border: #d9d9de;
+  --tayori-rule: #ececef;
   --tayori-accent: #2f5bd3;
   --tayori-accent-text: #ffffff;
-  --tayori-badge: var(--tayori-accent);
-  --tayori-badge-text: var(--tayori-accent-text);
-  --tayori-radius: 12px;
-  --tayori-inner-radius: 6px;
+  --tayori-attention: var(--tayori-accent);
+  --tayori-attention-text: var(--tayori-accent-text);
+  --tayori-danger: color-mix(in oklab, #c62828 85%, var(--tayori-text));
+  --tayori-success: color-mix(in oklab, #1a7f37 85%, var(--tayori-text));
+  --tayori-hover: color-mix(in oklab, var(--tayori-text) 5%, transparent);
+
+  --tayori-radius: 6px;
+  --tayori-radius-inner: 4px;
+  --tayori-radius-card: 10px;
+  --tayori-radius-panel: 12px;
+  --tayori-radius-media: 8px;
   --tayori-space: 0.5rem;
-  --tayori-icon-size: 20px;
-  --tayori-panel-width: 26rem;
-  --tayori-shadow: 0 24px 64px -12px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(0, 0, 0, 0.06);
+  --tayori-icon-size: 18px;
+  --tayori-panel-width: 27rem;
+  --tayori-page-width: 46rem;
+
+  --tayori-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  --tayori-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --tayori-shadow-panel: 0 24px 64px -12px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(0, 0, 0, 0.06);
   --tayori-focus-ring: 0 0 0 2px var(--tayori-background), 0 0 0 4px var(--tayori-accent);
-  --tayori-transition: 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --tayori-transition: 120ms ease-out;
+  --tayori-ease: 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --tayori-backdrop: rgba(15, 15, 20, 0.36);
+
+  /* The hues of the categories, mixed with the text so that each reads
+     on a light and on a dark background. */
+  --tayori-gray: #6b6b76;
+  --tayori-red: #d93a3a;
+  --tayori-orange: #e2711d;
+  --tayori-amber: #c98a00;
+  --tayori-green: #1f9d55;
+  --tayori-teal: #0f9488;
+  --tayori-blue: #2f5bd3;
+  --tayori-purple: #7c4dcc;
+  --tayori-pink: #d6408b;
 }
 
 :where([data-theme="dark"], .dark) {
@@ -45,26 +78,260 @@
   --tayori-muted: #9a9aa6;
   --tayori-background: #1b1b1f;
   --tayori-surface: #26262c;
+  --tayori-canvas: #141417;
   --tayori-border: #34343c;
+  --tayori-rule: #2a2a31;
   --tayori-accent: #7c9cff;
   --tayori-accent-text: #0e0e12;
-  --tayori-shadow: 0 24px 64px -12px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  --tayori-danger: #ff7b72;
+  --tayori-success: #5cc98a;
+  --tayori-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --tayori-shadow-card: none;
+  --tayori-shadow-panel: 0 24px 64px -12px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  --tayori-backdrop: rgba(0, 0, 0, 0.55);
+  --tayori-gray: #a0a0ab;
+  --tayori-red: #ff7b72;
+  --tayori-orange: #ff9f5a;
+  --tayori-amber: #f2c14e;
+  --tayori-green: #5cc98a;
+  --tayori-teal: #4fd1c5;
+  --tayori-blue: #7c9cff;
+  --tayori-purple: #b39dff;
+  --tayori-pink: #ff8cc6;
 }
 
-/* The body of an entry is Kotoba content, in the news's colours. */
+@media (prefers-color-scheme: dark) {
+  :where(.tayori-auto:not([data-theme="light"])) {
+    --tayori-text: #ececf1;
+    --tayori-muted: #9a9aa6;
+    --tayori-background: #1b1b1f;
+    --tayori-surface: #26262c;
+    --tayori-canvas: #141417;
+    --tayori-border: #34343c;
+    --tayori-rule: #2a2a31;
+    --tayori-accent: #7c9cff;
+    --tayori-accent-text: #0e0e12;
+    --tayori-danger: #ff7b72;
+    --tayori-success: #5cc98a;
+    --tayori-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    --tayori-shadow-card: none;
+    --tayori-shadow-panel: 0 24px 64px -12px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
+    --tayori-backdrop: rgba(0, 0, 0, 0.55);
+    --tayori-gray: #a0a0ab;
+    --tayori-red: #ff7b72;
+    --tayori-orange: #ff9f5a;
+    --tayori-amber: #f2c14e;
+    --tayori-green: #5cc98a;
+    --tayori-teal: #4fd1c5;
+    --tayori-blue: #7c9cff;
+    --tayori-purple: #b39dff;
+    --tayori-pink: #ff8cc6;
+    color-scheme: dark;
+  }
+}
+
+/* The body of an entry is Kotoba content, in the news's colours and type. */
 .tayori-panel,
-.tayori-page {
+.tayori-page,
+.tayori-announcement,
+.tayori-preview {
   --kotoba-font: var(--tayori-font);
-  --kotoba-heading-font: var(--tayori-heading-font);
+  --kotoba-heading-font: var(--tayori-title-font);
   --kotoba-text: var(--tayori-text);
   --kotoba-muted: var(--tayori-muted);
   --kotoba-background: var(--tayori-background);
   --kotoba-surface: var(--tayori-surface);
   --kotoba-border: var(--tayori-border);
   --kotoba-accent: var(--tayori-accent);
+  --kotoba-radius: var(--tayori-radius);
 }
 
-/* The button. */
+/* ── Icons, keys, chips ─────────────────────────────────────────── */
+
+.tayori-icon {
+  flex: none;
+  width: var(--tayori-icon-size);
+  height: var(--tayori-icon-size);
+}
+
+.tayori-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.375rem;
+  height: 1.375rem;
+  padding: 0 0.3125rem;
+  border: 1px solid var(--tayori-border);
+  border-bottom-width: 2px;
+  border-radius: var(--tayori-radius-inner);
+  background: var(--tayori-background);
+  color: var(--tayori-muted);
+  font: 500 var(--tayori-tiny) / 1 var(--tayori-font);
+}
+
+.tayori-icon-button {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--tayori-radius);
+  background: transparent;
+  color: var(--tayori-muted);
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    background-color var(--tayori-transition),
+    color var(--tayori-transition);
+}
+
+.tayori-icon-button:hover {
+  background: var(--tayori-surface);
+  color: var(--tayori-text);
+}
+
+.tayori-button:focus-visible,
+.tayori-panel :focus-visible,
+.tayori-page :focus-visible,
+.tayori-announcement :focus-visible {
+  outline: none;
+  box-shadow: var(--tayori-focus-ring);
+}
+
+.tayori-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  height: 1.875rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--tayori-border);
+  border-radius: 999px;
+  background: var(--tayori-background);
+  color: var(--tayori-muted);
+  font: 500 var(--tayori-small) / 1 var(--tayori-font);
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    border-color var(--tayori-transition),
+    background-color var(--tayori-transition),
+    color var(--tayori-transition);
+}
+
+.tayori-chip:hover {
+  border-color: color-mix(in oklab, var(--tayori-border) 60%, var(--tayori-text));
+  color: var(--tayori-text);
+}
+
+.tayori-chip[aria-pressed="true"],
+.tayori-chip[aria-current="page"] {
+  border-color: var(--tayori-text);
+  background: var(--tayori-text);
+  color: var(--tayori-background);
+}
+
+.tayori-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--tayori-hue, var(--tayori-gray));
+}
+
+[data-color="gray"] { --tayori-hue: var(--tayori-gray); }
+[data-color="red"] { --tayori-hue: var(--tayori-red); }
+[data-color="orange"] { --tayori-hue: var(--tayori-orange); }
+[data-color="amber"] { --tayori-hue: var(--tayori-amber); }
+[data-color="green"] { --tayori-hue: var(--tayori-green); }
+[data-color="teal"] { --tayori-hue: var(--tayori-teal); }
+[data-color="blue"] { --tayori-hue: var(--tayori-blue); }
+[data-color="purple"] { --tayori-hue: var(--tayori-purple); }
+[data-color="pink"] { --tayori-hue: var(--tayori-pink); }
+
+.tayori-chip[aria-pressed="true"] .tayori-dot,
+.tayori-chip[aria-current="page"] .tayori-dot {
+  box-shadow: 0 0 0 2px var(--tayori-text);
+}
+
+/* ── The meta line of an entry ──────────────────────────────────── */
+
+.tayori-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem 0.5rem;
+  margin: 0;
+  color: var(--tayori-muted);
+  font-size: var(--tayori-small);
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+}
+
+.tayori-category {
+  display: inline-flex;
+  align-items: center;
+  height: 1.375rem;
+  padding: 0 0.5rem;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--tayori-hue, var(--tayori-gray)) 13%, transparent);
+  color: color-mix(in oklab, var(--tayori-hue, var(--tayori-gray)) 78%, var(--tayori-text));
+  font-size: var(--tayori-tiny);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.tayori-new {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  color: var(--tayori-attention);
+  font-size: var(--tayori-tiny);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.tayori-new::before {
+  content: "";
+  width: 0.4375rem;
+  height: 0.4375rem;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.tayori-pinned {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--tayori-text);
+  font-size: var(--tayori-tiny);
+  font-weight: 500;
+}
+
+.tayori-pinned .tayori-icon {
+  --tayori-icon-size: 13px;
+}
+
+/* ── Covers ─────────────────────────────────────────────────────── */
+
+.tayori-cover {
+  margin: 0;
+  overflow: hidden;
+  border-radius: var(--tayori-radius-media);
+  background: var(--tayori-surface);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--tayori-text) 6%, transparent);
+}
+
+.tayori-cover img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
+/* ── The button ─────────────────────────────────────────────────── */
 
 tayori-news {
   position: relative;
@@ -75,180 +342,310 @@ tayori-news {
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: var(--tayori-space);
-  padding: 0.375rem;
-  border: 0;
-  border-radius: var(--tayori-inner-radius);
+  gap: 0.375rem;
+  height: 2.25rem;
+  min-width: 2.25rem;
+  padding: 0 0.5625rem;
+  border: 1px solid transparent;
+  border-radius: var(--tayori-radius);
   background: transparent;
   color: inherit;
-  font: inherit;
+  font: 500 var(--tayori-small) / 1 var(--tayori-font);
   cursor: pointer;
+  transition: background-color var(--tayori-transition);
 }
 
-.tayori-button:hover {
+.tayori-button:hover,
+.tayori-button[aria-expanded="true"] {
   background: color-mix(in oklab, currentColor 8%, transparent);
-}
-
-.tayori-button:focus-visible,
-.tayori-panel :focus-visible {
-  outline: none;
-  box-shadow: var(--tayori-focus-ring);
-}
-
-.tayori-icon {
-  width: var(--tayori-icon-size);
-  height: var(--tayori-icon-size);
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.75;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 
 .tayori-badge {
   position: absolute;
-  top: -0.125rem;
-  right: -0.25rem;
+  top: -0.25rem;
+  right: -0.375rem;
+  display: grid;
+  place-items: center;
   min-width: 1.125rem;
   height: 1.125rem;
-  padding: 0 0.3rem;
+  padding: 0 0.3125rem;
+  border: 2px solid var(--tayori-background);
   border-radius: 999px;
-  background: var(--tayori-badge);
-  color: var(--tayori-badge-text);
-  font-size: 0.6875rem;
-  font-weight: 600;
-  line-height: 1.125rem;
-  text-align: center;
+  box-sizing: content-box;
+  background: var(--tayori-attention);
+  color: var(--tayori-attention-text);
+  font: 600 0.6875rem / 1 var(--tayori-font);
+  font-variant-numeric: tabular-nums;
+  animation: tayori-pop 240ms cubic-bezier(0.2, 0.8, 0.2, 1.4);
 }
 
-.tayori-button-label + .tayori-badge,
-.tayori-button-label ~ .tayori-badge {
+.tayori-button-labelled .tayori-badge {
   position: static;
+  border: 0;
+  animation: none;
 }
 
-/* The panel: fixed to the side of the page. */
+@keyframes tayori-pop {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+}
+
+/* ── The panel ──────────────────────────────────────────────────── */
 
 .tayori-panel {
   position: fixed;
-  z-index: 1000;
+  z-index: 60;
   top: 0.75rem;
   right: 0.75rem;
   bottom: 0.75rem;
   display: flex;
   flex-direction: column;
   width: min(var(--tayori-panel-width), calc(100vw - 1.5rem));
-  border-radius: var(--tayori-radius);
+  overflow: hidden;
+  border-radius: var(--tayori-radius-panel);
   background: var(--tayori-background);
+  box-shadow: var(--tayori-shadow-panel);
   color: var(--tayori-text);
-  box-shadow: var(--tayori-shadow);
-  font-family: var(--tayori-font);
-  font-size: var(--tayori-font-size);
-  line-height: var(--tayori-line-height);
-  text-align: start;
-  animation: tayori-in var(--tayori-transition);
+  font: var(--tayori-weight) var(--tayori-font-size) / var(--tayori-line-height) var(--tayori-font);
+  text-align: left;
+  animation: tayori-panel-in var(--tayori-ease);
 }
 
-@keyframes tayori-in {
+@keyframes tayori-panel-in {
   from {
     opacity: 0;
-    transform: translateX(0.75rem);
+    transform: translateX(0.75rem) scale(0.99);
   }
 }
 
 .tayori-panel-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--tayori-border);
+  gap: 0.25rem;
+  min-height: 3.5rem;
+  padding: 0 0.75rem 0 1.25rem;
+  border-bottom: 1px solid var(--tayori-rule);
+}
+
+.tayori-panel-header:has(> .tayori-icon-button:first-child) {
+  padding-left: 0.75rem;
 }
 
 .tayori-panel-header h2 {
+  flex: 1;
   margin: 0;
-  font-family: var(--tayori-heading-font);
-  font-size: 1.0625rem;
-  font-weight: 600;
-}
-
-.tayori-close {
-  width: 2rem;
-  height: 2rem;
-  border: 0;
-  border-radius: var(--tayori-inner-radius);
-  background: transparent;
-  color: var(--tayori-muted);
-  font-size: 1.375rem;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.tayori-close:hover {
-  background: var(--tayori-surface);
-  color: var(--tayori-text);
+  font: var(--tayori-title-weight) 1.0625rem / 1.2 var(--tayori-title-font);
+  letter-spacing: var(--tayori-title-tracking);
 }
 
 .tayori-panel-body {
   flex: 1;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 0.25rem 1.25rem 1rem;
+  padding: 1rem 1.25rem 1.25rem;
+  scrollbar-width: thin;
 }
 
-.tayori-panel-footer {
-  padding: 0.75rem 1.25rem;
-  border-top: 1px solid var(--tayori-border);
-  font-size: var(--tayori-small);
+.tayori-panel .tayori-filter {
+  margin: -0.25rem -1.25rem 1rem;
+  padding: 0 1.25rem 0.125rem;
 }
 
-.tayori-panel-footer a {
-  color: var(--tayori-accent);
+.tayori-filter {
+  display: flex;
+  gap: 0.375rem;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
-/* The entries. */
+.tayori-filter::-webkit-scrollbar {
+  display: none;
+}
 
-.tayori-news {
+.tayori-cards {
+  display: grid;
+  gap: 0.75rem;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.tayori-news > li + li {
-  border-top: 1px solid var(--tayori-border);
+.tayori-card {
+  position: relative;
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.875rem;
+  border: 1px solid var(--tayori-rule);
+  border-radius: var(--tayori-radius-card);
+  background: var(--tayori-background);
+  box-shadow: var(--tayori-shadow-card);
+  transition:
+    border-color var(--tayori-transition),
+    background-color var(--tayori-transition),
+    box-shadow var(--tayori-transition);
 }
 
-.tayori-entry {
-  padding: 1.125rem 0;
+.tayori-card:hover {
+  border-color: var(--tayori-border);
+  background: color-mix(in oklab, var(--tayori-surface) 45%, var(--tayori-background));
 }
 
-.tayori-entry-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.375rem;
-  margin: 0 0 0.375rem;
+.tayori-card:focus-within {
+  box-shadow: var(--tayori-focus-ring);
+}
+
+.tayori-card-pinned {
+  border-color: color-mix(in oklab, var(--tayori-text) 22%, var(--tayori-rule));
+}
+
+.tayori-card-cover {
+  margin: -0.375rem -0.375rem 0.25rem;
+  border-radius: calc(var(--tayori-radius-card) - 3px);
+}
+
+.tayori-card-title {
+  margin: 0;
+  font: var(--tayori-title-weight) 1rem / 1.35 var(--tayori-title-font);
+  letter-spacing: var(--tayori-title-tracking);
+}
+
+/* The title's button opens the entry; it covers the whole card. */
+.tayori-card-title button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tayori-card-title button::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.tayori-card .tayori-card-title button:focus-visible {
+  box-shadow: none;
+}
+
+.tayori-card-summary {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
   color: var(--tayori-muted);
   font-size: var(--tayori-small);
+  line-height: 1.55;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
 }
 
-.tayori-category,
-.tayori-new {
-  padding: 0.0625rem 0.5rem;
-  border-radius: 999px;
+.tayori-reaction-counts {
+  display: flex;
+  gap: 0.75rem;
+  margin: 0.125rem 0 0;
+  color: var(--tayori-muted);
+  font-size: var(--tayori-tiny);
+  font-variant-numeric: tabular-nums;
+}
+
+.tayori-more {
+  display: block;
+  width: 100%;
+  height: 2.25rem;
+  margin-top: 0.75rem;
+  border: 1px dashed var(--tayori-border);
+  border-radius: var(--tayori-radius);
+  background: none;
+  color: var(--tayori-muted);
+  font: 500 var(--tayori-small) / 1 var(--tayori-font);
+  cursor: pointer;
+  transition:
+    border-color var(--tayori-transition),
+    color var(--tayori-transition);
+}
+
+.tayori-more:hover {
+  border-color: color-mix(in oklab, var(--tayori-border) 50%, var(--tayori-text));
+  color: var(--tayori-text);
+}
+
+.tayori-empty {
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  padding: 3rem 1rem;
+  color: var(--tayori-muted);
+  font-size: var(--tayori-small);
+  text-align: center;
+}
+
+.tayori-empty .tayori-icon {
+  --tayori-icon-size: 2rem;
+  opacity: 0.55;
+  stroke-width: 1.5;
+}
+
+.tayori-empty p {
+  margin: 0;
+}
+
+.tayori-panel-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 2.75rem;
+  padding: 0 1.25rem;
+  border-top: 1px solid var(--tayori-rule);
   background: var(--tayori-surface);
-  font-weight: 500;
+  color: var(--tayori-muted);
+  font-size: var(--tayori-tiny);
 }
 
-.tayori-new {
-  background: var(--tayori-accent);
-  color: var(--tayori-accent-text);
+.tayori-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.tayori-panel-footer a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--tayori-text);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.tayori-panel-footer a .tayori-icon {
+  --tayori-icon-size: 14px;
+  transition: transform var(--tayori-transition);
+}
+
+.tayori-panel-footer a:hover .tayori-icon {
+  transform: translateX(2px);
+}
+
+/* ── An entry, whole ────────────────────────────────────────────── */
+
+.tayori-entry {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
 }
 
 .tayori-entry-title {
-  margin: 0 0 0.5rem;
-  font-family: var(--tayori-heading-font);
-  font-size: 1.125rem;
-  font-weight: 600;
-  line-height: 1.3;
+  margin: 0;
+  font: var(--tayori-title-weight) 1.375rem / var(--tayori-title-line-height) var(--tayori-title-font);
+  letter-spacing: var(--tayori-title-tracking);
+  text-wrap: balance;
 }
 
 .tayori-entry-title a {
@@ -258,140 +655,890 @@ tayori-news {
 
 .tayori-entry-title a:hover {
   text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+}
+
+.tayori-entry-summary {
+  margin: 0;
+  color: color-mix(in oklab, var(--tayori-text) 76%, var(--tayori-muted));
+  font-size: 1.0625rem;
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+.tayori-entry-cover {
+  margin: 0.25rem 0;
 }
 
 .tayori-entry-body {
-  font-size: var(--tayori-font-size);
+  min-width: 0;
 }
 
-.tayori-entry-body img,
-.tayori-entry-body video {
-  max-width: 100%;
-  height: auto;
-  border-radius: var(--tayori-inner-radius);
+/* Kotoba's content starts and ends flush with the entry. */
+.tayori-entry-body > :first-child {
+  margin-top: 0;
 }
 
-.tayori-more {
-  display: block;
-  width: 100%;
+.tayori-entry-body > :last-child {
+  margin-bottom: 0;
+}
+
+.tayori-entry-footer {
   margin-top: 0.5rem;
-  padding: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--tayori-rule);
+}
+
+.tayori-panel .tayori-entry-title {
+  font-size: 1.25rem;
+}
+
+/* ── Reactions ──────────────────────────────────────────────────── */
+
+.tayori-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.tayori-reaction {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  height: 2rem;
+  padding: 0 0.625rem;
   border: 1px solid var(--tayori-border);
-  border-radius: var(--tayori-inner-radius);
+  border-radius: 999px;
   background: var(--tayori-background);
   color: var(--tayori-text);
-  font: inherit;
+  font: 500 var(--tayori-small) / 1 var(--tayori-font);
+  font-variant-numeric: tabular-nums;
   cursor: pointer;
+  transition:
+    border-color var(--tayori-transition),
+    background-color var(--tayori-transition),
+    transform var(--tayori-transition);
 }
 
-.tayori-more:hover {
+.tayori-reaction:hover:not(:disabled) {
+  border-color: color-mix(in oklab, var(--tayori-border) 55%, var(--tayori-text));
+  transform: translateY(-1px);
+}
+
+.tayori-reaction:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.tayori-reaction[aria-pressed="true"] {
+  border-color: color-mix(in oklab, var(--tayori-attention) 55%, var(--tayori-border));
+  background: color-mix(in oklab, var(--tayori-attention) 10%, var(--tayori-background));
+  color: color-mix(in oklab, var(--tayori-attention) 80%, var(--tayori-text));
+}
+
+.tayori-reaction:disabled {
+  cursor: default;
+  opacity: 0.75;
+}
+
+.tayori-reaction-emoji {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+/* ── Announcements ──────────────────────────────────────────────── */
+
+.tayori-announcement {
+  color: var(--tayori-text);
+  font: var(--tayori-weight) var(--tayori-font-size) / var(--tayori-line-height) var(--tayori-font);
+}
+
+.tayori-announcement-box {
+  position: relative;
+  background: var(--tayori-background);
+}
+
+.tayori-announcement-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin: 0 0 0.25rem;
+  color: var(--tayori-attention);
+  font-size: var(--tayori-tiny);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.tayori-announcement-eyebrow .tayori-icon {
+  --tayori-icon-size: 14px;
+}
+
+.tayori-announcement-title {
+  margin: 0;
+  font: var(--tayori-title-weight) 1.125rem / 1.3 var(--tayori-title-font);
+  letter-spacing: var(--tayori-title-tracking);
+}
+
+.tayori-announcement-summary {
+  margin: 0.375rem 0 0;
+  color: var(--tayori-muted);
+  font-size: var(--tayori-small);
+  line-height: 1.55;
+}
+
+.tayori-announcement-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.tayori-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.25rem;
+  padding: 0 0.875rem;
+  border: 1px solid var(--tayori-accent);
+  border-radius: var(--tayori-radius);
+  background: var(--tayori-accent);
+  color: var(--tayori-accent-text);
+  font: 500 var(--tayori-small) / 1 var(--tayori-font);
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color var(--tayori-transition),
+    border-color var(--tayori-transition);
+}
+
+.tayori-cta:hover {
+  background: color-mix(in oklab, var(--tayori-accent) 88%, black);
+}
+
+.tayori-cta-quiet {
+  border-color: var(--tayori-border);
+  background: var(--tayori-background);
+  color: var(--tayori-text);
+}
+
+.tayori-cta-quiet:hover {
+  border-color: color-mix(in oklab, var(--tayori-border) 60%, var(--tayori-text));
   background: var(--tayori-surface);
 }
 
-.tayori-empty {
-  padding: 2rem 0;
-  color: var(--tayori-muted);
-  text-align: center;
+.tayori-announcement-close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
 }
 
-/* The public page. */
-
-.tayori-page-body {
-  margin: 0;
-  background: var(--tayori-background);
-  color: var(--tayori-text);
+/* A popup: in the middle of the page, over a backdrop. */
+.tayori-announcement-popup {
+  position: fixed;
+  z-index: 70;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
 }
 
-.tayori-page {
-  max-width: 42rem;
-  margin: 0 auto;
-  padding: 3rem 1.25rem 4rem;
-  font-family: var(--tayori-font);
-  font-size: 1rem;
-  line-height: var(--tayori-line-height);
+.tayori-announcement-backdrop {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: var(--tayori-backdrop);
+  backdrop-filter: blur(2px);
+  animation: tayori-fade var(--tayori-ease);
 }
 
-.tayori-page-header {
-  margin-bottom: 1.5rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid var(--tayori-border);
+.tayori-announcement-popup .tayori-announcement-box {
+  display: grid;
+  gap: 1.25rem;
+  width: min(30rem, 100%);
+  padding: 1.5rem;
+  border-radius: var(--tayori-radius-panel);
+  box-shadow: var(--tayori-shadow-panel);
+  animation: tayori-rise var(--tayori-ease);
 }
 
-.tayori-page h1 {
-  margin: 0 0 0.5rem;
-  font-family: var(--tayori-heading-font);
-  font-size: 2rem;
-  font-weight: 600;
-  line-height: 1.2;
+.tayori-announcement-popup .tayori-announcement-cover {
+  margin: -0.75rem -0.75rem 0;
 }
 
-.tayori-page .tayori-entry-title {
+.tayori-announcement-popup .tayori-announcement-title {
   font-size: 1.375rem;
 }
 
-.tayori-page h1.tayori-entry-title {
-  font-size: 2rem;
+.tayori-announcement-popup .tayori-announcement-summary {
+  font-size: var(--tayori-font-size);
 }
 
-.tayori-page-links,
-.tayori-page-back {
+/* A toast: in a corner, out of the way. */
+.tayori-announcement-toast {
+  position: fixed;
+  z-index: 65;
+  right: 1rem;
+  bottom: 1rem;
+  width: min(22rem, calc(100vw - 2rem));
+}
+
+.tayori-announcement-toast .tayori-announcement-box {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--tayori-rule);
+  border-radius: var(--tayori-radius-card);
+  box-shadow: var(--tayori-shadow);
+  animation: tayori-rise var(--tayori-ease);
+}
+
+.tayori-announcement-toast .tayori-announcement-cover {
+  margin: -0.5rem -0.5rem 0;
+}
+
+.tayori-announcement-toast .tayori-announcement-text {
+  padding-right: 1.5rem;
+}
+
+.tayori-announcement-toast .tayori-cta {
+  height: 2rem;
+}
+
+/* A banner: a strip across the top of the page. */
+.tayori-announcement-banner .tayori-announcement-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  min-height: 2.75rem;
+  padding: 0.375rem 3rem;
+  background: var(--tayori-text);
+  color: var(--tayori-background);
+  font-size: var(--tayori-small);
+}
+
+.tayori-announcement-banner .tayori-announcement-text {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.tayori-announcement-banner .tayori-announcement-eyebrow {
+  margin: 0;
+  padding: 0.125rem 0.4375rem;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--tayori-background) 16%, transparent);
+  color: inherit;
+  font-size: 0.6875rem;
+}
+
+.tayori-announcement-banner .tayori-announcement-eyebrow .tayori-icon {
+  display: none;
+}
+
+.tayori-announcement-banner .tayori-announcement-title {
+  font: 500 var(--tayori-small) / 1.3 var(--tayori-font);
+  letter-spacing: 0;
+}
+
+.tayori-announcement-banner .tayori-cta {
+  height: 1.75rem;
+  padding: 0 0.625rem;
+  border-color: color-mix(in oklab, var(--tayori-background) 35%, transparent);
+  background: transparent;
+  color: inherit;
+}
+
+.tayori-announcement-banner .tayori-cta:hover {
+  background: color-mix(in oklab, var(--tayori-background) 12%, transparent);
+}
+
+.tayori-announcement-banner .tayori-announcement-close {
+  top: 50%;
+  right: 0.5rem;
+  color: inherit;
+  opacity: 0.75;
+  transform: translateY(-50%);
+}
+
+.tayori-announcement-banner .tayori-announcement-close:hover {
+  background: color-mix(in oklab, var(--tayori-background) 12%, transparent);
+  color: inherit;
+  opacity: 1;
+}
+
+@keyframes tayori-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes tayori-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+}
+
+/* ── The public page ────────────────────────────────────────────── */
+
+.tayori-page {
+  min-height: 100vh;
+  margin: 0;
+  background: var(--tayori-background);
+  color: var(--tayori-text);
+  font: var(--tayori-weight) var(--tayori-font-size) / var(--tayori-line-height) var(--tayori-font);
+  -webkit-font-smoothing: antialiased;
+}
+
+.tayori-page *,
+.tayori-page *::before,
+.tayori-page *::after {
+  box-sizing: border-box;
+}
+
+.tayori-page a {
+  color: inherit;
+}
+
+.tayori-shell {
+  width: min(var(--tayori-page-width), 100%);
+  margin: 0 auto;
+  padding: 0 1.25rem;
+}
+
+.tayori-preview-bar {
+  position: sticky;
+  z-index: 5;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.5rem;
+  padding: 0.375rem 1rem;
+  background: var(--tayori-attention);
+  color: var(--tayori-attention-text);
+  font-size: var(--tayori-small);
+  font-weight: 500;
+}
+
+.tayori-masthead {
+  padding: 4.5rem 0 2.25rem;
+}
+
+.tayori-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin: 0 0 1rem;
+  color: var(--tayori-muted);
+  font-size: var(--tayori-tiny);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.tayori-eyebrow::before {
+  content: "";
+  width: 2rem;
+  height: 2px;
+  background: var(--tayori-attention);
+}
+
+.tayori-page-title {
+  margin: 0;
+  font: var(--tayori-title-weight) clamp(2.25rem, 1.5rem + 3vw, 3.25rem) / 1.05 var(--tayori-title-font);
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+.tayori-page-description {
+  max-width: 36rem;
+  margin: 1rem 0 0;
+  color: var(--tayori-muted);
+  font-size: 1.125rem;
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+.tayori-masthead-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+  margin-top: 1.75rem;
+}
+
+.tayori-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 1rem;
+  color: var(--tayori-muted);
+  font-size: var(--tayori-small);
+}
+
+.tayori-links a,
+.tayori-links span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  color: var(--tayori-muted);
+  text-decoration: none;
+}
+
+.tayori-links a:hover {
+  color: var(--tayori-text);
+}
+
+.tayori-links [aria-current="page"] {
+  color: var(--tayori-text);
+  font-weight: 500;
+}
+
+.tayori-links .tayori-icon {
+  --tayori-icon-size: 15px;
+}
+
+.tayori-subscribe {
+  display: flex;
+  gap: 0.375rem;
+  width: min(26rem, 100%);
+}
+
+.tayori-input {
+  flex: 1;
+  min-width: 0;
+  height: 2.5rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--tayori-border);
+  border-radius: var(--tayori-radius);
+  background: var(--tayori-background);
+  color: var(--tayori-text);
+  font: var(--tayori-font-size) / 1 var(--tayori-font);
+  transition:
+    border-color var(--tayori-transition),
+    box-shadow var(--tayori-transition);
+}
+
+.tayori-input::placeholder {
+  color: color-mix(in oklab, var(--tayori-muted) 80%, transparent);
+}
+
+.tayori-input:hover {
+  border-color: color-mix(in oklab, var(--tayori-border) 60%, var(--tayori-text));
+}
+
+.tayori-page .tayori-input:focus-visible {
+  border-color: var(--tayori-accent);
+}
+
+.tayori-subscribe .tayori-cta {
+  height: 2.5rem;
+}
+
+.tayori-notice {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 1.5rem 0 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid color-mix(in oklab, var(--tayori-success) 30%, var(--tayori-rule));
+  border-radius: var(--tayori-radius);
+  background: color-mix(in oklab, var(--tayori-success) 8%, var(--tayori-background));
+  font-size: var(--tayori-small);
+}
+
+.tayori-notice .tayori-icon {
+  color: var(--tayori-success);
+}
+
+.tayori-notice-error {
+  border-color: color-mix(in oklab, var(--tayori-danger) 30%, var(--tayori-rule));
+  background: color-mix(in oklab, var(--tayori-danger) 8%, var(--tayori-background));
+}
+
+.tayori-notice-error .tayori-icon {
+  color: var(--tayori-danger);
+}
+
+.tayori-toolbar {
+  position: sticky;
+  z-index: 4;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0 -1.25rem;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--tayori-rule);
+  background: color-mix(in oklab, var(--tayori-background) 88%, transparent);
+  backdrop-filter: saturate(1.4) blur(10px);
+}
+
+.tayori-toolbar .tayori-filter {
+  flex: 1;
+}
+
+.tayori-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: none;
+}
+
+.tayori-search .tayori-icon {
+  --tayori-icon-size: 15px;
+  position: absolute;
+  left: 0.6875rem;
+  color: var(--tayori-muted);
+  pointer-events: none;
+}
+
+.tayori-search .tayori-input {
+  width: 13rem;
+  height: 1.875rem;
+  padding-left: 2rem;
+  border-radius: 999px;
+  font-size: var(--tayori-small);
+  transition:
+    width var(--tayori-ease),
+    border-color var(--tayori-transition),
+    box-shadow var(--tayori-transition);
+}
+
+.tayori-search .tayori-input:focus {
+  width: 17rem;
+}
+
+.tayori-results {
+  margin: 1.5rem 0 0;
+  color: var(--tayori-muted);
+  font-size: var(--tayori-small);
+}
+
+.tayori-results a {
+  margin-left: 0.5rem;
+  color: var(--tayori-text);
+}
+
+/* The timeline: the date on the side, each entry whole. */
+.tayori-timeline {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tayori-timeline > li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr);
+  gap: 2rem;
+  padding: 3rem 0;
+  border-bottom: 1px solid var(--tayori-rule);
+}
+
+.tayori-timeline > li:last-child {
+  border-bottom: 0;
+}
+
+.tayori-timeline-date {
+  position: sticky;
+  top: 4.5rem;
+  align-self: start;
+  margin: 0;
+  padding-top: 0.25rem;
+  color: var(--tayori-muted);
+  font-size: var(--tayori-small);
+  font-variant-numeric: tabular-nums;
+}
+
+.tayori-timeline .tayori-entry {
+  gap: 1rem;
+}
+
+.tayori-timeline .tayori-entry-title {
+  font-size: 1.75rem;
+  line-height: 1.2;
+}
+
+.tayori-timeline .tayori-meta time {
+  display: none;
+}
+
+.tayori-pager {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 2rem 0 5rem;
+}
+
+.tayori-pager a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 2.5rem;
+  padding: 0 1rem;
+  border: 1px solid var(--tayori-border);
+  border-radius: var(--tayori-radius);
+  color: var(--tayori-text);
+  font-size: var(--tayori-small);
+  font-weight: 500;
+  text-decoration: none;
+  transition:
+    border-color var(--tayori-transition),
+    background-color var(--tayori-transition);
+}
+
+.tayori-pager a:hover {
+  border-color: color-mix(in oklab, var(--tayori-border) 60%, var(--tayori-text));
+  background: var(--tayori-surface);
+}
+
+.tayori-pager a:only-child[rel="next"] {
+  margin-left: auto;
+}
+
+.tayori-page .tayori-empty {
+  padding: 5rem 1rem;
+  font-size: var(--tayori-font-size);
+}
+
+/* An entry's own page. */
+.tayori-article {
+  padding: 3rem 0 2rem;
+}
+
+.tayori-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-bottom: 2.5rem;
+  color: var(--tayori-muted);
+  font-size: var(--tayori-small);
+  text-decoration: none;
+  transition: color var(--tayori-transition);
+}
+
+.tayori-back:hover {
+  color: var(--tayori-text);
+}
+
+.tayori-back .tayori-icon {
+  --tayori-icon-size: 15px;
+  transition: transform var(--tayori-transition);
+}
+
+.tayori-back:hover .tayori-icon {
+  transform: translateX(-2px);
+}
+
+.tayori-article .tayori-entry {
+  gap: 1.25rem;
+}
+
+.tayori-article .tayori-entry-title {
+  font-size: clamp(2rem, 1.5rem + 2vw, 2.75rem);
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+}
+
+.tayori-article .tayori-entry-summary {
+  font-size: 1.25rem;
+}
+
+.tayori-article .tayori-entry-cover {
+  margin: 0.75rem 0;
+}
+
+.tayori-entry-nav {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin: 3rem 0 0;
+}
+
+.tayori-entry-nav a {
+  display: grid;
+  gap: 0.25rem;
+  padding: 1rem 1.125rem;
+  border: 1px solid var(--tayori-rule);
+  border-radius: var(--tayori-radius-card);
+  text-decoration: none;
+  transition:
+    border-color var(--tayori-transition),
+    background-color var(--tayori-transition);
+}
+
+.tayori-entry-nav a:hover {
+  border-color: var(--tayori-border);
+  background: var(--tayori-surface);
+}
+
+.tayori-entry-nav span {
+  color: var(--tayori-muted);
+  font-size: var(--tayori-tiny);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tayori-entry-nav strong {
+  font: var(--tayori-title-weight) 1rem / 1.35 var(--tayori-title-font);
+  letter-spacing: var(--tayori-title-tracking);
+}
+
+.tayori-entry-nav a[rel="next"] {
+  grid-column: 2;
+  text-align: right;
+}
+
+.tayori-subscribe-card {
+  display: grid;
+  gap: 0.75rem;
+  margin: 3rem 0 0;
+  padding: 1.5rem;
+  border: 1px solid var(--tayori-rule);
+  border-radius: var(--tayori-radius-card);
+  background: var(--tayori-surface);
+}
+
+.tayori-subscribe-card h2 {
+  margin: 0;
+  font: var(--tayori-title-weight) 1.125rem / 1.3 var(--tayori-title-font);
+  letter-spacing: var(--tayori-title-tracking);
+}
+
+.tayori-subscribe-card p {
   margin: 0;
   color: var(--tayori-muted);
   font-size: var(--tayori-small);
 }
 
-.tayori-page-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
+.tayori-page-footer {
+  padding: 2.5rem 0 3rem;
+  border-top: 1px solid var(--tayori-rule);
+  color: var(--tayori-muted);
+  font-size: var(--tayori-tiny);
 }
 
-.tayori-page a {
-  color: var(--tayori-accent);
+.tayori-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
-.tayori-page .tayori-entry-title a {
-  color: inherit;
-}
+/* ── Small screens, touch, motion, contrast ─────────────────────── */
 
-.tayori-languages {
-  display: inline-flex;
-  gap: 0.75rem;
-}
-
-.tayori-languages a[aria-current] {
-  color: var(--tayori-text);
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.tayori-page-more {
-  margin-top: 1.5rem;
-  text-align: center;
-}
-
-@media (forced-colors: active) {
-  .tayori-badge,
-  .tayori-new {
-    border: 1px solid CanvasText;
+@media (max-width: 640px) {
+  .tayori-panel {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    max-height: 88vh;
+    border-radius: var(--tayori-radius-panel) var(--tayori-radius-panel) 0 0;
+    animation-name: tayori-sheet-in;
   }
 
-  .tayori-panel {
-    border: 1px solid CanvasText;
+  .tayori-masthead {
+    padding-top: 3rem;
+  }
+
+  .tayori-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .tayori-search,
+  .tayori-search .tayori-input,
+  .tayori-search .tayori-input:focus {
+    width: 100%;
+  }
+
+  .tayori-timeline > li {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+    padding: 2.25rem 0;
+  }
+
+  .tayori-timeline-date {
+    position: static;
+    padding: 0;
+  }
+
+  .tayori-entry-nav {
+    grid-template-columns: 1fr;
+  }
+
+  .tayori-entry-nav a[rel="next"] {
+    grid-column: 1;
+  }
+
+  .tayori-announcement-banner .tayori-announcement-box {
+    justify-content: flex-start;
+    padding: 0.625rem 3rem 0.625rem 1rem;
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .tayori-panel {
-    animation: none;
+@keyframes tayori-sheet-in {
+  from {
+    transform: translateY(100%);
   }
 }
 
 @media (pointer: coarse) {
-  .tayori-button,
-  .tayori-close {
-    min-width: 44px;
-    min-height: 44px;
-    justify-content: center;
+  .tayori-icon-button,
+  .tayori-reaction,
+  .tayori-chip {
+    min-height: 2.75rem;
+  }
+
+  .tayori-icon-button {
+    width: 2.75rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tayori-panel,
+  .tayori-panel *,
+  .tayori-page *,
+  .tayori-announcement,
+  .tayori-announcement *,
+  .tayori-badge {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .tayori-panel,
+  .tayori-card,
+  .tayori-announcement-box {
+    border: 1px solid CanvasText;
+  }
+
+  .tayori-chip[aria-pressed="true"],
+  .tayori-chip[aria-current="page"],
+  .tayori-reaction[aria-pressed="true"],
+  .tayori-badge {
+    forced-color-adjust: none;
+    border-color: Highlight;
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  .tayori-new::before,
+  .tayori-dot {
+    forced-color-adjust: none;
+    background: CanvasText;
   }
 }

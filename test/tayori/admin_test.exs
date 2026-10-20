@@ -8,7 +8,7 @@ defmodule Tayori.AdminTest do
     test "an admin opens the admin", %{conn: conn} do
       {:ok, _view, html} = conn |> as_admin() |> live("/admin/news")
       assert html =~ "Entries"
-      assert html =~ "Nothing has been written yet"
+      assert html =~ "No entries yet"
     end
 
     test "nobody is sent where the resolver says", %{conn: conn} do
@@ -47,7 +47,7 @@ defmodule Tayori.AdminTest do
       {:ok, view, html} = conn |> as_admin() |> live("/admin/news")
       assert html =~ "A draft"
       assert html =~ "Out now"
-      assert html =~ "For plan:pro"
+      assert html =~ ~r{title="plan:pro">\s*<svg.*?</svg>Pro}s
 
       html = view |> form("#entries-search", q: "out") |> render_change()
       assert_patch(view, "/admin/news?q=out")
@@ -72,6 +72,8 @@ defmodule Tayori.AdminTest do
 
   describe "editor" do
     test "writes a draft, with categories and segments", %{conn: conn} do
+      {:ok, _} = Tayori.Categories.create(%{"names" => %{"en" => "New"}, "color" => "blue"})
+      {:ok, _} = Tayori.Categories.create(%{"names" => %{"en" => "Improved"}, "color" => "green"})
       {:ok, view, html} = conn |> as_admin() |> live("/admin/news/new")
       assert html =~ "New entry"
       assert html =~ "Pro"
@@ -91,7 +93,7 @@ defmodule Tayori.AdminTest do
                 "body" => JSON.encode!(body.doc)
               }
             },
-            "categories" => "New, Improved",
+            "categories" => ["", "new", "improved"],
             "segments" => ["", "plan:pro"]
           }
         })
@@ -101,7 +103,7 @@ defmodule Tayori.AdminTest do
 
       [entry] = Entries.list()
       assert entry.slug == "faster-exports"
-      assert entry.categories == ["New", "Improved"]
+      assert entry.categories == ["new", "improved"]
       assert entry.segments == ["plan:pro"]
       assert entry.author == %{"id" => 7, "name" => "Hanzo"}
 
@@ -147,7 +149,7 @@ defmodule Tayori.AdminTest do
 
     test "adds a language, and shows errors", %{conn: conn} do
       {:ok, view, _html} = conn |> as_admin() |> live("/admin/news/new")
-      html = view |> element("button", "+ Português (Portugal)") |> render_click()
+      html = view |> element(".ta-add-language", "Português (Portugal)") |> render_click()
       assert html =~ ~s|aria-label="Português (Portugal)"|
 
       html =

@@ -12,6 +12,7 @@ defmodule Tayori.Icons do
     "arrow-up-right" => ~S|<path d="M7 7h10v10"/> <path d="M7 17 17 7"/>|,
     "chevron-left" => ~S|<path d="m15 18-6-6 6-6"/>|,
     "chevron-right" => ~S|<path d="m9 18 6-6-6-6"/>|,
+    "chevron-up" => ~S|<path d="m18 15-6-6-6 6"/>|,
     "chevron-down" => ~S|<path d="m6 9 6 6 6-6"/>|,
     "x" => ~S|<path d="M18 6 6 18"/> <path d="m6 6 12 12"/>|,
     "plus" => ~S|<path d="M5 12h14"/> <path d="M12 5v14"/>|,

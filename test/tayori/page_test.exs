@@ -28,7 +28,7 @@ defmodule Tayori.PageTest do
 
     html = build_conn() |> get("/changelog/exports?lang=pt-PT") |> html_response(200)
     assert html =~ "Exportações"
-    assert html =~ "← Test news"
+    assert html =~ ~r{class="tayori-back">\s*<svg.*</svg>Test news}s
     assert html =~ Tayori.Messages.date(Tayori.Messages.for_locale("pt-PT"), Date.utc_today())
 
     assert build_conn() |> get("/changelog/nope") |> response(404)

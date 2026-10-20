@@ -134,6 +134,37 @@ defmodule Tayori do
   end
 
   @doc """
+  The entries on either side of an entry, for the reader: `{newer, older}`,
+  each an entry with its translation or nil.
+  """
+  @spec adjacent(Reader.t(), Entry.t(), keyword()) :: {Entry.t() | nil, Entry.t() | nil}
+  def adjacent(%Reader{} = reader, %Entry{published_at: at, id: id}, opts \\ []) do
+    config = Config.get()
+    now = Keyword.get_lazy(opts, :now, &DateTime.utc_now/0)
+    visible = Query.visible(config, reader, now)
+
+    newer =
+      visible
+      |> where([e], e.published_at > ^at or (e.published_at == ^at and e.id > ^id))
+      |> order_by([e], asc: e.published_at, asc: e.id)
+      |> limit(1)
+
+    older =
+      visible
+      |> where([e], e.published_at < ^at or (e.published_at == ^at and e.id < ^id))
+      |> Query.newest_first()
+      |> limit(1)
+
+    [newer, older]
+    |> Enum.map(
+      &(&1
+        |> config.repo.all(prefix: config.prefix)
+        |> with_translations(config, reader))
+    )
+    |> then(fn [n, o] -> {List.first(n), List.first(o)} end)
+  end
+
+  @doc """
   How many entries the reader has not seen: those published since they
   last saw the news (`mark_seen/2`), or since `reader.since`. Zero for a
   visitor.

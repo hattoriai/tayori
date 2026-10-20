@@ -48,7 +48,7 @@ defmodule Tayori.LiveTest do
     [fresh, old] =
       html
       |> LazyHTML.from_fragment()
-      |> LazyHTML.query(".tayori-entry")
+      |> LazyHTML.query(".tayori-card")
       |> Enum.map(&LazyHTML.text/1)
 
     assert fresh =~ "New" and fresh =~ "Fresh"

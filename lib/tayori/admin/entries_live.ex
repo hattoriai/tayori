@@ -1,22 +1,30 @@
 defmodule Tayori.Admin.EntriesLive do
   @moduledoc false
   # The entries: drafts and scheduled first, then the published, with a
-  # search and a filter of status. It follows the changes of the other
-  # admins as they make them.
+  # search and the statuses as tabs. Each row has its cover, categories,
+  # languages and, with the features on, its views and reactions. It
+  # follows the changes of the other admins as they make them.
 
   use Phoenix.LiveView, layout: false
   use PhoenixMountable.Path, mountable: Tayori.Router
 
   import Tayori.Admin.Components
 
-  alias Tayori.{Entries, Entry}
+  alias Tayori.{Categories, Category, Config, Entries, Entry, Reactions, Resolver, Views}
 
   @statuses %{"draft" => :draft, "scheduled" => :scheduled, "published" => :published}
 
   @impl true
   def mount(_params, _session, socket) do
     if connected?(socket), do: Tayori.subscribe()
-    {:ok, assign(socket, page_title: "News")}
+    # The names of the audiences, from the app's resolver.
+    audiences =
+      for {_group, segments} <- Resolver.segment_groups(socket.assigns.resolver),
+          {key, label} <- segments,
+          into: %{},
+          do: {key, label}
+
+    {:ok, assign(socket, page_title: "Entries", audiences: audiences)}
   end
 
   @impl true
@@ -31,8 +39,18 @@ defmodule Tayori.Admin.EntriesLive do
   end
 
   defp load(socket) do
+    config = socket.assigns.config
     entries = Entries.list(status: socket.assigns.status, search: socket.assigns.search)
-    assign(socket, entries: entries, now: DateTime.utc_now())
+    ids = Enum.map(entries, & &1.id)
+
+    assign(socket,
+      entries: entries,
+      counts: Entries.counts(),
+      categories: Categories.by_key(),
+      views: if(Config.feature?(config, :analytics), do: Views.totals(ids)),
+      reactions: if(Config.feature?(config, :reactions), do: Reactions.totals(ids)),
+      now: DateTime.utc_now()
+    )
   end
 
   @impl true
@@ -46,69 +64,140 @@ defmodule Tayori.Admin.EntriesLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <.page page={:entries} flash={@flash}>
-      <div class="ta-toolbar">
-        <h1>Entries</h1>
-        <.link :if={@access == :all} navigate={~m"/new"} class="ta-button ta-primary">
-          New entry
-        </.link>
+    <.page page={:entries} flash={@flash} access={@access}>
+      <div class="ta-heading">
+        <div>
+          <h1>Entries</h1>
+          <p class="ta-subtitle">What your people read in the app, on the page and by email.</p>
+        </div>
       </div>
 
-      <div class="ta-filters">
+      <div class="ta-list-bar">
         <nav class="ta-tabs" aria-label="Status">
           <.link
-            :for={{label, status} <- [{"All", nil}, {"Drafts", :draft}, {"Scheduled", :scheduled}, {"Published", :published}]}
+            :for={
+              {label, status, count} <- [
+                {"All", nil, @counts.all},
+                {"Drafts", :draft, @counts.draft},
+                {"Scheduled", :scheduled, @counts.scheduled},
+                {"Published", :published, @counts.published}
+              ]
+            }
             patch={list_path(status, @search)}
             aria-current={@status == status && "page"}
           >
-            {label}
+            {label} <span class="ta-count">{count}</span>
           </.link>
         </nav>
-        <form id="entries-search" phx-change="search" phx-submit="search" role="search">
+        <form id="entries-search" phx-change="search" phx-submit="search" role="search" class="ta-search">
+          <.icon name="search" />
           <input
             type="search"
             name="q"
             value={@search}
             placeholder="Search titles"
             aria-label="Search titles"
-            phx-debounce="250"
             class="ta-input"
+            phx-debounce="200"
           />
         </form>
       </div>
 
-      <ul :if={@entries != []} class="ta-entries" id="entries">
+      <ol :if={@entries != []} class="ta-entries">
         <li :for={entry <- @entries} id={"entry-#{entry.id}"}>
-          <.link navigate={~m"/#{entry.id}"} class="ta-entry">
-            <span class="ta-entry-title">{title(entry, @config)}</span>
-            <span class="ta-entry-meta">
-              <.status entry={entry} now={@now} />
-              <span :for={category <- entry.categories} class="ta-chip">{category}</span>
-              <span :if={entry.segments != []} class="ta-chip ta-chip-segment">
-                For {Enum.join(entry.segments, ", ")}
+          <.link navigate={~m"/#{entry.id}"} class="ta-entry-row">
+            <span class="ta-thumb">
+              <img :if={entry.cover} src={entry.cover["url"]} alt="" loading="lazy" />
+              <.icon :if={!entry.cover} name="file-text" />
+            </span>
+            <span class="ta-entry-main">
+              <span class="ta-entry-title">
+                <.icon :if={entry.pinned_at} name="pin" class="ta-pin" />
+                {title(entry, @config)}
               </span>
-              <span :if={length(@config.locales) > 1} class="ta-muted">
-                {entry.translations |> Enum.map(& &1.locale) |> Enum.join(" · ")}
+              <span :if={summary(entry, @config)} class="ta-entry-summary">
+                {summary(entry, @config)}
+              </span>
+              <span class="ta-entry-meta">
+                <.status entry={entry} now={@now} />
+                <span
+                  :for={key <- entry.categories}
+                  class="tayori-category"
+                  data-color={category_color(@categories, key)}
+                >
+                  {category_name(@categories, key, @config)}
+                </span>
+                <span :for={segment <- entry.segments} class="ta-tag" title={segment}>
+                  <.icon name="lock" />{Map.get(@audiences, segment, segment)}
+                </span>
+                <span :if={entry.announce} class="ta-tag">
+                  <.icon name="megaphone" />{String.capitalize(entry.announce)}
+                </span>
+                <span :if={length(@config.locales) > 1} class="ta-languages-used">
+                  {entry.translations |> Enum.map(& &1.locale) |> Enum.join(" · ")}
+                </span>
               </span>
             </span>
+            <span :if={@views || @reactions} class="ta-entry-stats">
+              <span :if={@views} title="Views">
+                <.icon name="eye" />{get_in(@views, [entry.id, :views]) || 0}
+              </span>
+              <span :if={@views} title="Readers">
+                <.icon name="users" />{get_in(@views, [entry.id, :readers]) || 0}
+              </span>
+              <span :if={@reactions} title="Reactions">
+                <.icon name="smile-plus" />{Map.get(@reactions, entry.id, 0)}
+              </span>
+            </span>
+            <.icon name="chevron-right" class="ta-row-chevron" />
           </.link>
         </li>
-      </ul>
+      </ol>
 
-      <div :if={@entries == []} class="ta-empty">
-        <p :if={@search == "" and is_nil(@status)}>
-          Nothing has been written yet. The first entry tells your people what changed.
-        </p>
-        <p :if={@search != "" or @status}>No entries here.</p>
-      </div>
+      <.empty :if={@entries == [] and @search != ""} icon="search" title="No entry matches">
+        <p>Nothing has “{@search}” in its title or address.</p>
+      </.empty>
+
+      <.empty :if={@entries == [] and @search == ""} icon="newspaper" title={empty_title(@status)}>
+        <p>Write what changed, and why it matters to your people.</p>
+        <.link :if={@access == :all} navigate={~m"/new"} class="ta-button ta-primary">
+          <.icon name="plus" />Write the first entry
+        </.link>
+      </.empty>
     </.page>
     """
   end
 
+  defp empty_title(nil), do: "No entries yet"
+  defp empty_title(:draft), do: "No drafts"
+  defp empty_title(:scheduled), do: "Nothing scheduled"
+  defp empty_title(:published), do: "Nothing published yet"
+
   defp title(entry, config) do
     case Entry.translation(entry, nil, config.locales) do
-      %{title: title} -> title
-      nil -> entry.slug
+      %{title: title} when title not in [nil, ""] -> title
+      _ -> entry.slug
+    end
+  end
+
+  defp summary(entry, config) do
+    case Entry.translation(entry, nil, config.locales) do
+      %{summary: summary} when is_binary(summary) -> summary
+      _ -> nil
+    end
+  end
+
+  defp category_color(categories, key) do
+    case categories[key] do
+      %Category{color: color} -> color
+      nil -> "gray"
+    end
+  end
+
+  defp category_name(categories, key, config) do
+    case categories[key] do
+      %Category{} = category -> Category.name(category, nil, config.locales)
+      nil -> key
     end
   end
 
