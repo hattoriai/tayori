@@ -13,7 +13,10 @@
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "skipLibCheck": true,
-    "types": ["node"]
+    "types": ["node"],
+    "paths": {
+      "phoenix_mountable": ["../deps/phoenix_mountable"]
+    }
   },
   "include": ["src", "test"]
 }
