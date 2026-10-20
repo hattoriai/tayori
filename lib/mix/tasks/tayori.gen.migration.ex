@@ -42,12 +42,14 @@ defmodule Mix.Tasks.Tayori.Gen.Migration do
     case Path.wildcard(Path.join(dir, "*_add_tayori.exs")) do
       [existing | _rest] ->
         Mix.shell().info([:green, "* unchanged ", :reset, existing, " (the migration exists)"])
+        :unchanged
 
       [] ->
         path = Path.join(dir, "#{timestamp()}_add_tayori.exs")
         File.mkdir_p!(dir)
         File.write!(path, migration(repo, opts[:prefix]))
         Mix.shell().info([:green, "* creating ", :reset, path])
+        :created
     end
   end
 

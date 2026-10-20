@@ -17,7 +17,8 @@ defmodule Tayori.API do
   ## The routes
 
     * `GET /` - the newest entries: `{"entries": [...], "more": bool,
-      "unread": n, "seenAt": time, "messages": {...}}`. `?before=<id>` gives
+      "unread": n, "newAfter": time, "messages": {...}}`; an entry
+      published after `newAfter` is new to the reader (nil for a visitor). `?before=<id>` gives
       the entries published before that one; `?limit=` up to 50 (10).
     * `GET /unread` - `{"unread": n, "messages": {...}}`, the count alone,
       cheap enough to ask often.
@@ -62,7 +63,7 @@ defmodule Tayori.API do
       entries: entries |> Enum.take(limit) |> Enum.map(&entry_json(&1, opts)),
       more: length(entries) > limit,
       unread: if(reader, do: Tayori.unread_count(reader), else: 0),
-      seenAt: reader && Tayori.seen_at(reader),
+      newAfter: reader && Tayori.new_after(reader),
       messages: Messages.for_locale(locale)
     })
   end

@@ -184,7 +184,9 @@ defmodule Tayori.Admin.EntryLive do
            editor_id(locale),
            locale,
            :draft,
-           {:draft, notes, locale}, label: "Draft")}
+           {:draft, notes, locale},
+           label: "Draft"
+         )}
     end
   end
 
@@ -201,7 +203,9 @@ defmodule Tayori.Admin.EntryLive do
            editor_id(to),
            to,
            :translate,
-           {:translate, source, first, to}, label: "Translation")}
+           {:translate, source, first, to},
+           label: "Translation"
+         )}
 
       _ ->
         {:noreply,

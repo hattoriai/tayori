@@ -24,7 +24,7 @@ interface IndexResponse {
   entries: ApiEntry[];
   more: boolean;
   unread: number;
-  seenAt: string | null;
+  newAfter: string | null;
   messages: Messages;
 }
 
@@ -39,9 +39,9 @@ export function unreadText(messages: Messages, n: number): string {
   return (messages[key] ?? "{n}").replace("{n}", String(n));
 }
 
-/** Whether an entry was published after the reader last saw the news. */
-export function isNew(entry: ApiEntry, seenAt: string | null): boolean {
-  return seenAt !== null && new Date(entry.publishedAt).getTime() > new Date(seenAt).getTime();
+/** Whether an entry is new to the reader: published after `newAfter` (never for a visitor). */
+export function isNew(entry: ApiEntry, newAfter: string | null): boolean {
+  return newAfter !== null && new Date(entry.publishedAt).getTime() > new Date(newAfter).getTime();
 }
 
 /** One entry, as Tayori.Components.entry/1 renders it. */
@@ -108,7 +108,7 @@ export class TayoriNews extends HTMLElement {
   private messages: Messages = {};
   private count = 0;
   private entries: ApiEntry[] = [];
-  private seenAt: string | null = null;
+  private newAfter: string | null = null;
   private timer: number | undefined;
   private readonly panelId = `tayori-news-panel-${++panels}`;
 
@@ -184,7 +184,7 @@ export class TayoriNews extends HTMLElement {
 
     this.messages = data.messages;
     this.entries = data.entries;
-    this.seenAt = data.seenAt;
+    this.newAfter = data.newAfter;
     this.renderPanel(data.more);
     this.setUnread(0);
     void this.request("/seen", "POST");
@@ -241,7 +241,7 @@ export class TayoriNews extends HTMLElement {
     body.className = "tayori-panel-body";
     const list = document.createElement("ol");
     list.className = "tayori-news";
-    for (const entry of this.entries) list.append(renderEntry(entry, this.messages, isNew(entry, this.seenAt)));
+    for (const entry of this.entries) list.append(renderEntry(entry, this.messages, isNew(entry, this.newAfter)));
     body.append(list);
 
     if (this.entries.length === 0) {
@@ -289,7 +289,7 @@ export class TayoriNews extends HTMLElement {
     if (!data) return;
 
     this.entries.push(...data.entries);
-    for (const entry of data.entries) list.append(renderEntry(entry, this.messages, isNew(entry, this.seenAt)));
+    for (const entry of data.entries) list.append(renderEntry(entry, this.messages, isNew(entry, this.newAfter)));
     if (this.panel) localizeTimes(this.panel, document.documentElement.lang || undefined);
     if (!data.more) button.remove();
   }

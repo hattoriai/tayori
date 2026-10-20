@@ -145,6 +145,18 @@ defmodule Tayori do
   defp latest(a, b), do: if(DateTime.compare(a, b) == :gt, do: a, else: b)
 
   @doc """
+  The time after which an entry is new to the reader: when they last saw
+  the news, else `reader.since`, else the beginning of time (everything is
+  new to a reader who never looked). Nil for a visitor: nothing is new.
+  """
+  @spec new_after(Reader.t()) :: DateTime.t() | nil
+  def new_after(%Reader{id: nil}), do: nil
+
+  def new_after(%Reader{} = reader) do
+    latest(seen_at(reader), reader.since) || ~U[1970-01-01 00:00:00Z]
+  end
+
+  @doc """
   When the reader last saw the news, or nil.
   """
   @spec seen_at(Reader.t()) :: DateTime.t() | nil

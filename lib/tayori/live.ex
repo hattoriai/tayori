@@ -113,7 +113,7 @@ defmodule Tayori.Live do
   defp handle_event("tayori:open", _params, socket) do
     state = socket.assigns.tayori
     reader = state.reader || Reader.visitor(state.locale)
-    seen_before = state.reader && Tayori.seen_at(state.reader)
+    seen_before = state.reader && Tayori.new_after(state.reader)
     entries = Tayori.news(reader, limit: state.limit + 1)
 
     if state.reader, do: Tayori.mark_seen(state.reader)
