@@ -69,6 +69,10 @@ defmodule Tayori.Config do
         * `:kinds` - the category of each kind of change a source names,
           `%{"added" => "new", "fixed" => "fixed"}` (`%{}`). A kind that
           is a category's key is that category.
+        * `:github` - how a merged pull request's labels speak to the
+          inbox (see `Tayori.GitHub`): `:label_prefix` (`"changelog:"`),
+          and `:only_labeled`, to take only the pull requests with a
+          label of the prefix (`false`).
     * `:digest` - when the inbox becomes an entry (see `Tayori.Digest`):
         * `:every` - `:manual` (the admin asks), `:ingest` (each time
           changes come), `{:weekly, day}` (`:monday` ... `:sunday`),
@@ -284,7 +288,8 @@ defmodule Tayori.Config do
           sources: [{module(), keyword()}],
           ingest_on_start: boolean(),
           audience: String.t(),
-          kinds: %{String.t() => String.t()}
+          kinds: %{String.t() => String.t()},
+          github: %{label_prefix: String.t(), only_labeled: boolean()}
         }
 
   @typedoc "The `:digest` option, checked."
@@ -321,12 +326,29 @@ defmodule Tayori.Config do
       sources: Enum.map(sources, &source/1),
       ingest_on_start: Keyword.get(opts, :ingest_on_start, true) == true,
       audience: audience,
-      kinds: Map.new(kinds, fn {k, v} -> {String.downcase(k), v} end)
+      kinds: Map.new(kinds, fn {k, v} -> {String.downcase(k), v} end),
+      github: github(Keyword.get(opts, :github, []))
     }
   end
 
   defp inbox(other),
     do: raise(ArgumentError, ":inbox must be a keyword list, got: #{inspect(other)}")
+
+  defp github(opts) when is_list(opts) do
+    prefix = Keyword.get(opts, :label_prefix, "changelog:")
+
+    unless is_binary(prefix) and prefix != "" do
+      raise ArgumentError, ":label_prefix of :github must be a string, got: #{inspect(prefix)}"
+    end
+
+    %{
+      label_prefix: String.downcase(prefix),
+      only_labeled: Keyword.get(opts, :only_labeled, false) == true
+    }
+  end
+
+  defp github(other),
+    do: raise(ArgumentError, ":github of :inbox must be a keyword list, got: #{inspect(other)}")
 
   defp source?({module, opts}) when is_atom(module) and is_list(opts), do: true
   defp source?(module) when is_atom(module), do: true

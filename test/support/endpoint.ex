@@ -92,6 +92,17 @@ defmodule TayoriTest.Host do
            end
          end
 
+         # The API for machines, as the Automation guide mounts it: no
+         # session, no CSRF protection; CI and GitHub prove who they are.
+         pipeline :machines do
+           plug :accepts, ["json"]
+         end
+
+         scope "/machines" do
+           pipe_through :machines
+           tayori_api "/news", resolver: TayoriTest.Resolver, as: :tayori_machines
+         end
+
          # The API for the :embed feature, as the guide mounts it: no
          # CSRF protection, the readers come with a token.
          pipeline :embed do

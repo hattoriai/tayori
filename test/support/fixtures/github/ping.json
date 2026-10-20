@@ -1,0 +1,17 @@
+{
+  "zen": "Keep it logically awesome.",
+  "hook_id": 42,
+  "hook": {
+    "type": "Repository",
+    "id": 42,
+    "active": true,
+    "events": ["pull_request", "release"],
+    "config": {
+      "content_type": "json",
+      "insecure_ssl": "0",
+      "url": "https://myapp.com/api/machines/news/hooks/github"
+    }
+  },
+  "repository": {"id": 5001, "name": "app", "full_name": "atelier/app", "default_branch": "main"},
+  "sender": {"login": "sakura", "id": 102, "type": "User"}
+}
