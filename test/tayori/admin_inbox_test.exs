@@ -414,6 +414,20 @@ defmodule Tayori.AdminInboxTest do
       refute has_element?(view, "#automation button", "Read now")
     end
 
+    test "the embed's snippet is the embed's mount, not the machines'", %{
+      conn: conn,
+      config: config
+    } do
+      put_config(config,
+        features: [:embed],
+        embed: %{origins: ["https://www.example.com"], max_age: 86_400}
+      )
+
+      {:ok, view, _html} = conn |> as_admin() |> live("/admin/news/settings")
+      assert has_element?(view, "#embed-snippet", "/embed/news/tayori.js")
+      refute has_element?(view, "#embed-snippet", "/machines/")
+    end
+
     test "the cadence in words" do
       alias Tayori.Admin.Automation
 
