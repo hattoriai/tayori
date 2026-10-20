@@ -249,6 +249,22 @@ if Code.ensure_loaded?(Sake.Server) do
                  ~s(No change with the id "x".)
       end
 
+      test "a new change starts a digest of each ingest", %{config: config, repo: repo} do
+        oban =
+          if repo == TayoriTest.SQLiteRepo,
+            do: TayoriTest.SQLiteOban,
+            else: TayoriTest.PostgresOban
+
+        put_config(config, oban: oban, digest: [every: :ingest])
+
+        call!(client(), "add_change", %{"title" => "Exports", "ref" => "pr-1"})
+        assert %DateTime{} = last = Tayori.Digest.status().last_run_at
+
+        # The same change again is nothing new.
+        call!(client(), "add_change", %{"title" => "Exports", "ref" => "pr-1"})
+        assert Tayori.Digest.status().last_run_at == last
+      end
+
       test "refuses a category or a segment the app does not have" do
         assert tool_error(client(), "add_change", %{"title" => "X", "category" => "News"}) =~
                  "Unknown categories: News. The categories are new, fixed"

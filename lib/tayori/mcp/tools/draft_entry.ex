@@ -38,9 +38,10 @@ if Code.ensure_loaded?(Sake.Server) do
       with {:ok, ids} <- Support.change_ids(ids), do: {:ok, [ids: ids]}
     end
 
-    # Always a draft, whatever the :digest config says.
+    # Always a plain draft, whatever the :digest config says: the client
+    # is the model, and writes it better from there.
     defp run(opts) do
-      case Digest.run([publish: :draft] ++ opts) do
+      case Digest.run([publish: :draft, ai: false] ++ opts) do
         {:ok, entry} ->
           {:ok, Tayori.Entries.get!(entry.id)}
 

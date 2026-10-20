@@ -37,7 +37,7 @@ if Code.ensure_loaded?(Sake.Server) do
       description:
         "Its name where it comes from (a pull request, a commit); one is made if not given"
 
-    alias Tayori.Inbox
+    alias Tayori.{Digest, Inbox}
     alias Tayori.MCP.Support
 
     @impl true
@@ -63,7 +63,10 @@ if Code.ensure_loaded?(Sake.Server) do
 
       with :ok <- Support.categories(args[:category] && [args[:category]]),
            :ok <- Support.segments(args[:segments]),
+           new? = not Support.change_exists?("mcp", attrs.ref),
            {:ok, change} <- Inbox.add(attrs, source: "mcp") do
+        # A digest of each ingest takes the changes of MCP too.
+        if new?, do: Digest.after_ingest(1)
         {:ok, Support.change(change)}
       else
         {:error, reason} -> {:error, Support.error(reason)}

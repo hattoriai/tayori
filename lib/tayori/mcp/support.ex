@@ -177,6 +177,15 @@ if Code.ensure_loaded?(Sake.Server) do
       end
     end
 
+    @doc "Whether the inbox has the change of a source and a ref."
+    @spec change_exists?(String.t(), String.t()) :: boolean()
+    def change_exists?(source, ref) do
+      config = Config.get()
+
+      from(c in Change, where: c.source == ^source and c.ref == ^ref)
+      |> config.repo.exists?(prefix: config.prefix)
+    end
+
     @doc "Ids of changes, checked."
     @spec change_ids([String.t()]) :: {:ok, [Ecto.UUID.t()]} | {:error, String.t()}
     def change_ids(ids) do
