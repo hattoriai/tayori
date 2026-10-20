@@ -30,6 +30,11 @@ defmodule Tayori.AdminTest do
       assert html =~ ~r/<fieldset[^>]*disabled/
       render_submit(view, "save", %{"entry" => %{"slug" => "changed"}, "intent" => "save"})
       assert Entries.get!(entry.id).slug == "visible"
+
+      # No uploads for a reader of the admin; an admin who writes has them.
+      refute html =~ ~s(data-upload=")
+      {:ok, _view, html} = conn |> as_admin() |> live("/admin/news/#{entry.id}")
+      assert html =~ ~s(data-upload=")
     end
   end
 

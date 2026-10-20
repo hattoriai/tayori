@@ -54,7 +54,10 @@ defmodule Tayori.Admin.EntryLive do
   end
 
   # One upload for each language: Kotoba puts each file in the editor it
-  # was dropped on.
+  # was dropped on. Only an admin who may write uploads.
+  defp allow_uploads(%{assigns: %{access: access}} = socket, _locales) when access != :all,
+    do: socket
+
   defp allow_uploads(socket, locales) do
     Enum.reduce(locales, socket, fn locale, socket ->
       allow_upload(socket, upload_name(locales, locale),
@@ -383,9 +386,11 @@ defmodule Tayori.Admin.EntryLive do
     |> Map.put_new("segments", [])
   end
 
-  defp consume_all(socket) do
+  defp consume_all(%{assigns: %{access: :all}} = socket) do
     Enum.reduce(socket.assigns.config.locales, socket, &consume(&2, &1))
   end
+
+  defp consume_all(socket), do: socket
 
   defp consume(socket, locale) do
     opts = if socket.assigns.storage, do: [storage: socket.assigns.storage], else: []
@@ -533,7 +538,7 @@ defmodule Tayori.Admin.EntryLive do
                   field={t[:body]}
                   label_id={"#{editor_id(t[:locale].value)}-label"}
                   features={Translation.features()}
-                  uploads={@uploads[upload_name(@config.locales, t[:locale].value)]}
+                  uploads={assigns[:uploads][upload_name(@config.locales, t[:locale].value)]}
                   placeholder="What changed, and why it matters to your people"
                   readonly={@read_only}
                   assist={if @ai, do: AI.actions()}
