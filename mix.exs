@@ -76,8 +76,8 @@ defmodule Tayori.MixProject do
       # has it.
       {:phoenix_ecto, "~> 4.6"},
       # The mounts in the app's router, their assets and the migrations.
-      # 0.2.2 finds the callbacks of a definition not loaded yet.
-      {:phoenix_mountable, "~> 0.2.2"},
+      # 0.2.3 compiles the installer in an app without Igniter.
+      {:phoenix_mountable, "~> 0.2.3"},
       {:igniter, "~> 0.6", optional: true},
       {:phoenix, if(@oldest, do: "~> 1.7.14", else: "~> 1.7.14 or ~> 1.8")},
       {:phoenix_html, "~> 4.1"},
@@ -98,7 +98,7 @@ defmodule Tayori.MixProject do
       # The time zones of the development server's date picker.
       {:tz, "~> 0.28", only: [:dev, :test]},
       # The MCP server, Tayori.MCP, mounted in the app's own.
-      {:sake, "~> 0.4.2", optional: true}
+      {:sake, "~> 0.4.3", optional: true}
     ]
   end
 
