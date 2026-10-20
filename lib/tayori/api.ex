@@ -64,6 +64,14 @@ defmodule Tayori.API do
       `{"html", "id", "kind"}`, all nil when there is none. With the
       `:announcements` feature, else a 404.
 
+  For machines, not readers, with no session (see the
+  [Automation](automation.md) guide):
+
+    * `POST /changes` - changes for the inbox, with the ingest token
+      (`Tayori.Ingest`).
+    * `POST /hooks/github` - GitHub's webhook, signed with its secret
+      (`Tayori.GitHub`).
+
   With the `:embed` feature, also:
 
     * `OPTIONS` of each route - the CORS preflight of the sites of the

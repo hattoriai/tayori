@@ -1,0 +1,23 @@
+{
+  "action": "published",
+  "release": {
+    "html_url": "https://github.com/atelier/app/releases/tag/v1.4.0",
+    "id": 9001,
+    "tag_name": "v1.4.0",
+    "target_commitish": "main",
+    "name": "1.4.0",
+    "draft": false,
+    "prerelease": false,
+    "created_at": "2026-10-20T09:30:00Z",
+    "published_at": "2026-10-20T09:31:12Z",
+    "author": {"login": "sakura", "id": 102, "type": "User"},
+    "body": "## What's Changed\r\n\r\n### Added\r\n\r\n* Exports in two clicks: zip a project with its files. by @hanzo in https://github.com/atelier/app/pull/1234\r\n\r\n### Fixed\r\n\r\n* Dates showed a day early in Auckland. by @sakura in https://github.com/atelier/app/pull/1236\r\n\r\n## New Contributors\r\n\r\n* @kaito made their first contribution in https://github.com/atelier/app/pull/1230\r\n\r\n**Full Changelog**: https://github.com/atelier/app/compare/v1.3.0...v1.4.0"
+  },
+  "repository": {
+    "id": 5001,
+    "name": "app",
+    "full_name": "atelier/app",
+    "default_branch": "main"
+  },
+  "sender": {"login": "sakura", "id": 102, "type": "User"}
+}
