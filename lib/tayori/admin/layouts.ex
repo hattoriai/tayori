@@ -96,7 +96,7 @@ defmodule Tayori.Admin.Layouts do
           <div class="ta-bar-actions">
             <.appearance />
             <.link :if={@access == :all} navigate={~m"/new"} class="ta-button ta-primary">
-              <.icon name="plus" />New entry
+              <.icon name="plus" /><span class="ta-bar-label">New entry</span>
             </.link>
           </div>
         </div>

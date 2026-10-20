@@ -92,7 +92,7 @@
   box-sizing: border-box;
 }
 
-.tayori-admin a {
+:where(.tayori-admin) a {
   color: inherit;
 }
 
@@ -2421,7 +2421,8 @@ select.ta-input {
   }
 
   /* The labels of the bar stay for screen readers. */
-  .ta-nav a .ta-nav-label {
+  .ta-nav a .ta-nav-label,
+  .ta-bar-actions .ta-bar-label {
     display: inline;
     position: absolute;
     width: 1px;
