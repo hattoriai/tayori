@@ -202,13 +202,16 @@ defmodule Tayori.Live do
         state =
           if state.announcement && state.announcement.id == entry.id do
             if state.reader, do: Tayori.Announcements.dismiss(state.reader, entry.id)
-            %{state | announcement: nil, categories: Tayori.Categories.by_key()}
+            state = %{state | announcement: nil, categories: Tayori.Categories.by_key()}
+            # The panel opens on it, with the list to go back to.
+            if state.open, do: state, else: load(state)
           else
             state
           end
 
+        # The reactions of the entry and of the list, for the way back.
         state = %{state | open: true, entry: entry}
-        {:halt, put_state(socket, reactions(state, [entry]))}
+        {:halt, put_state(socket, reactions(state))}
     end
   end
 
