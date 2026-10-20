@@ -65,6 +65,22 @@ defmodule Tayori.Test do
   end
 
   @doc """
+  Announces the entries whose time has come, as Tayori's scheduler does,
+  in the test's process: the app's notifier is called, the subscribers
+  emailed and the webhooks told, or, with the `:oban` option, their jobs
+  enqueued. Each entry is announced once.
+
+      entry = publish!("Exports")
+      announce!()
+      assert_enqueued worker: Tayori.Worker, args: %{"job" => "notify", "entry_id" => entry.id}
+  """
+  @spec announce!() :: :ok
+  def announce! do
+    Tayori.Scheduler.announce_due(Tayori.Config.get())
+    :ok
+  end
+
+  @doc """
   The count of unread entries that the button of a LiveView shows (0 when
   it shows none).
   """

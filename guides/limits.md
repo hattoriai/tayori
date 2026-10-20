@@ -28,7 +28,9 @@ they read. The count stops at 99.
 A scheduled entry is published at its time (it shows to readers from
 then on); its announcement (to open pages and the notifier) comes within a
 minute on the node that reaches it first, or at once on the node of the
-admin who scheduled it.
+admin who scheduled it. What it sends (emails, webhooks, the notifier)
+is retried by Oban when Tayori has it, and is lost with the node that
+sends it when it has not: see [Notifications](notifications.md).
 
 ## Time zones
 

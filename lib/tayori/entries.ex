@@ -118,6 +118,17 @@ defmodule Tayori.Entries do
     |> config.repo.preload(:translations, prefix: config.prefix)
   end
 
+  @doc "An entry by its id, with its translations, or nil."
+  @spec get(Ecto.UUID.t()) :: Entry.t() | nil
+  def get(id) do
+    config = Config.get()
+
+    case config.repo.get(Entry, id, prefix: config.prefix) do
+      nil -> nil
+      entry -> config.repo.preload(entry, :translations, prefix: config.prefix)
+    end
+  end
+
   @doc "A new entry, with an empty translation in the first language."
   @spec new() :: Entry.t()
   def new do

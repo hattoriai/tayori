@@ -63,12 +63,22 @@ defmodule Tayori.Subscribers do
         config.repo.get_by(__MODULE__, [email: email], prefix: config.prefix) ||
           config.repo.insert!(changeset, prefix: config.prefix)
 
-      if subscriber.confirmed_at == nil,
-        do: deliver(config, &Tayori.Mail.confirm(config, &1), [subscriber])
+      if subscriber.confirmed_at == nil, do: send_confirmation(config, subscriber)
 
       :ok
     else
       {:error, changeset}
+    end
+  end
+
+  # The reader asked for it a moment ago: sent now, in the request.
+  defp send_confirmation(config, subscriber) do
+    case config.mailer.deliver(Tayori.Mail.confirm(config, subscriber)) do
+      {:ok, _} ->
+        :ok
+
+      {:error, reason} ->
+        Logger.warning("Tayori could not email #{subscriber.id}: #{inspect(reason)}")
     end
   end
 
@@ -119,23 +129,25 @@ defmodule Tayori.Subscribers do
   end
 
   @doc false
-  # Emails an entry to the confirmed subscribers, once, from the
-  # scheduler's announcement. The entry is claimed first (its emailed_at),
-  # so that two nodes never send it twice.
-  def send_entry(%Config{} = config, entry_id) do
-    entry = Tayori.Entries.get!(entry_id)
+  # Claims an entry's email, once (its emailed_at), and returns the
+  # confirmed subscribers to send it to, from the scheduler's
+  # announcement. Two nodes never claim it both. An entry not to email,
+  # or claimed already, has none.
+  @spec claim_entry(Config.t(), Ecto.UUID.t()) :: [Ecto.UUID.t()]
+  def claim_entry(%Config{} = config, entry_id) do
+    entry = Tayori.Entries.get(entry_id)
 
-    if entry.email and entry.segments == [] and Config.feature?(config, :subscriptions) and
-         claim(config, entry_id) do
-      from(s in __MODULE__, where: not is_nil(s.confirmed_at), order_by: s.inserted_at)
-      |> config.repo.all(prefix: config.prefix)
-      |> Enum.chunk_every(100)
-      |> Enum.each(
-        &deliver(config, fn subscriber -> Tayori.Mail.entry(config, entry, subscriber) end, &1)
+    if (entry && entry.email) and entry.segments == [] and
+         Config.feature?(config, :subscriptions) and claim(config, entry_id) do
+      from(s in __MODULE__,
+        where: not is_nil(s.confirmed_at),
+        order_by: s.inserted_at,
+        select: s.id
       )
+      |> config.repo.all(prefix: config.prefix)
+    else
+      []
     end
-
-    :ok
   end
 
   defp claim(config, entry_id) do
@@ -149,18 +161,21 @@ defmodule Tayori.Subscribers do
     count == 1
   end
 
-  defp deliver(config, build, subscribers) do
-    for subscriber <- subscribers do
-      case config.mailer.deliver(build.(subscriber)) do
-        {:ok, _} ->
-          :ok
-
-        {:error, reason} ->
-          Logger.warning("Tayori could not email #{subscriber.id}: #{inspect(reason)}")
+  @doc false
+  # Emails an entry to one subscriber. One who unsubscribed since, or an
+  # entry deleted since, is nothing to send.
+  @spec email(Config.t(), Ecto.UUID.t(), Ecto.UUID.t()) :: :ok | {:error, term()}
+  def email(%Config{} = config, entry_id, subscriber_id) do
+    with %__MODULE__{confirmed_at: %DateTime{}} = subscriber <-
+           config.repo.get(__MODULE__, subscriber_id, prefix: config.prefix),
+         %Entry{} = entry <- Tayori.Entries.get(entry_id) do
+      case config.mailer.deliver(Tayori.Mail.entry(config, entry, subscriber)) do
+        {:ok, _} -> :ok
+        {:error, reason} -> {:error, reason}
       end
+    else
+      _gone -> :ok
     end
-
-    :ok
   end
 
   defp token, do: 24 |> :crypto.strong_rand_bytes() |> Base.url_encode64(padding: false)

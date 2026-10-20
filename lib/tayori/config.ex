@@ -49,6 +49,12 @@ defmodule Tayori.Config do
       (required with `:subscriptions`).
     * `:reactions` - the emoji readers react with
       (`["👍", "🎉", "❤️", "🚀", "👀"]`).
+    * `:oban` - the app's Oban, which then sends what a publication sends
+      (the emails, the webhooks, the call to the `:notifier`) as jobs:
+      `oban: Oban`, or `oban: [name: MyApp.Oban, queue: :news]` for
+      another instance or queue (`:default`). The queue must be one the
+      app runs. Without it, they are sent by tasks in the node, as
+      `Tayori.Jobs` explains.
   """
 
   @features [:reactions, :announcements, :analytics, :subscriptions, :webhooks, :embed]
@@ -65,6 +71,7 @@ defmodule Tayori.Config do
     :mailer,
     :email_from,
     :page_url,
+    :oban,
     locales: ["en"],
     features: [],
     reactions: @reactions
@@ -80,6 +87,7 @@ defmodule Tayori.Config do
           mailer: module() | nil,
           email_from: String.t() | {String.t(), String.t()} | nil,
           page_url: String.t() | nil,
+          oban: %{name: term(), queue: atom()} | nil,
           locales: [String.t(), ...],
           features: [feature()],
           reactions: [String.t(), ...]
@@ -96,31 +104,61 @@ defmodule Tayori.Config do
   def new(opts) do
     repo = Keyword.get(opts, :repo) || raise ArgumentError, "Tayori needs the :repo option"
     pubsub = Keyword.get(opts, :pubsub) || raise ArgumentError, "Tayori needs the :pubsub option"
-    locales = Keyword.get(opts, :locales, ["en"])
+    features = features(Keyword.get(opts, :features, []))
+    check_dependencies(features, opts)
 
+    %__MODULE__{
+      oban: oban(opts[:oban]),
+      mailer: opts[:mailer],
+      email_from: opts[:email_from],
+      page_url: opts[:page_url] && String.trim_trailing(opts[:page_url], "/"),
+      features: features,
+      reactions: reactions(Keyword.get(opts, :reactions, @reactions)),
+      repo: repo,
+      pubsub: pubsub,
+      secret_key_base: secret_key_base(opts[:secret_key_base]),
+      vault: opts[:vault],
+      prefix: opts[:prefix],
+      notifier: opts[:notifier],
+      locales: locales(Keyword.get(opts, :locales, ["en"]))
+    }
+  end
+
+  defp locales(locales) do
     unless is_list(locales) and locales != [] and Enum.all?(locales, &is_binary/1) do
       raise ArgumentError, ":locales must be a list of language tags, got: #{inspect(locales)}"
     end
 
-    secret = opts[:secret_key_base]
+    locales
+  end
 
+  defp secret_key_base(secret) do
     if secret != nil and (not is_binary(secret) or byte_size(secret) < 32) do
       raise ArgumentError, ":secret_key_base must be a string of at least 32 bytes"
     end
 
-    features = Keyword.get(opts, :features, [])
+    secret
+  end
 
+  defp features(features) do
     unless is_list(features) and Enum.all?(features, &(&1 in @features)) do
       raise ArgumentError,
             ":features must be a list of #{inspect(@features)}, got: #{inspect(features)}"
     end
 
-    reactions = Keyword.get(opts, :reactions, @reactions)
+    Enum.uniq(features)
+  end
 
+  defp reactions(reactions) do
     unless is_list(reactions) and reactions != [] and Enum.all?(reactions, &emoji?/1) do
       raise ArgumentError, ":reactions must be a list of emoji, got: #{inspect(reactions)}"
     end
 
+    reactions
+  end
+
+  # The features that send something need the app's mailer, or Req.
+  defp check_dependencies(features, opts) do
     if :subscriptions in features do
       for key <- [:mailer, :email_from, :page_url], opts[key] == nil do
         raise ArgumentError, "the :subscriptions feature needs the #{inspect(key)} option"
@@ -134,21 +172,29 @@ defmodule Tayori.Config do
     if :webhooks in features and not Code.ensure_loaded?(Req) do
       raise ArgumentError, "the :webhooks feature needs the :req dependency"
     end
+  end
 
-    %__MODULE__{
-      mailer: opts[:mailer],
-      email_from: opts[:email_from],
-      page_url: opts[:page_url] && String.trim_trailing(opts[:page_url], "/"),
-      features: Enum.uniq(features),
-      reactions: reactions,
-      repo: repo,
-      pubsub: pubsub,
-      secret_key_base: secret,
-      vault: opts[:vault],
-      prefix: opts[:prefix],
-      notifier: opts[:notifier],
-      locales: locales
-    }
+  defp oban(nil), do: nil
+  defp oban(name) when is_atom(name), do: oban(name: name)
+
+  defp oban(opts) when is_list(opts) do
+    unless Code.ensure_loaded?(Oban) do
+      raise ArgumentError, "the :oban option needs the :oban dependency"
+    end
+
+    name = Keyword.get(opts, :name, Oban)
+    queue = Keyword.get(opts, :queue, :default)
+
+    unless is_atom(queue) do
+      raise ArgumentError, ":queue of the :oban option must be an atom, got: #{inspect(queue)}"
+    end
+
+    %{name: name, queue: queue}
+  end
+
+  defp oban(other) do
+    raise ArgumentError,
+          ":oban must be the name of an Oban instance or [name: ..., queue: ...], got: #{inspect(other)}"
   end
 
   @doc "Keeps the config for the whole node."

@@ -7,6 +7,17 @@ and Tayori follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- The `:oban` option: with the app's Oban, the emails, webhooks and
+  notifier call of a publication are jobs of `Tayori.Worker`, one each,
+  retried with Oban's backoff through deploys and crashes, in the
+  `:default` queue or another (`oban: [name: Oban, queue: :news]`).
+  Without it, they are sent from tasks, as `Tayori.Jobs` explains.
+  `mix tayori.install` sets it when the app has Oban.
+- `Tayori.Test.announce!/0` announces the entries whose time has come, in
+  the test's process.
+
 ### Changed
 
 - Tayori is mounted with [PhoenixMountable](https://hexdocs.pm/phoenix_mountable):

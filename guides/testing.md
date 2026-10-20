@@ -41,7 +41,18 @@ Call your notifier with an entry, as Tayori does:
 
 ```elixir
 entry = publish!("Exports")
-assert {:ok, _job} = MyApp.NewsNotifier.published(entry)
+MyApp.NewsNotifier.published(entry)
+```
+
+With the `:oban` option, what a publication sends is a job of
+`Tayori.Worker`, which your Oban's testing mode keeps:
+
+```elixir
+use Oban.Testing, repo: MyApp.Repo
+
+entry = publish!("Exports")
+announce!()
+assert_enqueued worker: Tayori.Worker, args: %{"job" => "notify", "entry_id" => entry.id}
 ```
 
 ## The JSON API

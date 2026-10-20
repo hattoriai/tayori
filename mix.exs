@@ -68,7 +68,7 @@ defmodule Tayori.MixProject do
       {:esbuild, "~> 0.10", only: :dev, runtime: false},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false},
       # The body of an entry, and its editor in the admin.
-      {:kotoba, "~> 0.4"},
+      {:kotoba, "~> 0.5"},
       # The publication date's picker in the admin.
       {:koyomi, "~> 0.2"},
       {:lazy_html, "~> 0.1", only: :test},
@@ -90,6 +90,9 @@ defmodule Tayori.MixProject do
       # app's own mailer, and webhooks (the :webhooks feature).
       {:swoosh, "~> 1.17", optional: true},
       {:req, "~> 0.5", optional: true},
+      # The emails, webhooks and notifier calls of a publication as jobs,
+      # with retries that survive a deploy, when the app runs Oban.
+      {:oban, "~> 2.19", optional: true},
       {:telemetry, "~> 1.0"},
       # The time zones of the development server's date picker.
       {:tz, "~> 0.28", only: [:dev, :test]}
@@ -181,7 +184,8 @@ defmodule Tayori.MixProject do
           Tayori.Messages,
           Tayori.Locales
         ],
-        Mounting: [Tayori.Router, Tayori.API, Tayori.Page, Tayori.Notifier],
+        Mounting: [Tayori.Router, Tayori.API, Tayori.Page],
+        Publishing: [Tayori.Notifier, Tayori.Jobs, Tayori.Worker],
         Database: [Tayori.Migrations],
         AI: [Tayori.AI],
         Testing: [Tayori.Test]

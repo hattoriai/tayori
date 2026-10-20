@@ -66,6 +66,8 @@ if config_env() == :test do
 
   config :tayori, ecto_repos: [TayoriTest.SQLiteRepo, TayoriTest.PostgresRepo]
 
+  config :tayori, TayoriTest.Mailer, adapter: Swoosh.Adapters.Test
+
   # A forgotten version of Tayori.Migrations fails the tests.
   config :phoenix_mountable, pending_migrations: :raise
 end

@@ -15,7 +15,8 @@ defmodule Mix.Tasks.Tayori.Install do
       `LiveSocket`;
     * `assets/css/app.css` imports kotoba.css and tayori.css, and the Sumi
       theme as a comment;
-    * the application starts Tayori after the repo and the PubSub;
+    * the application starts Tayori after the repo and the PubSub, with
+      `oban: Oban` when the app has Oban (`Tayori.Jobs`);
     * `lib/my_app_web/tayori_resolver.ex`, the resolver, which lets no one
       in the admin until you say who your admins are.
 
@@ -49,21 +50,28 @@ defmodule Mix.Tasks.Tayori.Install do
       pubsub = Module.concat(prefix, PubSub)
       endpoint = Module.concat(web, Endpoint)
 
+      options =
+        quote do
+          [
+            repo: unquote(repo),
+            pubsub: unquote(pubsub),
+            secret_key_base:
+              Application.fetch_env!(unquote(app), unquote(endpoint))[:secret_key_base],
+            locales: ["en"]
+          ]
+        end
+
+      # An app with Oban gives it what a publication sends, in its
+      # :default queue: see Tayori.Jobs.
+      options =
+        if Igniter.Project.Deps.has_dep?(igniter, :oban),
+          do: options ++ [oban: Oban],
+          else: options
+
       igniter
       |> PhoenixMountable.Igniter.add_css_imports(:kotoba, ["kotoba.css"])
-      |> App.add_new_child(
-        {Tayori,
-         {:code,
-          quote do
-            [
-              repo: unquote(repo),
-              pubsub: unquote(pubsub),
-              secret_key_base:
-                Application.fetch_env!(unquote(app), unquote(endpoint))[:secret_key_base],
-              locales: ["en"]
-            ]
-          end}},
-        after: [repo, pubsub, Phoenix.PubSub]
+      |> App.add_new_child({Tayori, {:code, options}},
+        after: [repo, pubsub, Phoenix.PubSub, Oban]
       )
       |> resolver(Module.concat(web, TayoriResolver))
     end

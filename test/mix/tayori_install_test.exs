@@ -56,9 +56,11 @@ defmodule Mix.Tasks.Tayori.InstallTest do
   defmodule Test.MixProject do
     use Mix.Project
 
-    def project, do: [app: :test, version: "0.1.0", deps: []]
+    def project, do: [app: :test, version: "0.1.0", deps: deps()]
 
     def application, do: [mod: {Test.Application, []}, extra_applications: [:logger]]
+
+    defp deps, do: []
   end
   """
 
@@ -126,6 +128,28 @@ defmodule Mix.Tasks.Tayori.InstallTest do
 
     assert application =~
              "Application.fetch_env!(:test, TestWeb.Endpoint)[:secret_key_base]"
+  end
+
+  test "gives Tayori the app's Oban, when it has one" do
+    refute install() |> file("lib/test/application.ex") =~ "oban:"
+
+    mix_exs =
+      String.replace(@mix_exs, "defp deps, do: []", ~s(defp deps, do: [{:oban, "~> 2.19"}]))
+
+    application =
+      install(%{"mix.exs" => mix_exs, "lib/test/application.ex" => with_oban()})
+      |> file("lib/test/application.ex")
+
+    assert application =~ "oban: Oban"
+    assert application =~ ~r/\{Oban, .*\{Tayori,/s
+  end
+
+  defp with_oban do
+    String.replace(
+      @application,
+      "{Phoenix.PubSub, name: Test.PubSub},",
+      "{Phoenix.PubSub, name: Test.PubSub},\n        {Oban, Application.fetch_env!(:test, Oban)},"
+    )
   end
 
   test "writes the resolver, which lets no one in" do

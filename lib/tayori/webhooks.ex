@@ -10,16 +10,13 @@ defmodule Tayori.Webhooks do
 
   Their URLs and secrets are kept encrypted, as the AI key is (a `:vault`
   or the `:secret_key_base` of `Tayori.Config`). A failed delivery is
-  retried twice, a few seconds apart, then logged.
+  tried again (`Tayori.Jobs`), unless the place refused it for good.
 
   A webhook gets every entry, for everyone or not; Slack and Discord get
   the entries for everyone, which are public.
   """
 
   alias Tayori.{Config, Entry, Settings}
-
-  require Logger
-
   # Req is an optional dependency, needed with the :webhooks feature.
   @compile {:no_warn_undefined, Req}
 
@@ -107,17 +104,45 @@ defmodule Tayori.Webhooks do
   end
 
   @doc false
-  # Sends an entry to every place, from the scheduler's announcement.
-  def deliver(%Config{} = config, entry_id) do
-    if Config.feature?(config, :webhooks) do
-      entry = Tayori.Entries.get!(entry_id)
-
-      for hook <- hooks(), hook["kind"] == "webhook" or entry.segments == [] do
-        deliver_one(config, hook, entry)
-      end
+  # The places to tell of an entry, from the scheduler's announcement.
+  @spec targets(Config.t(), Ecto.UUID.t()) :: [String.t()]
+  def targets(%Config{} = config, entry_id) do
+    with true <- Config.feature?(config, :webhooks),
+         %Entry{} = entry <- Tayori.Entries.get(entry_id) do
+      for hook <- hooks(), hook["kind"] == "webhook" or entry.segments == [], do: hook["id"]
+    else
+      _none -> []
     end
+  end
 
-    :ok
+  @doc false
+  # Tells one place of an entry, once. A place removed since, or an entry
+  # deleted since, is nothing to tell.
+  @spec deliver(Config.t(), Ecto.UUID.t(), String.t()) :: :ok | {:error, term()}
+  def deliver(%Config{} = config, entry_id, hook_id) do
+    with %{} = hook <- Enum.find(hooks(), &(&1["id"] == hook_id)),
+         %Entry{} = entry <- Tayori.Entries.get(entry_id) do
+      post(hook, payload(config, hook, entry))
+    else
+      _gone -> :ok
+    end
+  end
+
+  @doc false
+  # Whether a failed delivery is worth another try: not when the place
+  # refused it for good (a 4xx other than a timeout or too many requests).
+  @spec retry?(term()) :: boolean()
+  def retry?({:status, status}) when status in 400..499, do: status in [408, 425, 429]
+  def retry?(_reason), do: true
+
+  @doc false
+  # The name of a place, for the logs.
+  @spec name(String.t()) :: String.t()
+  def name(hook_id) do
+    case Enum.find(hooks(), &(&1["id"] == hook_id)) do
+      %{"name" => name} -> name
+      nil -> hook_id
+    end
   end
 
   @doc "Sends a test message to a place, and returns how it went."
@@ -128,21 +153,6 @@ defmodule Tayori.Webhooks do
     case Enum.find(hooks(), &(&1["id"] == id)) do
       nil -> {:error, :not_found}
       hook -> post(hook, payload(config, hook, nil))
-    end
-  end
-
-  defp deliver_one(config, hook, entry, attempt \\ 1) do
-    case post(hook, payload(config, hook, entry)) do
-      :ok ->
-        :ok
-
-      {:error, reason} when attempt < 3 ->
-        Process.sleep(attempt * 2_000)
-        _ = reason
-        deliver_one(config, hook, entry, attempt + 1)
-
-      {:error, reason} ->
-        Logger.warning("Tayori could not tell #{hook["name"]} of an entry: #{inspect(reason)}")
     end
   end
 

@@ -43,7 +43,7 @@ the hook and one style sheet.
 | Entries | a title, a summary, a body in Kotoba (headings, lists, links, code, tables, images, videos, files), categories, a slug; drafts, scheduled, published, unpublished |
 | Languages | each entry in each of your languages, the first required; each reader gets theirs, else the first |
 | Admin | mounted with `tayori_admin`, behind your pipeline; your resolver says who the admin is and what they may do (all, read only, nothing); a search, filters of status, live as other admins write |
-| Publishing | now, or at a time in the admin's own time zone; each entry announced once, on one node of a cluster, to your notifier and to every open page |
+| Publishing | now, or at a time in the admin's own time zone; each entry announced once, on one node of a cluster, to every open page, the subscribers, the webhooks and your notifier; as Oban jobs, retried through deploys, when your app has Oban |
 | Readers | `Tayori.Reader`, built by your resolver from your own user: an id, segments, a language, the time they joined |
 | In the app | a button with the count of unread entries, a panel with New marks and Show more, Escape and a click outside to close; live over PubSub, and across tabs |
 | Any frontend | a JSON API (`tayori_api`) and `<tayori-news>`, the same button and panel |
