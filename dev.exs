@@ -457,7 +457,7 @@ defmodule TayoriDev.Layouts do
   def plain_page(assigns) do
     ~H"""
     <.shell dev_user={@dev_user} here={@here}>
-      <:button><tayori-news api="/api/news" page="/changelog"></tayori-news></:button>
+      <:button><tayori-news api="/api/news"></tayori-news></:button>
       <div class="dev-main">
         <h2>A page without LiveView</h2>
         <p>

@@ -1,159 +1,99 @@
 // <tayori-news api="/api/news">: the button, the panel and the
 // announcement of the news, for a page that LiveView does not render, on
-// the app's origin or another (the :embed feature). It reads Tayori.API:
-// the count of unread entries at once and every few minutes, the entries
-// when it opens (and marks them seen), an entry when a card is chosen. It
-// renders the markup of Tayori.Components, so tayori.css styles both, in
-// every theme.
+// the app's origin or another (the :embed feature).
+//
+// The markup is not the element's: the server renders the components of
+// Tayori.Components, as in a LiveView, and the element puts them in the
+// page (Tayori.API's /ui routes). It answers what LiveView would: each
+// phx-click with its phx-value-*, phx-click-away, and Escape where the
+// markup asks (phx-window-keydown). One panel, wherever it is shown.
 
-import { icon } from "./icons";
 import { localizeTimes } from "./times";
 
-export type Messages = Record<string, string>;
-
-export interface ApiCategory {
-  key: string;
+/** An event of the markup: its name and its phx-value-* values. */
+export interface PhxEvent {
   name: string;
-  color: string;
+  values: Record<string, string>;
 }
 
-export interface ApiCover {
-  url: string;
-  alt: string;
-  width: number | null;
-  height: number | null;
+/** The event a click on `target` sends, as LiveView reads it: the closest phx-click. */
+export function phxEvent(target: Element, root: Element): PhxEvent | null {
+  const el = target.closest<HTMLElement>("[phx-click]");
+  if (!el || !root.contains(el)) return null;
+  if (el instanceof HTMLButtonElement && el.disabled) return null;
+  return { name: el.getAttribute("phx-click") ?? "", values: phxValues(el) };
 }
 
-export interface ApiReactions {
-  counts: Record<string, number>;
-  mine: string[];
-}
-
-export interface ApiEntry {
-  id: string;
-  slug: string;
-  title: string;
-  summary: string | null;
-  cover: ApiCover | null;
-  categories: ApiCategory[];
-  pinned: boolean;
-  publishedAt: string;
-  locale: string;
-  html: string | null;
-  text: string | null;
-  url: string | null;
-  reactions?: ApiReactions;
-}
-
-export interface ApiAnnouncement extends ApiEntry {
-  announce: "popup" | "toast" | "banner";
-  until: string | null;
-  cta: { url: string; label: string | null } | null;
-}
-
-/** What every answer of the news says of the reader and the app. */
-interface About {
-  signedIn: boolean;
-  locale: string;
-  features: string[];
-  emoji: string[];
-  messages: Messages;
-}
-
-interface UnreadResponse extends About {
-  unread: number;
-}
-
-interface IndexResponse extends About {
-  entries: ApiEntry[];
-  more: boolean;
-  unread: number;
-  newAfter: string | null;
-  page: string | null;
-}
-
-let elements = 0;
-
-/** The count of unread entries in words. */
-export function unreadText(messages: Messages, n: number): string {
-  const key = n === 1 ? "unreadOne" : "unreadOther";
-  return (messages[key] ?? "{n}").replace("{n}", String(n));
-}
-
-/** Whether an entry is new to the reader: published after `newAfter` (never for a visitor). */
-export function isNew(entry: Pick<ApiEntry, "publishedAt">, newAfter: string | null): boolean {
-  return newAfter !== null && new Date(entry.publishedAt).getTime() > new Date(newAfter).getTime();
-}
-
-/** The line of a card: the summary, else the start of the body, as the LiveView card. */
-export function summaryText(entry: Pick<ApiEntry, "summary" | "text">): string | null {
-  if (entry.summary) return entry.summary;
-  const text = (entry.text ?? "").replace(/\s+/g, " ").trim();
-  if (text === "") return null;
-  return [...text].length > 180 ? `${[...text].slice(0, 177).join("")}…` : text;
-}
-
-/** The three most given reactions of an entry, for its card. */
-export function topReactions(reactions: ApiReactions | undefined): [string, number][] {
-  if (!reactions) return [];
-  return Object.entries(reactions.counts)
-    .filter(([, n]) => n > 0)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3);
-}
-
-type Attrs = Record<string, string | boolean | null | undefined>;
-type Child = Node | string | null | undefined | false;
-
-/** An element with attributes (false and nullish ones left out) and children. */
-function h<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Attrs = {}, ...children: Child[]): HTMLElementTagNameMap[K] {
-  const el = document.createElement(tag);
-  for (const [name, value] of Object.entries(attrs)) {
-    if (value === false || value === null || value === undefined) continue;
-    el.setAttribute(name, value === true ? "" : value);
+/** The phx-value-* attributes of an element, by name. */
+export function phxValues(el: Element): Record<string, string> {
+  const values: Record<string, string> = {};
+  for (const attr of Array.from(el.attributes)) {
+    if (attr.name.startsWith("phx-value-")) values[attr.name.slice("phx-value-".length)] = attr.value;
   }
-  for (const child of children) if (child) el.append(child);
-  return el;
+  return values;
+}
+
+/** The query of a view of the panel, as Tayori.API reads it. */
+export function panelQuery(view: { category: string | null; pages: number; entry: string | null; since: string | null }): string {
+  const params = new URLSearchParams();
+  if (view.category) params.set("category", view.category);
+  if (view.pages > 1) params.set("pages", String(view.pages));
+  if (view.entry) params.set("entry", view.entry);
+  if (view.since) params.set("since", view.since);
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
+interface Html {
+  html: string | null;
+}
+
+/** The first element of a piece of HTML. */
+function fragment(html: string): HTMLElement | null {
+  const template = document.createElement("template");
+  template.innerHTML = html;
+  return template.content.firstElementChild as HTMLElement | null;
 }
 
 export class TayoriNews extends HTMLElement {
   static observedAttributes = ["reader-token"];
 
-  private readonly uid = ++elements;
-  private readonly panelId = `tayori-panel-${this.uid}`;
-  private button!: HTMLButtonElement;
-  private badge!: HTMLSpanElement;
-  private labelText: HTMLSpanElement | null = null;
+  private button: HTMLElement | null = null;
   private panel: HTMLElement | null = null;
   private announcementEl: HTMLElement | null = null;
+  private announcementId: string | null = null;
   private timer: number | undefined;
-
-  private about: About = { signedIn: false, locale: "", features: [], emoji: [], messages: {} };
-  private count = 0;
-  private entries: ApiEntry[] = [];
-  private more = false;
-  private newAfter: string | null = null;
-  private page: string | null = null;
-  private categories: ApiCategory[] = [];
-  private category: string | null = null;
-  private entry: ApiEntry | null = null;
-  private announcement: ApiAnnouncement | null = null;
-  private readonly dismissed = new Set<string>();
   private token: string | null = null;
+  private count = 0;
+
+  // The view of the open panel, which the server renders again.
+  private category: string | null = null;
+  private pages = 1;
+  private entry: string | null = null;
+  private since: string | null = null;
+
+  private readonly onClick = (event: Event) => {
+    const target = event.target as Element;
+    const root = event.currentTarget as Element;
+    const phx = phxEvent(target, root);
+    if (!phx) return;
+    event.preventDefault();
+    void this.run(phx);
+  };
 
   private readonly onKey = (event: KeyboardEvent) => {
     if (event.key !== "Escape") return;
-    if (this.panel) {
-      if (this.entry) this.back();
-      else this.close(true);
-    } else if (this.announcement?.announce === "popup" && this.announcementEl) {
-      void this.dismiss();
-    }
+    // As phx-window-keydown with phx-key="Escape": the panel's, else a popup's.
+    const el = this.panel ?? this.announcementEl;
+    const name = el?.getAttribute("phx-window-keydown");
+    if (el && name && el.getAttribute("phx-key") === "Escape") void this.run({ name, values: phxValues(el) });
   };
 
+  // phx-click-away: a press outside the panel closes it.
   private readonly onPointer = (event: PointerEvent) => {
     const target = event.target as Node;
-    if (this.panel && !this.contains(target) && !this.announcementEl?.contains(target)) this.close(false);
+    const inside = this.panel?.contains(target) || this.button?.contains(target) || this.announcementEl?.contains(target);
+    if (this.panel && !inside) this.close(false);
   };
 
   private readonly onVisible = () => {
@@ -165,48 +105,20 @@ export class TayoriNews extends HTMLElement {
     return this.count;
   }
 
-  /** The path or URL of the JSON API (`api`, or `src`, its older name). */
+  /** The path or URL of Tayori.API (`api`, or `src`, its older name). */
   get api(): string {
     return (this.getAttribute("api") ?? this.getAttribute("src") ?? "/api/news").replace(/\/$/, "");
-  }
-
-  private get messages(): Messages {
-    return this.about.messages;
-  }
-
-  private get pageLink(): string | null {
-    return this.getAttribute("page") ?? this.page;
   }
 
   attributeChangedCallback(name: string, _old: string | null, value: string | null): void {
     if (name === "reader-token") {
       this.token = value && value.trim() !== "" ? value.trim() : null;
-      if (this.isConnected && this.button) void this.refresh();
+      if (this.isConnected) void this.refresh();
     }
   }
 
   connectedCallback(): void {
-    this.button = h("button", {
-      type: "button",
-      class: this.hasAttribute("label") ? "tayori-button tayori-button-labelled" : "tayori-button",
-      "aria-haspopup": "dialog",
-      "aria-expanded": "false",
-      "aria-controls": this.panelId,
-    });
-    this.button.append(icon("sparkles"));
-
-    if (this.hasAttribute("label")) {
-      this.labelText = h("span", { class: "tayori-button-label" });
-      this.button.append(this.labelText);
-    }
-
-    this.badge = h("span", { class: "tayori-badge", "aria-hidden": "true" });
-    this.badge.hidden = true;
-    this.button.append(this.badge);
-    this.button.addEventListener("click", () => (this.panel ? this.close(true) : void this.open()));
-    this.replaceChildren(this.button);
-    this.setUnread(0);
-
+    this.addEventListener("click", this.onClick);
     document.addEventListener("visibilitychange", this.onVisible);
     document.addEventListener("keydown", this.onKey);
     void this.refresh();
@@ -217,37 +129,47 @@ export class TayoriNews extends HTMLElement {
 
   disconnectedCallback(): void {
     window.clearInterval(this.timer);
+    this.removeEventListener("click", this.onClick);
     document.removeEventListener("visibilitychange", this.onVisible);
     document.removeEventListener("keydown", this.onKey);
     this.close(false);
-    this.announcementEl?.remove();
-    this.announcementEl = null;
+    this.removeAnnouncement();
   }
 
-  /** Asks the count of unread entries again, and the announcement. */
+  /** Asks the button again (its count of unread entries), and the announcement. */
   async refresh(): Promise<void> {
-    const data = await this.request<UnreadResponse>("/unread");
-    if (!data) return;
-    this.setAbout(data);
-    this.setUnread(this.panel ? 0 : data.unread);
-    if (this.has("announcements")) await this.loadAnnouncement();
+    const label = this.hasAttribute("label") ? "?label=1" : "";
+    const data = await this.request<Html & { unread: number }>(`/ui/button${label}`);
+    if (data?.html) {
+      const button = fragment(data.html);
+      if (button) {
+        if (this.button) this.button.replaceWith(button);
+        else this.prepend(button);
+        this.button = button;
+        this.count = this.panel ? 0 : data.unread;
+        if (this.panel) this.markOpen(true);
+      }
+    }
+    await this.loadAnnouncement();
   }
 
-  /** Opens the panel, with the newest entries, and marks them seen. */
+  /** Opens the panel on the newest entries, and marks them seen. */
   async open(): Promise<void> {
-    const [data, categories] = await Promise.all([
-      this.request<IndexResponse>(this.listPath()),
-      this.request<{ categories: ApiCategory[] }>("/categories"),
-    ]);
-    if (!data) return;
-
-    this.setList(data);
-    this.categories = categories?.categories ?? [];
+    const data = await this.request<Html & { since: string | null }>("/ui/panel", { method: "POST" });
+    if (!data?.html) return;
+    this.category = null;
+    this.pages = 1;
     this.entry = null;
-    this.createPanel();
-    this.setUnread(0);
-    void this.request("/seen", { method: "POST" });
-    this.renderAnnouncement();
+    this.since = data.since;
+    this.count = 0;
+    this.putPanel(data.html);
+    this.button?.querySelector(".tayori-badge")?.remove();
+    this.button?.setAttribute("aria-label", this.button.getAttribute("aria-label")?.split(",")[0] ?? "");
+    // The open panel has the news: a popup or a toast steps aside until it closes.
+    if (this.announcementEl && !this.announcementEl.classList.contains("tayori-announcement-banner")) {
+      this.removeAnnouncement();
+    }
+    this.panel?.focus();
     this.dispatchEvent(new CustomEvent("tayori:open", { bubbles: true }));
   }
 
@@ -257,363 +179,122 @@ export class TayoriNews extends HTMLElement {
     this.panel.remove();
     this.panel = null;
     this.entry = null;
-    this.button.setAttribute("aria-expanded", "false");
+    this.markOpen(false);
     document.removeEventListener("pointerdown", this.onPointer);
-    if (focus) this.button.focus();
-    this.renderAnnouncement();
+    if (focus) this.button?.focus();
+    void this.loadAnnouncement();
     this.dispatchEvent(new CustomEvent("tayori:close", { bubbles: true }));
   }
 
-  private has(feature: string): boolean {
-    return this.about.features.includes(feature);
-  }
+  // ── The events of the markup, as Tayori.Live answers them ────────
 
-  private setAbout(about: About): void {
-    this.about = {
-      signedIn: about.signedIn,
-      locale: about.locale,
-      features: about.features,
-      emoji: about.emoji,
-      messages: about.messages,
-    };
-  }
-
-  private setList(data: IndexResponse): void {
-    this.setAbout(data);
-    this.entries = data.entries;
-    this.more = data.more;
-    this.newAfter = data.newAfter;
-    this.page = data.page;
-  }
-
-  private listPath(before?: string): string {
-    const params = new URLSearchParams();
-    if (this.category) params.set("category", this.category);
-    if (before) params.set("before", before);
-    const query = params.toString();
-    return query ? `?${query}` : "";
-  }
-
-  private setUnread(n: number): void {
-    this.count = n;
-    this.badge.hidden = n === 0;
-    this.badge.textContent = n > 9 ? "9+" : String(n);
-    const label = this.messages.button ?? "What's new";
-    this.button.setAttribute("aria-label", n > 0 ? `${label}, ${unreadText(this.messages, n)}` : label);
-    if (this.labelText) this.labelText.textContent = label;
-  }
-
-  // ── The panel ───────────────────────────────────────────────────
-
-  private createPanel(): void {
-    this.panel?.remove();
-    const panel = h("div", {
-      id: this.panelId,
-      class: "tayori-panel",
-      role: "dialog",
-      "aria-modal": "false",
-      "aria-labelledby": `${this.panelId}-title`,
-      tabindex: "-1",
-    });
-    this.panel = panel;
-    this.append(panel);
-    this.button.setAttribute("aria-expanded", "true");
-    document.addEventListener("pointerdown", this.onPointer);
-    this.renderPanel();
-    panel.focus();
-  }
-
-  private renderPanel(): void {
-    const panel = this.panel;
-    if (!panel) return;
-    const m = this.messages;
-    if (this.about.locale) panel.lang = this.about.locale;
-
-    const page = this.pageLink;
-    const header = h(
-      "header",
-      { class: "tayori-panel-header" },
-      this.entry && this.iconButton("arrow-left", m.back ?? "Back", () => this.back(), "tayori-back-button"),
-      h("h2", { id: `${this.panelId}-title` }, m.title ?? "What's new"),
-      page && this.iconLink("arrow-up-right", m.allNews ?? "All the news", page),
-      this.iconButton("x", m.close ?? "Close", () => this.close(true), "tayori-close"),
-    );
-
-    const body = this.entry ? this.entryBody(this.entry) : this.listBody();
-
-    const footer = h(
-      "footer",
-      { class: "tayori-panel-footer" },
-      h("span", { class: "tayori-hint" }, h("kbd", { class: "tayori-kbd" }, "Esc"), " ", this.entry ? (m.back ?? "Back") : (m.close ?? "Close")),
-      page && h("a", { href: page }, m.allNews ?? "All the news", " ", icon("arrow-right")),
-    );
-
-    panel.replaceChildren(header, body, footer);
-    localizeTimes(panel, this.about.locale || document.documentElement.lang || undefined);
-  }
-
-  private iconButton(name: Parameters<typeof icon>[0], label: string, onClick: () => void, extra = ""): HTMLButtonElement {
-    const button = h("button", { type: "button", class: `tayori-icon-button ${extra}`.trim(), "aria-label": label }, icon(name));
-    button.addEventListener("click", onClick);
-    return button;
-  }
-
-  private iconLink(name: Parameters<typeof icon>[0], label: string, href: string): HTMLAnchorElement {
-    return h("a", { href, class: "tayori-icon-button", "aria-label": label, title: label }, icon(name));
-  }
-
-  private listBody(): HTMLElement {
-    const m = this.messages;
-    const body = h("div", { class: "tayori-panel-body", "data-tayori-view": "list" });
-
-    if (this.categories.length > 0) body.append(this.filter());
-
-    if (this.entries.length > 0) {
-      const list = h("ol", { class: "tayori-cards" });
-      for (const entry of this.entries) list.append(h("li", { "data-entry-id": entry.id }, this.card(entry)));
-      body.append(list);
-    } else {
-      body.append(h("div", { class: "tayori-empty" }, icon("inbox"), h("p", {}, m.empty ?? "No news yet.")));
+  private async run({ name, values }: PhxEvent): Promise<void> {
+    switch (name) {
+      case "tayori:open":
+        return this.panel ? this.close(true) : this.open();
+      case "tayori:close":
+        return this.close(true);
+      case "tayori:filter":
+        this.category = values.category || null;
+        this.pages = 1;
+        this.entry = null;
+        return this.view(() => this.panel?.querySelector<HTMLElement>(".tayori-chip[aria-pressed='true']"));
+      case "tayori:more": {
+        const shown = this.panel?.querySelectorAll(".tayori-cards > li").length ?? 0;
+        this.pages += 1;
+        return this.view(() => this.panel?.querySelectorAll<HTMLElement>(".tayori-card-title button")[shown] ?? null);
+      }
+      case "tayori:show":
+        return this.show(values.id);
+      case "tayori:back": {
+        const id = this.entry;
+        this.entry = null;
+        return this.view(() => (id ? this.cardButton(id) : this.panel));
+      }
+      case "tayori:react":
+        return this.react(values.id, values.emoji);
+      case "tayori:dismiss":
+        return this.dismiss(values.id);
     }
-
-    if (this.more) {
-      const more = h("button", { type: "button", class: "tayori-more" }, m.more ?? "Show more");
-      more.addEventListener("click", () => void this.loadMore());
-      body.append(more);
-    }
-
-    return body;
   }
 
-  private filter(): HTMLElement {
-    const m = this.messages;
-    const nav = h("nav", { class: "tayori-filter", "aria-label": m.categories ?? "Categories" });
-    const chip = (key: string | null, ...children: Child[]) => {
-      const button = h("button", { type: "button", class: "tayori-chip", "aria-pressed": String(this.category === key) }, ...children);
-      button.addEventListener("click", () => void this.filterBy(key));
-      return button;
-    };
-
-    nav.append(chip(null, m.all ?? "All"));
-    for (const category of this.categories) {
-      const button = chip(category.key, h("span", { class: "tayori-dot", "aria-hidden": "true" }), category.name);
-      button.dataset.color = category.color;
-      nav.append(button);
-    }
-    return nav;
-  }
-
-  private meta(entry: ApiEntry): HTMLElement {
-    const m = this.messages;
-    const meta = h("p", { class: "tayori-meta" });
-    if (entry.pinned) meta.append(h("span", { class: "tayori-pinned" }, icon("pin"), m.pinned ?? "Pinned"));
-    if (isNew(entry, this.newAfter)) {
-      meta.append(h("span", { class: "tayori-new", title: m.new ?? "New" }, h("span", { class: "tayori-visually-hidden" }, m.new ?? "New")));
-    }
-    for (const category of entry.categories) {
-      meta.append(h("span", { class: "tayori-category", "data-color": category.color || "gray" }, category.name));
-    }
-    meta.append(h("time", { datetime: entry.publishedAt, "data-tayori-time": "date" }, entry.publishedAt.slice(0, 10)));
-    return meta;
-  }
-
-  private cover(cover: ApiCover, className: string, loading = "lazy"): HTMLElement {
-    const img = h("img", { src: cover.url, alt: cover.alt, loading, decoding: "async" });
-    if (cover.width) img.width = cover.width;
-    if (cover.height) img.height = cover.height;
-    return h("figure", { class: `tayori-cover ${className}` }, img);
-  }
-
-  /** An entry as a card of the panel: the whole card opens it. */
-  private card(entry: ApiEntry): HTMLElement {
-    const title = h("button", { type: "button", "data-entry-id": entry.id }, entry.title);
-    title.addEventListener("click", () => void this.show(entry));
-    const summary = summaryText(entry);
-    const counts = this.has("reactions") ? topReactions(entry.reactions) : [];
-
-    return h(
-      "article",
-      { class: entry.pinned ? "tayori-card tayori-card-pinned" : "tayori-card", lang: entry.locale },
-      entry.cover && this.cover(entry.cover, "tayori-card-cover"),
-      this.meta(entry),
-      h("h3", { class: "tayori-card-title" }, title),
-      summary && h("p", { class: "tayori-card-summary" }, summary),
-      counts.length > 0 && h("p", { class: "tayori-reaction-counts" }, ...counts.map(([emoji, n]) => h("span", {}, `${emoji} ${n}`))),
-    );
-  }
-
-  private entryBody(entry: ApiEntry): HTMLElement {
-    const article = h(
-      "article",
-      { class: "tayori-entry", lang: entry.locale },
-      this.meta(entry),
-      h("h3", { class: "tayori-entry-title" }, entry.url ? h("a", { href: entry.url }, entry.title) : h("span", {}, entry.title)),
-      entry.summary && h("p", { class: "tayori-entry-summary" }, entry.summary),
-      entry.cover && this.cover(entry.cover, "tayori-entry-cover"),
-    );
-
-    if (entry.html) {
-      // The body as Kotoba renders it on the server: every text escaped,
-      // and no HTML of the author's own.
-      const body = h("div", { class: "kotoba-content tayori-entry-body" });
-      body.innerHTML = entry.html;
-      article.append(body);
-    }
-
-    if (this.has("reactions")) article.append(h("footer", { class: "tayori-entry-footer" }, this.reactions(entry)));
-    return h("div", { class: "tayori-panel-body", "data-tayori-view": "entry" }, article);
-  }
-
-  /** The reactions of an entry: each emoji with its count; the reader's own are pressed. */
-  private reactions(entry: ApiEntry): HTMLElement {
-    const m = this.messages;
-    const counts = entry.reactions?.counts ?? {};
-    const mine = entry.reactions?.mine ?? [];
-    const group = h("div", { class: "tayori-reactions", role: "group", "aria-label": m.react ?? "React to this update" });
-
-    for (const emoji of this.about.emoji) {
-      const n = counts[emoji] ?? 0;
-      const button = h(
-        "button",
-        {
-          type: "button",
-          class: "tayori-reaction",
-          "aria-pressed": String(mine.includes(emoji)),
-          disabled: !this.about.signedIn,
-          title: !this.about.signedIn && (m.signInToReact ?? "Sign in to react"),
-          "data-emoji": emoji,
-        },
-        h("span", { class: "tayori-reaction-emoji", "aria-hidden": "true" }, emoji),
-        n > 0 && h("span", { class: "tayori-reaction-count" }, String(n)),
-      );
-      button.addEventListener("click", () => void this.react(entry, emoji));
-      group.append(button);
-    }
-    return group;
-  }
-
-  private async filterBy(key: string | null): Promise<void> {
-    this.category = key;
-    const data = await this.request<IndexResponse>(this.listPath());
-    if (!data || !this.panel) return;
-    this.setList(data);
-    this.entry = null;
-    this.renderPanel();
-    this.panel.querySelector<HTMLElement>(".tayori-chip[aria-pressed='true']")?.focus();
-  }
-
-  private async loadMore(): Promise<void> {
-    const last = this.entries.filter((entry) => !entry.pinned).at(-1);
-    if (!last) return;
-    const data = await this.request<IndexResponse>(this.listPath(last.id));
-    if (!data || !this.panel) return;
-    this.entries = [...this.entries, ...data.entries];
-    this.more = data.more;
-    this.renderPanel();
-    this.panel.querySelector<HTMLElement>(`button[data-entry-id="${data.entries[0]?.id ?? last.id}"]`)?.focus();
-  }
-
-  /** Opens an entry in the panel, whole, as the API gives it. */
-  private async show(entry: ApiEntry): Promise<void> {
-    const data = await this.request<{ entry: ApiEntry }>(`/${encodeURIComponent(entry.slug)}`);
-    if (!data) return;
+  /** Opens an entry of the list, or the announcement, whole in the panel. */
+  private async show(id: string | undefined): Promise<void> {
+    if (!id) return;
+    if (id === this.announcementId) this.removeAnnouncement(true);
+    this.entry = id;
     if (!this.panel) {
-      await this.open();
-      if (!this.panel) return;
+      this.category = null;
+      this.pages = 1;
     }
-    this.entry = data.entry;
-    this.renderPanel();
-    (this.panel as HTMLElement).querySelector<HTMLElement>(".tayori-back-button")?.focus();
+    await this.view(() => this.panel?.querySelector<HTMLElement>("[phx-click='tayori:back']") ?? null);
   }
 
-  /** Back to the list, with the focus on the card of the entry. */
-  private back(): void {
-    const id = this.entry?.id;
-    this.entry = null;
-    this.renderPanel();
-    const card = id && this.panel?.querySelector<HTMLElement>(`button[data-entry-id="${id}"]`);
-    if (card) card.focus();
-    else this.panel?.focus();
+  private async react(id: string | undefined, emoji: string | undefined): Promise<void> {
+    if (!id || !emoji) return;
+    const done = await this.request(`/${encodeURIComponent(id)}/reactions`, { method: "POST", body: { emoji } });
+    if (!done) return;
+    await this.view(() =>
+      this.panel?.querySelector<HTMLElement>(`.tayori-reaction[phx-value-emoji="${CSS.escape(emoji)}"]`) ?? null,
+    );
   }
 
-  private async react(entry: ApiEntry, emoji: string): Promise<void> {
-    if (!this.about.signedIn) return;
-    const data = await this.request<{ reactions: ApiReactions }>(`/${encodeURIComponent(entry.id)}/reactions`, {
-      method: "POST",
-      body: { emoji },
-    });
-    if (!data) return;
+  /** Dismisses the announcement, for the reader on every device (for a visitor, on this page). */
+  private async dismiss(id: string | undefined): Promise<void> {
+    if (!id) return;
+    const hadFocus = this.announcementEl?.contains(document.activeElement) ?? false;
+    this.removeAnnouncement(true);
+    if (hadFocus) this.button?.focus();
+    await this.request(`/announcement/${encodeURIComponent(id)}/dismiss`, { method: "POST" });
+  }
 
-    const update = (e: ApiEntry) => (e.id === entry.id ? { ...e, reactions: data.reactions } : e);
-    this.entries = this.entries.map(update);
-    if (this.entry?.id === entry.id) {
-      this.entry = update(this.entry);
-      this.renderPanel();
-      this.panel?.querySelector<HTMLElement>(`.tayori-reaction[data-emoji="${CSS.escape(emoji)}"]`)?.focus();
-    }
+  /** Renders the panel's view again, then puts the focus where `focus` says. */
+  private async view(focus: () => HTMLElement | null | undefined): Promise<void> {
+    const query = panelQuery({ category: this.category, pages: this.pages, entry: this.entry, since: this.since });
+    const data = await this.request<Html>(`/ui/panel${query}`);
+    if (!data?.html) return;
+    this.putPanel(data.html);
+    (focus() ?? this.panel)?.focus();
+  }
+
+  private putPanel(html: string): void {
+    const panel = fragment(html);
+    if (!panel) return;
+    panel.tabIndex = -1;
+    localizeTimes(panel, panel.lang || undefined);
+    if (this.panel) this.panel.replaceWith(panel);
+    else this.append(panel);
+    this.panel = panel;
+    this.markOpen(true);
+    document.addEventListener("pointerdown", this.onPointer);
+  }
+
+  private markOpen(open: boolean): void {
+    this.button?.setAttribute("aria-expanded", String(open));
+  }
+
+  private cardButton(id: string): HTMLElement | null {
+    return this.panel?.querySelector<HTMLElement>(`[phx-click="tayori:show"][phx-value-id="${CSS.escape(id)}"]`) ?? null;
   }
 
   // ── The announcement ────────────────────────────────────────────
 
+  private readonly dismissed = new Set<string>();
+
   private async loadAnnouncement(): Promise<void> {
-    const data = await this.request<{ announcement: ApiAnnouncement | null }>("/announcement");
-    if (!data) return;
-    const next = data.announcement && !this.dismissed.has(data.announcement.id) ? data.announcement : null;
-    if (next?.id === this.announcement?.id && next?.title === this.announcement?.title) return;
-    this.announcement = next;
-    this.renderAnnouncement();
-  }
-
-  /** The announcement of the moment: a popup, a toast, or a banner where the page says. */
-  private renderAnnouncement(): void {
-    this.announcementEl?.remove();
-    this.announcementEl = null;
-    const a = this.announcement;
+    const data = await this.request<Html & { id: string | null; kind: string | null }>("/ui/announcement");
+    // No :announcements feature, or none: nothing to show.
+    if (!data?.html || !data.id || this.dismissed.has(data.id)) return this.removeAnnouncement();
     // The open panel has the news: a popup or a toast would cover it.
-    if (!a || (this.panel && a.announce !== "banner")) return;
+    if (this.panel && data.kind !== "banner") return this.removeAnnouncement();
+    if (data.id === this.announcementId) return;
 
-    const m = this.messages;
-    const titleId = `tayori-announcement-${this.uid}-title`;
-    const popup = a.announce === "popup";
+    const el = fragment(data.html);
+    if (!el) return;
+    this.removeAnnouncement();
+    el.addEventListener("click", this.onClick);
 
-    const readMore = h("button", { type: "button", class: a.cta ? "tayori-cta tayori-cta-quiet" : "tayori-cta" }, m.readMore ?? "Read more");
-    readMore.addEventListener("click", () => void this.readAnnouncement());
-    const close = this.iconButton("x", m.dismiss ?? "Dismiss", () => void this.dismiss(), "tayori-announcement-close");
-
-    const box = h(
-      "div",
-      { class: "tayori-announcement-box" },
-      a.cover && a.announce !== "banner" && this.cover(a.cover, "tayori-announcement-cover", "eager"),
-      h(
-        "div",
-        { class: "tayori-announcement-text" },
-        h("p", { class: "tayori-announcement-eyebrow" }, icon("sparkles"), m.new ?? "New"),
-        h("p", { id: titleId, class: "tayori-announcement-title" }, a.title),
-        a.summary && a.announce !== "banner" && h("p", { class: "tayori-announcement-summary" }, a.summary),
-      ),
-      h("div", { class: "tayori-announcement-actions" }, a.cta && h("a", { href: a.cta.url, class: "tayori-cta" }, a.cta.label ?? m.tryIt ?? "Try it"), readMore),
-      close,
-    );
-
-    const el = h(
-      "div",
-      {
-        class: `tayori-announcement tayori-announcement-${a.announce}`,
-        role: popup ? "dialog" : "status",
-        "aria-modal": popup && "true",
-        "aria-labelledby": titleId,
-        lang: a.locale,
-      },
-      box,
-    );
-
-    if (popup) {
-      const backdrop = h("div", { class: "tayori-announcement-backdrop" });
-      backdrop.addEventListener("click", () => void this.dismiss());
-      el.append(backdrop);
-    }
-
-    if (a.announce === "banner") {
+    if (data.kind === "banner") {
       const selector = this.getAttribute("banner");
       const target = selector ? document.querySelector(selector) : null;
       if (target) target.append(el);
@@ -623,27 +304,17 @@ export class TayoriNews extends HTMLElement {
     }
 
     this.announcementEl = el;
-    if (popup) readMore.focus();
+    this.announcementId = data.id;
+    if (data.kind === "popup") el.querySelector<HTMLElement>("[phx-click='tayori:show']")?.focus();
   }
 
-  /** Dismisses the announcement, for the reader on every device (for a visitor, on this page). */
-  private async dismiss(): Promise<void> {
-    const a = this.announcement;
-    if (!a) return;
-    const hadFocus = this.announcementEl?.contains(document.activeElement) ?? false;
-    this.dismissed.add(a.id);
-    this.announcement = null;
-    this.renderAnnouncement();
-    if (hadFocus) this.button.focus();
-    await this.request(`/announcement/${encodeURIComponent(a.id)}/dismiss`, { method: "POST" });
-  }
-
-  /** Reading the announcement is enough of an answer to it. */
-  private async readAnnouncement(): Promise<void> {
-    const a = this.announcement;
-    if (!a) return;
-    await this.dismiss();
-    await this.show(a);
+  /** Takes the announcement off the page; `forGood` keeps it off on this page. */
+  private removeAnnouncement(forGood = false): void {
+    if (forGood && this.announcementId) this.dismissed.add(this.announcementId);
+    this.announcementEl?.removeEventListener("click", this.onClick);
+    this.announcementEl?.remove();
+    this.announcementEl = null;
+    this.announcementId = null;
   }
 
   // ── The API ─────────────────────────────────────────────────────

@@ -1,12 +1,12 @@
 defmodule Tayori.API do
   @moduledoc """
   The news as JSON, for a frontend that Phoenix does not render (React,
-  Vue, Svelte, a mobile app) and for `<tayori-news>`, the element of
-  Tayori's script. Mounted with `Tayori.Router.tayori_api/2`:
+  Vue, Svelte, a mobile app), and as HTML for `<tayori-news>`, the
+  element of Tayori's script. Mounted with `Tayori.Router.tayori_api/2`:
 
       scope "/api" do
         pipe_through [:api_session]
-        tayori_api "/news", resolver: MyAppWeb.TayoriResolver, page: "/changelog"
+        tayori_api "/news", resolver: MyAppWeb.TayoriResolver
       end
 
   Mount it behind a pipeline that has the app's session (`fetch_session`,
@@ -44,6 +44,25 @@ defmodule Tayori.API do
       not one of the app's. With the `:reactions` feature, else a 404.
     * `GET /:slug` - one entry: `{"entry": {...}}`, or a 404. It counts a
       view of the entry from `"widget"` (the `:analytics` feature).
+
+  `<tayori-news>` reads the panel as HTML: the components of
+  `Tayori.Components`, rendered from the same state as in a LiveView
+  (`Tayori.Live.State`), in `{"html": ...}`. The element answers their
+  `phx-click`, so the markup is one, wherever the panel is shown:
+
+    * `GET /ui/button` - the button, with the reader's count of unread
+      entries: `{"html", "unread"}`. `?label=1` shows its word.
+    * `POST /ui/panel` - opens the panel on the list, and marks the news
+      seen: `{"html", "since"}`. `since` keeps the New marks of the
+      opening in the panel's other views.
+    * `GET /ui/panel` - a view of the open panel: `?category=<key>`,
+      `?pages=` (the pages of the list shown, up to 20), `?entry=<id>`
+      (an entry of the list, or the announcement, opened whole; a view
+      from `"widget"`), `?since=`: `{"html", "entry"}`, or a 404 for an
+      entry the reader does not see.
+    * `GET /ui/announcement` - the announcement of the moment:
+      `{"html", "id", "kind"}`, all nil when there is none. With the
+      `:announcements` feature, else a 404.
 
   With the `:embed` feature, also:
 
@@ -97,6 +116,7 @@ defmodule Tayori.API do
 
   alias Tayori.{Announcements, Categories, Category, Config, Embed, Entries, Entry}
   alias Tayori.{Messages, Reactions, Reader, Resolver, Views}
+  alias Tayori.Panel
   alias Tayori.Router.Page
 
   @impl Plug
@@ -258,6 +278,83 @@ defmodule Tayori.API do
         not_found(conn)
     end
   end
+
+  # ── The panel as HTML, for <tayori-news> ────────────────────────
+
+  defp handle(:ui_button, conn, reader, locale, opts) do
+    conn = fetch_query_params(conn)
+    state = Panel.new(reader, page: opts[:page], locale: locale)
+    label? = conn.query_params["label"] in ["1", "true"]
+    json(conn, 200, %{html: Panel.HTML.button(state, label?), unread: state.unread})
+  end
+
+  # Opens the panel: the list, with the news marked seen. `since` is the
+  # time what was new until now was published after, for the panel's
+  # other views.
+  defp handle(:ui_open, conn, reader, locale, opts) do
+    state = reader |> Panel.new(page: opts[:page], locale: locale) |> Panel.open()
+
+    json(conn, 200, %{
+      html: Panel.HTML.panel(state),
+      since: state.seen_before && DateTime.to_iso8601(state.seen_before)
+    })
+  end
+
+  # The open panel as the element left it: `?category=`, `?pages=` (the
+  # pages of the list shown), `?entry=<id>` (an entry of them, or the
+  # announcement, opened whole), `?since=` (from the opening).
+  defp handle(:ui_panel, conn, reader, locale, opts) do
+    conn = fetch_query_params(conn)
+    params = conn.query_params
+    pages = params |> Map.get("pages", "1") |> parse_int(1) |> min(20) |> max(1)
+
+    state =
+      %{
+        Panel.new(reader, page: opts[:page], locale: locale)
+        | open: true,
+          category: blank(params["category"]),
+          categories: Categories.by_key(),
+          seen_before: since(params["since"])
+      }
+
+    state = Panel.load(state, state.limit * pages)
+
+    case blank(params["entry"]) do
+      nil ->
+        json(conn, 200, %{html: Panel.HTML.panel(state), entry: nil})
+
+      id ->
+        case Panel.show(state, id, "widget") do
+          {:ok, state} -> json(conn, 200, %{html: Panel.HTML.panel(state), entry: id})
+          :error -> not_found(conn)
+        end
+    end
+  end
+
+  defp handle(:ui_announcement, conn, reader, locale, opts) do
+    if feature?(:announcements) do
+      state = Panel.new(reader, page: opts[:page], locale: locale)
+
+      body =
+        case state.announcement do
+          nil -> %{html: nil, id: nil, kind: nil}
+          entry -> %{html: Panel.HTML.announcement(state), id: entry.id, kind: entry.announce}
+        end
+
+      json(conn, 200, body)
+    else
+      not_found(conn)
+    end
+  end
+
+  defp since(value) when is_binary(value) do
+    case DateTime.from_iso8601(value) do
+      {:ok, at, _offset} -> at
+      _ -> nil
+    end
+  end
+
+  defp since(_value), do: nil
 
   # What every answer of the news says of the reader and the app.
   defp about(reader, locale) do

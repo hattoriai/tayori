@@ -68,10 +68,12 @@ and Tayori follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The news, the public page and the admin are redesigned in the style of
   Hattori AI's libraries, in Tayori's theme or Sumi's, light and dark.
 - An entry's headings in its body stay below its title.
-- `<tayori-news>` is the LiveView panel: the same markup and classes,
+- `<tayori-news>` is the LiveView panel: the API renders the same
+  `Tayori.Components` for it (its `/ui` routes), and the element answers
+  their clicks and keys as LiveView would, so the markup is one: the
   categories, covers, an entry opened in the panel with its reactions,
-  Escape and the focus as there, and the announcement. Its attribute is
-  `api` (`src` still works).
+  Escape and the focus, and the announcement. Its attribute is `api`
+  (`src` still works); the page's links are the API's.
 - The API's entries have their categories as `{"key", "name", "color"}`,
   not keys, and its first page keeps every pinned entry besides the
   limit.

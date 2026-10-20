@@ -33,6 +33,10 @@ defmodule Tayori.Router.API do
     get "/categories", Tayori.API, :categories, as: :categories
     get "/announcement", Tayori.API, :announcement, as: :announcement
     post "/announcement/:id/dismiss", Tayori.API, :dismiss, as: :dismiss
+    get "/ui/button", Tayori.API, :ui_button, as: :ui_button
+    get "/ui/panel", Tayori.API, :ui_panel, as: :ui_panel
+    post "/ui/panel", Tayori.API, :ui_open, as: :ui_open
+    get "/ui/announcement", Tayori.API, :ui_announcement, as: :ui_announcement
     get "/tayori.js", Tayori.API, :asset, as: :script
     get "/tayori.css", Tayori.API, :asset, as: :stylesheet
     get "/tayori-sumi.css", Tayori.API, :asset, as: :sumi_stylesheet

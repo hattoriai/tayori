@@ -39,7 +39,7 @@ defmodule Tayori.Live do
   import Phoenix.Component, only: [assign: 3]
   import Phoenix.LiveView
 
-  alias Tayori.{Reader, Resolver}
+  alias Tayori.{Panel, Resolver}
 
   defmodule State do
     @moduledoc """
@@ -110,20 +110,7 @@ defmodule Tayori.Live do
   def on_mount(opts, _params, _session, socket) when is_list(opts) do
     resolver = Keyword.fetch!(opts, :resolver)
     reader = Resolver.reader(resolver, socket)
-    config = Tayori.Config.get()
-    locale = (reader && reader.locale) || Tayori.Config.default_locale(config)
-
-    state = %State{
-      reader: reader,
-      unread: if(reader, do: Tayori.unread_count(reader), else: 0),
-      page: opts[:page],
-      locale: locale,
-      locales: config.locales,
-      messages: Tayori.Messages.for_locale(locale),
-      limit: Keyword.get(opts, :limit, 10),
-      features: config.features,
-      emoji: config.reactions
-    }
+    state = Panel.new(reader, page: opts[:page], limit: Keyword.get(opts, :limit, 10))
 
     socket =
       if connected?(socket) do
@@ -137,108 +124,33 @@ defmodule Tayori.Live do
         socket
       end
 
-    state = %{state | announcement: Tayori.Announcements.current(reader_of(state))}
     {:cont, assign(socket, :tayori, state)}
   end
 
-  defp reader_of(state), do: state.reader || Reader.visitor(state.locale)
+  defp handle_event("tayori:open", _params, socket), do: update(socket, &Panel.open/1)
+  defp handle_event("tayori:close", _params, socket), do: update(socket, &Panel.close/1)
+  defp handle_event("tayori:more", _params, socket), do: update(socket, &Panel.more/1)
+  defp handle_event("tayori:back", _params, socket), do: update(socket, &Panel.back/1)
 
-  defp handle_event("tayori:open", _params, socket) do
-    state = socket.assigns.tayori
-    seen_before = state.reader && Tayori.new_after(state.reader)
-
-    if state.reader, do: Tayori.mark_seen(state.reader)
-
-    state =
-      %{state | open: true, unread: 0, seen_before: seen_before, entry: nil}
-      |> Map.put(:categories, Tayori.Categories.by_key())
-      |> load()
-
-    {:halt, put_state(socket, state)}
-  end
-
-  defp handle_event("tayori:close", _params, socket) do
-    {:halt, put_state(socket, %{socket.assigns.tayori | open: false, entry: nil})}
-  end
-
-  defp handle_event("tayori:more", _params, socket) do
-    state = socket.assigns.tayori
-
-    more =
-      Tayori.news(reader_of(state),
-        limit: state.limit + 1,
-        before: state.entries |> Enum.reject(& &1.pinned_at) |> List.last(),
-        category: state.category
-      )
-
-    entries = state.entries ++ Enum.take(more, state.limit)
-
-    {:halt,
-     put_state(
-       socket,
-       %{state | entries: entries, more: length(more) > state.limit} |> reactions()
-     )}
-  end
-
-  defp handle_event("tayori:filter", params, socket) do
-    category = blank(params["category"])
-    state = load(%{socket.assigns.tayori | category: category, entry: nil})
-    {:halt, put_state(socket, state)}
-  end
+  defp handle_event("tayori:filter", params, socket),
+    do: update(socket, &Panel.filter(&1, blank(params["category"])))
 
   defp handle_event("tayori:show", %{"id" => id}, socket) do
-    state = socket.assigns.tayori
-
-    case Enum.find(state.entries, &(&1.id == id)) ||
-           (state.announcement && state.announcement.id == id && state.announcement) do
-      nil ->
-        {:halt, socket}
-
-      entry ->
-        track(state, [entry])
-
-        # Reading the announcement is enough of an answer to it.
-        state =
-          if state.announcement && state.announcement.id == entry.id,
-            do: read_announcement(state, entry),
-            else: state
-
-        # The reactions of the entry and of the list, for the way back.
-        state = %{state | open: true, entry: entry}
-        {:halt, put_state(socket, reactions(state))}
+    case Panel.show(socket.assigns.tayori, id, "panel") do
+      {:ok, state} -> {:halt, put_state(socket, state)}
+      :error -> {:halt, socket}
     end
   end
 
-  defp handle_event("tayori:back", _params, socket) do
-    {:halt, put_state(socket, %{socket.assigns.tayori | entry: nil})}
-  end
+  defp handle_event("tayori:react", %{"id" => id, "emoji" => emoji}, socket),
+    do: update(socket, &Panel.react(&1, id, emoji))
 
-  defp handle_event("tayori:react", %{"id" => id, "emoji" => emoji}, socket) do
-    state = socket.assigns.tayori
-
-    # Only an entry the reader has in front of them: the id is the client's.
-    if :reactions in state.features && state.reader && shown?(state, id) do
-      _ = Tayori.Reactions.toggle(state.reader, id, emoji)
-      {:halt, put_state(socket, reactions(state))}
-    else
-      {:halt, socket}
-    end
-  end
-
-  defp handle_event("tayori:dismiss", %{"id" => id}, socket) do
-    state = socket.assigns.tayori
-    if state.reader, do: Tayori.Announcements.dismiss(state.reader, id)
-    {:halt, put_state(socket, %{state | announcement: nil})}
-  end
+  defp handle_event("tayori:dismiss", %{"id" => id}, socket),
+    do: update(socket, &Panel.dismiss(&1, id))
 
   defp handle_event(_event, _params, socket), do: {:cont, socket}
 
-  # The panel opens on the announcement, with the list to go back to.
-  defp read_announcement(state, entry) do
-    if state.reader, do: Tayori.Announcements.dismiss(state.reader, entry.id)
-    state = %{state | announcement: nil, categories: Tayori.Categories.by_key()}
-    if state.open, do: state, else: load(state)
-  end
+  defp update(socket, fun), do: {:halt, put_state(socket, fun.(socket.assigns.tayori))}
 
   defp handle_info({Tayori, :seen, _id}, socket) do
     {:halt, put_state(socket, %{socket.assigns.tayori | unread: 0})}
@@ -258,8 +170,8 @@ defmodule Tayori.Live do
   defp handle_info({Tayori, :reacted, id}, socket) do
     state = socket.assigns.tayori
 
-    if state.open and Enum.any?(shown(state), &(&1.id == id)),
-      do: {:halt, put_state(socket, reactions(state))},
+    if state.open and Enum.any?(Panel.shown(state), &(&1.id == id)),
+      do: {:halt, put_state(socket, Panel.reactions(state))},
       else: {:halt, socket}
   end
 
@@ -280,7 +192,7 @@ defmodule Tayori.Live do
           # The panel shows the news as it is: what is published while it
           # is open is seen.
           if state.reader, do: Tayori.mark_seen(state.reader)
-          state = load(state, max(length(state.entries), state.limit))
+          state = Panel.load(state, max(length(state.entries), state.limit))
 
           entry =
             state.entry &&
@@ -295,51 +207,11 @@ defmodule Tayori.Live do
           state
       end
 
-    state = %{state | announcement: Tayori.Announcements.current(reader_of(state))}
+    state = %{state | announcement: Tayori.Announcements.current(Panel.reader_of(state))}
     {:halt, put_state(socket, state)}
   end
 
   defp handle_info(_message, socket), do: {:cont, socket}
-
-  # The first page of the list, with the reactions of its entries.
-  defp load(state, limit \\ nil) do
-    limit = limit || state.limit
-    entries = Tayori.news(reader_of(state), limit: limit + 1, category: state.category)
-    pinned = Enum.count(entries, & &1.pinned_at)
-
-    %{
-      state
-      | entries: Enum.take(entries, limit + pinned),
-        more: length(entries) > limit + pinned
-    }
-    |> reactions()
-  end
-
-  defp shown(%{entry: nil, entries: entries}), do: entries
-  defp shown(%{entry: entry, entries: entries}), do: [entry | entries]
-
-  defp reactions(state, entries \\ nil) do
-    if :reactions in state.features do
-      ids = Enum.map(entries || shown(state), & &1.id) |> Enum.uniq()
-      %{state | reactions: Tayori.Reactions.for_entries(reader_of(state), ids)}
-    else
-      state
-    end
-  end
-
-  defp shown?(state, id) do
-    Enum.any?(state.entries, &(&1.id == id)) or (state.entry != nil and state.entry.id == id)
-  end
-
-  # An entry is read in the panel when it is opened there, not when its
-  # card is in the list.
-  defp track(state, entries) do
-    if :analytics in state.features do
-      for entry <- entries, do: Tayori.Views.track(state.reader, entry.id, "panel")
-    end
-
-    :ok
-  end
 
   defp blank(value) when value in [nil, ""], do: nil
   defp blank(value), do: value

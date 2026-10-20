@@ -127,11 +127,15 @@ in the `x-csrf-token` header.
 
 ## `<tayori-news>`
 
-The script of the news defines `<tayori-news>`, the button, the panel and
-the announcement of the LiveView components, over the JSON API:
+The script of the news defines `<tayori-news>`: the button, the panel and
+the announcement of the LiveView. The markup is the LiveView's own: the
+API renders `Tayori.Components` for the reader (its `/ui` routes), and
+the element puts it in the page and answers its clicks, keys and the
+click outside as LiveView would. A change to the panel is a change to
+both.
 
 ```html
-<tayori-news api="/api/news" page="/changelog"></tayori-news>
+<tayori-news api="/api/news"></tayori-news>
 ```
 
 ```js
@@ -140,8 +144,6 @@ import "tayori"
 
 * `api` - the path or the address of the JSON API (`src` is its older
   name).
-* `page` - the public page, for the panel's link to all the news (the
-  API's `:page` when not given).
 * `label` - show the word beside the icon.
 * `poll` - how often to ask the count again, in seconds (300; 0 never).
   It also asks when the page comes back into view.
@@ -158,9 +160,12 @@ back to the list, then closes, and a click outside closes; the focus
 goes to the back button, back to the card, and back to the button. The
 announcement steps aside while the panel is open, as in the LiveView.
 
+The panel's links to the public page are the API's: its `:page`, else
+the `tayori_page` of the same router.
+
 It reads the CSRF token from `<meta name="csrf-token">` for its `POST`s
 on the app's own origin. It renders into the page, not a shadow root,
-with the same classes as the LiveView components, so `tayori.css` (and
+with the markup of the LiveView components, so `tayori.css` (and
 `kotoba.css`, and `tayori-sumi.css` for Sumi) style it, in light and
 dark, and your CSS can too.
 
@@ -175,7 +180,7 @@ import "tayori"
 export function Header() {
   return (
     <header>
-      <tayori-news api="/api/news" page="/changelog" />
+      <tayori-news api="/api/news" />
     </header>
   )
 }
