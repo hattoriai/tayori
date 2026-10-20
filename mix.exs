@@ -149,6 +149,7 @@ defmodule Tayori.MixProject do
         "guides/public_page.md",
         "guides/features.md",
         "guides/ai.md",
+        "guides/automation.md",
         "guides/notifications.md",
         "guides/testing.md",
         "guides/theming.md",
@@ -165,6 +166,7 @@ defmodule Tayori.MixProject do
           "guides/public_page.md",
           "guides/features.md",
           "guides/ai.md",
+          "guides/automation.md",
           "guides/notifications.md",
           "guides/testing.md",
           "guides/theming.md"

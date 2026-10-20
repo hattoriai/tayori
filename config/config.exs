@@ -71,6 +71,9 @@ if config_env() == :test do
   # The webhooks go to the stubs of the tests (Req.Test), never out.
   config :tayori, :req_options, plug: {Req.Test, Tayori.Webhooks}
 
+  # And so do the changes `mix tayori.ingest` sends.
+  config :tayori, :ingest_req_options, plug: {Req.Test, Mix.Tasks.Tayori.Ingest}, retry: false
+
   # A forgotten version of Tayori.Migrations fails the tests.
   config :phoenix_mountable, pending_migrations: :raise
 end
