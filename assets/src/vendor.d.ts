@@ -1,15 +1,5 @@
-// The packages of deps/ the admin bundles, which ship no types.
-
-declare module "phoenix" {
-  export const Socket: unknown;
-}
-
-declare module "phoenix_live_view" {
-  export class LiveSocket {
-    constructor(path: string, socket: unknown, opts: Record<string, unknown>);
-    connect(): void;
-  }
-}
+// Kotoba and Koyomi ship no types yet. Phoenix's are @types/phoenix,
+// and LiveView and PhoenixMountable ship their own (see tsconfig.json).
 
 declare module "kotoba" {
   export const Kotoba: object;

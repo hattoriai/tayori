@@ -45,7 +45,7 @@ defmodule Tayori.API do
 
   @impl Plug
   def call(conn, action) do
-    opts = conn.private.tayori_api
+    opts = conn.assigns.mount.options
     reader = Resolver.reader(opts.resolver, conn)
     locale = locale(conn, reader)
     handle(action, conn, reader, locale, opts)
@@ -118,7 +118,7 @@ defmodule Tayori.API do
       locale: t.locale,
       html: t.body && t.body.html,
       text: t.body && t.body.text,
-      url: opts[:page] && opts.page <> "/" <> entry.slug
+      url: opts[:page] && String.trim_trailing(opts.page, "/") <> "/" <> entry.slug
     }
   end
 

@@ -4,7 +4,37 @@ This guide adds Tayori to a Phoenix app, from the dependency to the first
 entry your readers see. It shows a Phoenix 1.8 app with `mix phx.gen.auth`;
 the [Admin](admin.md) guide covers other ways to know your admins.
 
-## 1. Add the dependency
+## 1. Run the installer
+
+With [Igniter](https://hexdocs.pm/igniter) (`mix archive.install hex igniter_new`
+once):
+
+```sh
+mix igniter.install tayori
+```
+
+It adds `{:tayori, "~> 0.1"}` to your deps and makes these changes,
+showing each one as a diff before it writes:
+
+* `lib/my_app_web/router.ex`: the admin at `/admin/news`, in the `/admin`
+  scope, and the public page at `/changelog` (step 6);
+* the migration of Tayori's tables, in `priv/repo/migrations`;
+* `assets/js/app.js`: `import { Tayori } from "tayori"`, and `Tayori` in
+  the hooks of the `LiveSocket`;
+* `assets/css/app.css`: Kotoba's style sheet and the news', and the Sumi
+  theme as a comment;
+* `lib/my_app/application.ex`: Tayori, after the repo and the PubSub
+  (step 4);
+* `lib/my_app_web/tayori_resolver.ex`: your resolver, which lets no one
+  into the admin until you say who your admins are (step 5).
+
+Running it again changes nothing. With Tayori already in your deps,
+`mix tayori.install` does the same. For writing with AI, with your own
+key, add `{:req_llm, "~> 1.6"}` to your deps too.
+
+## 2. Or make the changes by hand
+
+Add the dependency:
 
 ```elixir
 def deps do
@@ -16,30 +46,6 @@ def deps do
 end
 ```
 
-```sh
-mix deps.get
-```
-
-## 2. Run the installer
-
-```sh
-mix tayori.install
-```
-
-It makes these changes, and prints them:
-
-* `assets/js/app.js`: `import { Tayori } from "tayori"`, and `Tayori` in
-  the hooks of the `LiveSocket`;
-* `assets/css/app.css`: the style sheet of the news, and the Sumi theme
-  as a comment;
-* `lib/my_app_web/tayori_resolver.ex`: your resolver, which lets no one
-  into the admin until you say who your admins are (step 5);
-* the migration of Tayori's tables, in `priv/repo/migrations`.
-
-Give `--dry-run` to see the changes first. The installer does not add what
-a file already has, so you can run it again.
-
-## 2b. Or make the changes by hand
 
 In `assets/js/app.js`:
 
@@ -86,8 +92,8 @@ Run the migration:
 mix ecto.migrate
 ```
 
-Add Tayori to the children of `lib/my_app/application.ex`, after the repo
-and the PubSub, and before the endpoint:
+The installer added Tayori to the children of `lib/my_app/application.ex`,
+after the repo and the PubSub; by hand, add it there:
 
 ```elixir
 children = [
@@ -137,7 +143,8 @@ unread to them. The [Readers](readers.md) guide adds segments.
 
 ## 6. Mount the admin and the public page
 
-In `lib/my_app_web/router.ex`:
+The installer mounted both in `lib/my_app_web/router.ex`. Put the admin
+behind the pipeline that signs your users in:
 
 ```elixir
 import Tayori.Router

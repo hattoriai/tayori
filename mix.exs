@@ -8,6 +8,16 @@ defmodule Tayori.MixProject do
   # supports, for the CI job that tests them.
   @oldest System.get_env("TAYORI_OLDEST") in ["1", "true"]
 
+  # The bundles, built by mix tayori.build.
+  @bundles ~w(
+    priv/static/tayori.esm.js
+    priv/static/tayori.cjs.js
+    priv/static/tayori.css
+    priv/static/tayori-sumi.css
+    priv/static/tayori-admin.js
+    priv/static/tayori-admin.css
+  )
+
   def project do
     [
       app: :tayori,
@@ -65,6 +75,9 @@ defmodule Tayori.MixProject do
       # The admin's forms of Ecto changesets; every Phoenix app with Ecto
       # has it.
       {:phoenix_ecto, "~> 4.6"},
+      # The mounts in the app's router, their assets and the migrations.
+      {:phoenix_mountable, "~> 0.2"},
+      {:igniter, "~> 0.6", optional: true},
       {:phoenix, if(@oldest, do: "~> 1.7.14", else: "~> 1.7.14 or ~> 1.8")},
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_reload, "~> 1.6", only: :dev},
@@ -165,11 +178,18 @@ defmodule Tayori.MixProject do
           Tayori.Locales
         ],
         Mounting: [Tayori.Router, Tayori.API, Tayori.Page, Tayori.Notifier],
-        Database: [Tayori.Migration],
+        Database: [Tayori.Migrations],
         AI: [Tayori.AI],
         Testing: [Tayori.Test]
       ]
     ]
+  end
+
+  defp placeholder_bundles(_args) do
+    for bundle <- @bundles, not File.exists?(bundle) do
+      File.mkdir_p!(Path.dirname(bundle))
+      File.touch!(bundle)
+    end
   end
 
   # The browser tests need their npm packages; `npm ci` runs once.
@@ -182,6 +202,9 @@ defmodule Tayori.MixProject do
   defp aliases do
     [
       "assets.build": ["tayori.build"],
+      # The router embeds the bundles when it compiles, and mix tayori.build
+      # compiles Tayori first: in a fresh checkout, empty files let it.
+      "tayori.build": [&placeholder_bundles/1, "tayori.build"],
       dev: "run --no-halt dev.exs",
       "test.e2e": [&e2e_deps/1, "cmd --cd e2e npm test"],
       "test.js": ["cmd --cd assets npm test"],

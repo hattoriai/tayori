@@ -67,8 +67,8 @@ end
 defmodule TayoriDev.Migration do
   @moduledoc false
   use Ecto.Migration
-  def up, do: Tayori.Migration.up()
-  def down, do: Tayori.Migration.down()
+  def up, do: Tayori.Migrations.up(version: 1)
+  def down, do: Tayori.Migrations.down(to: 0)
 end
 
 defmodule TayoriDev.Seeds do
@@ -387,7 +387,7 @@ defmodule TayoriDev.Router do
 
     get "/plain", TayoriDev.PlainController, :show
     tayori_page("/changelog", title: "Atelier news", resolver: TayoriDev.Resolver)
-    tayori_page("/sumi/changelog", title: "Atelier news", theme: :sumi)
+    tayori_page("/sumi/changelog", title: "Atelier news", theme: :sumi, as: :tayori_page_sumi)
   end
 end
 

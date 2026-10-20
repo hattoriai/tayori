@@ -11,6 +11,6 @@ end
 defmodule TayoriTest.Migration do
   @moduledoc false
   use Ecto.Migration
-  def up, do: Tayori.Migration.up()
-  def down, do: Tayori.Migration.down()
+  def up, do: Tayori.Migrations.up(version: 1)
+  def down, do: Tayori.Migrations.down(to: 0)
 end

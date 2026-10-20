@@ -43,13 +43,6 @@ if config_env() == :test do
   config :logger, level: :warning
   config :phoenix, :json_library, JSON
 
-  config :tayori, TayoriTest.Endpoint,
-    secret_key_base: String.duplicate("tayori-test-secret-key-base-", 4),
-    live_view: [signing_salt: "tayori-test-salt"],
-    pubsub_server: TayoriTest.PubSub,
-    render_errors: [formats: [html: TayoriTest.ErrorHTML], layout: false],
-    server: false
-
   # The entries, tested with both adapters. The PostgreSQL tests are
   # tagged :postgres, and run when the database is reachable (see
   # test/test_helper.exs).
@@ -68,4 +61,7 @@ if config_env() == :test do
     pool_size: 5
 
   config :tayori, ecto_repos: [TayoriTest.SQLiteRepo, TayoriTest.PostgresRepo]
+
+  # A forgotten version of Tayori.Migrations fails the tests.
+  config :phoenix_mountable, pending_migrations: :raise
 end

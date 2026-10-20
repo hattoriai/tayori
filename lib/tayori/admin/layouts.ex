@@ -1,37 +1,23 @@
 defmodule Tayori.Admin.Layouts do
   @moduledoc false
-  # The admin's own document: its styles and script, and the meta tags its
-  # script reads to join the app's LiveView socket.
+  # The admin's own document: its styles and script (the mount's assets),
+  # and the meta tags its script reads to join the app's LiveView socket.
 
   use Phoenix.Component
-
-  alias Tayori.Assets
+  use PhoenixMountable.Path, mountable: Tayori.Router
 
   def root(assigns) do
     ~H"""
     <!DOCTYPE html>
-    <html lang="en" data-tayori-theme={@theme}>
+    <html lang="en" data-tayori-theme={@mount.options.theme}>
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="csrf-token" content={Phoenix.Controller.get_csrf_token()} />
-        <meta name="tayori-socket" content={@socket_path} />
+        <PhoenixMountable.Layout.meta mount={@mount} />
         <meta name="robots" content="noindex, nofollow" />
         <title>{assigns[:page_title] || "News"} · Tayori</title>
         <link rel="icon" type="image/svg+xml" href={favicon()} />
-        <link
-          phx-track-static
-          rel="stylesheet"
-          nonce={@csp_nonces[:style]}
-          href={@prefix <> "/assets/" <> Assets.name(:admin_css)}
-        />
-        <script
-          phx-track-static
-          defer
-          nonce={@csp_nonces[:script]}
-          src={@prefix <> "/assets/" <> Assets.name(:admin_js)}
-        >
-        </script>
+        <PhoenixMountable.Layout.assets mount={@mount} />
       </head>
       <body class="tayori-admin">
         {@inner_content}
@@ -50,7 +36,6 @@ defmodule Tayori.Admin.Layouts do
 
   defp favicon, do: @favicon
 
-  attr :prefix, :string, required: true
   attr :page, :atom, required: true
   attr :flash, :map, default: %{}
   slot :inner_block, required: true
@@ -58,7 +43,7 @@ defmodule Tayori.Admin.Layouts do
   def page(assigns) do
     ~H"""
     <header class="ta-header">
-      <.link navigate={@prefix} class="ta-brand">
+      <.link navigate={~m"/"} class="ta-brand">
         <svg viewBox="0 0 112 112" aria-hidden="true" class="ta-mark">
           <defs>
             <mask id="ta-letter" maskUnits="userSpaceOnUse" x="0" y="0" width="112" height="112">
@@ -83,8 +68,8 @@ defmodule Tayori.Admin.Layouts do
         <span>News</span>
       </.link>
       <nav class="ta-nav" aria-label="Admin">
-        <.link navigate={@prefix} aria-current={@page == :entries && "page"}>Entries</.link>
-        <.link navigate={@prefix <> "/settings"} aria-current={@page == :settings && "page"}>
+        <.link navigate={~m"/"} aria-current={@page == :entries && "page"}>Entries</.link>
+        <.link navigate={~m"/settings"} aria-current={@page == :settings && "page"}>
           Settings
         </.link>
       </nav>

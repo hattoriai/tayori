@@ -50,7 +50,7 @@ the hook and one style sheet.
 | Public page | `tayori_page`: the news for everyone, a page for each entry, Atom and JSON Feed, in the reader's language |
 | AI | any model of ReqLLM with your key, kept encrypted; draft, translate, rewrite, shorter, warmer, fix the spelling; suggestions you accept or reject |
 | Words | eight languages (`Tayori.Messages`), your own in the config |
-| Database | PostgreSQL and SQLite, in a migration of your app (`Tayori.Migration`) |
+| Database | PostgreSQL and SQLite, in a migration of your app (`Tayori.Migrations`) |
 | Theming | CSS custom properties, light and dark, the Sumi theme, forced colours, reduced motion; the admin in Tayori's theme or Sumi's |
 
 ## Install
@@ -59,31 +59,24 @@ Tayori needs Elixir 1.18 or later (it uses the built-in `JSON` module),
 Phoenix 1.7.14 or 1.8, Phoenix LiveView 1.1 or later, and Ecto with
 PostgreSQL or SQLite.
 
-Add `tayori` to the deps in `mix.exs`, and `req_llm` if you want AI:
-
-```elixir
-def deps do
-  [
-    {:tayori, "~> 0.1"},
-    {:req_llm, "~> 1.6"}
-  ]
-end
-```
-
-Then run:
+With [Igniter](https://hexdocs.pm/igniter):
 
 ```sh
-mix deps.get
-mix tayori.install
+mix igniter.install tayori
 mix ecto.migrate
 ```
 
-The installer adds the hook to `assets/js/app.js` and the style sheet to
-`assets/css/app.css`, writes `lib/my_app_web/tayori_resolver.ex` and the
-migration of Tayori's tables, and prints what it changed and what is
-left. Give `--dry-run` to see the changes first.
+The installer adds the dependency, mounts the admin at `/admin/news` and
+the public page at `/changelog`, writes the migration of Tayori's tables,
+adds the hook to `assets/js/app.js` and the style sheets to
+`assets/css/app.css`, starts Tayori in your application, and writes
+`lib/my_app_web/tayori_resolver.ex`, which lets no one in the admin until
+you say who your admins are. It shows each change as a diff before it
+writes, and running it again changes nothing.
 
-Then add Tayori to your supervision tree, after the repo and the PubSub:
+Without Igniter, add `{:tayori, "~> 0.1"}` (and `{:req_llm, "~> 1.6"}`
+for AI) to your deps, and Tayori to your supervision tree, after the repo
+and the PubSub:
 
 ```elixir
 {Tayori,

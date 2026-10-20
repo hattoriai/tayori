@@ -5,6 +5,7 @@ defmodule Tayori.Admin.EntriesLive do
   # admins as they make them.
 
   use Phoenix.LiveView, layout: false
+  use PhoenixMountable.Path, mountable: Tayori.Router
 
   import Tayori.Admin.Components
 
@@ -36,7 +37,7 @@ defmodule Tayori.Admin.EntriesLive do
 
   @impl true
   def handle_event("search", %{"q" => q}, socket) do
-    {:noreply, push_patch(socket, to: list_path(socket.assigns.prefix, socket.assigns.status, q))}
+    {:noreply, push_patch(socket, to: list_path(socket.assigns.status, q))}
   end
 
   @impl true
@@ -45,10 +46,10 @@ defmodule Tayori.Admin.EntriesLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <.page prefix={@prefix} page={:entries} flash={@flash}>
+    <.page page={:entries} flash={@flash}>
       <div class="ta-toolbar">
         <h1>Entries</h1>
-        <.link :if={@access == :all} navigate={@prefix <> "/new"} class="ta-button ta-primary">
+        <.link :if={@access == :all} navigate={~m"/new"} class="ta-button ta-primary">
           New entry
         </.link>
       </div>
@@ -57,7 +58,7 @@ defmodule Tayori.Admin.EntriesLive do
         <nav class="ta-tabs" aria-label="Status">
           <.link
             :for={{label, status} <- [{"All", nil}, {"Drafts", :draft}, {"Scheduled", :scheduled}, {"Published", :published}]}
-            patch={list_path(@prefix, status, @search)}
+            patch={list_path(status, @search)}
             aria-current={@status == status && "page"}
           >
             {label}
@@ -78,7 +79,7 @@ defmodule Tayori.Admin.EntriesLive do
 
       <ul :if={@entries != []} class="ta-entries" id="entries">
         <li :for={entry <- @entries} id={"entry-#{entry.id}"}>
-          <.link navigate={@prefix <> "/" <> entry.id} class="ta-entry">
+          <.link navigate={~m"/#{entry.id}"} class="ta-entry">
             <span class="ta-entry-title">{title(entry, @config)}</span>
             <span class="ta-entry-meta">
               <.status entry={entry} now={@now} />
@@ -111,11 +112,11 @@ defmodule Tayori.Admin.EntriesLive do
     end
   end
 
-  defp list_path(prefix, status, search) do
+  defp list_path(status, search) do
     query =
       [status: status && Atom.to_string(status), q: search != "" && search]
       |> Enum.filter(fn {_key, value} -> value end)
 
-    if query == [], do: prefix, else: prefix <> "?" <> URI.encode_query(query)
+    ~m"/?#{query}"
   end
 end

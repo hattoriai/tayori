@@ -1,24 +1,22 @@
 defmodule Tayori.Admin.Auth do
   @moduledoc false
-  # The last on_mount of the admin's live session: it takes the admin and
-  # their access from the session (read from the request of the page by
-  # Tayori.Router.__admin_session__/7), and stops those who may not see
-  # the admin.
+  # The library's on_mount of the admin's live session, after the app's:
+  # it takes the admin and their access from the session (read from the
+  # request of the page by Tayori.Router.session/3) and the options from
+  # the mount, and stops those who may not see the admin.
 
   import Phoenix.Component, only: [assign: 2]
   import Phoenix.LiveView
 
   def on_mount(:default, _params, session, socket) do
+    options = socket.assigns.mount.options
+
     socket =
       assign(socket,
-        prefix: session["prefix"],
-        resolver: session["resolver"],
+        resolver: options.resolver,
+        storage: options.storage,
         user: session["user"],
         access: session["access"],
-        theme: session["theme"],
-        socket_path: session["socket_path"],
-        storage: session["storage"],
-        csp_nonces: session["csp_nonces"] || %{},
         time_zone: time_zone(socket),
         locale: locale(socket),
         config: Tayori.Config.get()

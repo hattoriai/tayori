@@ -16,7 +16,7 @@ defmodule TayoriTest.ConnCase do
 
       alias Tayori.{Entries, Entry, Reader}
 
-      @endpoint TayoriTest.Endpoint
+      @endpoint TayoriTest.Host.Endpoint
     end
   end
 
