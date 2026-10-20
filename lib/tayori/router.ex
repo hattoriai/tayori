@@ -93,6 +93,7 @@ defmodule Tayori.Router do
   routes do
     live "/", Tayori.Admin.EntriesLive, :index
     live "/new", Tayori.Admin.EntryLive, :new
+    live "/inbox", Tayori.Admin.InboxLive, :index
     live "/categories", Tayori.Admin.CategoriesLive, :index
     live "/settings", Tayori.Admin.SettingsLive, :index
     live "/:id", Tayori.Admin.EntryLive, :edit

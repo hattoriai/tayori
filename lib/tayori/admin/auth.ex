@@ -3,7 +3,9 @@ defmodule Tayori.Admin.Auth do
   # The library's on_mount of the admin's live session, after the app's:
   # it takes the admin and their access from the session (read from the
   # request of the page by Tayori.Router.session/3) and the options from
-  # the mount, and stops those who may not see the admin.
+  # the mount, and stops those who may not see the admin. It keeps the
+  # count of the inbox's new changes for the bar, as the pages that follow
+  # Tayori's events hear of them.
 
   import Phoenix.Component, only: [assign: 2]
   import Phoenix.LiveView
@@ -28,7 +30,10 @@ defmodule Tayori.Admin.Auth do
 
     case socket.assigns.access do
       access when access in [:all, :read_only] ->
-        {:cont, socket}
+        {:cont,
+         socket
+         |> assign(inbox_new: Tayori.Inbox.pending_count())
+         |> attach_hook(:tayori_inbox, :handle_info, &count_inbox/2)}
 
       {:forbidden, path} when is_binary(path) ->
         {:halt, redirect(socket, to: path)}
@@ -37,6 +42,11 @@ defmodule Tayori.Admin.Auth do
         raise Tayori.Admin.NotFound
     end
   end
+
+  defp count_inbox({Tayori, :inbox, _id}, socket),
+    do: {:cont, assign(socket, inbox_new: Tayori.Inbox.pending_count())}
+
+  defp count_inbox(_message, socket), do: {:cont, socket}
 
   # The admin's own time zone, which their browser gives on connect: the
   # times of the admin are in it, when the app's time zone database knows

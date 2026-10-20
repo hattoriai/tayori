@@ -64,7 +64,7 @@ defmodule Tayori.Admin.EntriesLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <.page page={:entries} flash={@flash} access={@access}>
+    <.page page={:entries} flash={@flash} access={@access} inbox={@inbox_new}>
       <div class="ta-heading">
         <div>
           <h1>Entries</h1>

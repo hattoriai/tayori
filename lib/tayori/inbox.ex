@@ -145,8 +145,8 @@ defmodule Tayori.Inbox do
 
   @doc """
   The changes, the newest first. Options: `:state` (`"new"`, `"drafted"`,
-  `"hidden"`), `:source`, `:audience`, `:entry_id`, `:ids`, `:limit`
-  (100).
+  `"hidden"`), `:source`, `:audience`, `:entry_id`, `:ids`, `:search`
+  (words of the title), `:limit` (100).
   """
   @spec list(keyword()) :: [Change.t()]
   def list(opts \\ []) do
@@ -168,8 +168,14 @@ defmodule Tayori.Inbox do
       {:ids, ids}, q when is_list(ids) -> where(q, [c], c.id in ^ids)
       {:since, %DateTime{} = at}, q -> where(q, [c], c.occurred_at >= ^at)
       {:until, %DateTime{} = at}, q -> where(q, [c], c.occurred_at < ^at)
+      {:search, words}, q when is_binary(words) and words != "" -> search(q, words)
       _other, q -> q
     end)
+  end
+
+  defp search(query, words) do
+    like = "%" <> String.replace(String.downcase(words), ~r/[\\%_]/, "\\\\\\0") <> "%"
+    where(query, [c], fragment("lower(?) LIKE ? ESCAPE '\\'", c.title, ^like))
   end
 
   @doc """
@@ -185,6 +191,15 @@ defmodule Tayori.Inbox do
     |> filter(Keyword.take(opts, [:ids, :since, :until]))
     |> order_by([c], desc: c.highlight, asc: c.occurred_at)
     |> config.repo.all(prefix: config.prefix)
+  end
+
+  @doc "How many changes are waiting for a digest: new, and for the public."
+  @spec pending_count() :: non_neg_integer()
+  def pending_count do
+    config = Config.get()
+
+    from(c in Change, where: c.state == "new" and c.audience == "public", select: count())
+    |> config.repo.one(prefix: config.prefix)
   end
 
   @doc "A change by its id, or nil."

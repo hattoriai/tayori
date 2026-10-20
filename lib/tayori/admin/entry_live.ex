@@ -3,8 +3,9 @@ defmodule Tayori.Admin.EntryLive do
   # Writes an entry: its title, summary and body in each language (the
   # body in Kotoba's editor, with attachments), its cover, categories and
   # audience, and when it is published; with the features on, how it is
-  # announced in the app and whether it is emailed. The preview shows the
-  # entry as it is in the form, as readers will see it.
+  # announced in the app and whether it is emailed; and the changes of the
+  # inbox it was drafted from. The preview shows the entry as it is in the
+  # form, as readers will see it.
 
   use Phoenix.LiveView, layout: false
   use PhoenixMountable.Path, mountable: Tayori.Router
@@ -14,7 +15,7 @@ defmodule Tayori.Admin.EntryLive do
   alias Kotoba.Nodes.Attachment
   alias Phoenix.HTML.Form
   alias Tayori.Admin.Writer
-  alias Tayori.{AI, Categories, Config, Entries, Entry, Messages, Resolver, Translation}
+  alias Tayori.{AI, Categories, Config, Entries, Entry, Inbox, Messages, Resolver, Translation}
 
   @accept ~w(.png .jpg .jpeg .gif .webp .pdf .mp4 .webm)
   @cover_accept ~w(.png .jpg .jpeg .gif .webp)
@@ -46,7 +47,8 @@ defmodule Tayori.Admin.EntryLive do
         preview_as: :page,
         cover: entry.cover,
         pinned: entry.pinned_at != nil,
-        copied: false
+        copied: false,
+        from_inbox: if(entry.id, do: Inbox.list(entry_id: entry.id), else: [])
       )
       |> assign_form(Entries.change(entry))
       |> assign_schedule(entry.published_at)
@@ -577,7 +579,7 @@ defmodule Tayori.Admin.EntryLive do
       )
 
     ~H"""
-    <.page page={:entries} flash={@flash} access={@access} wide>
+    <.page page={:entries} flash={@flash} access={@access} inbox={@inbox_new} wide>
       <div class="ta-heading ta-editor-heading">
         <div class="ta-heading-title">
           <.link navigate={~m"/"} class="ta-icon-button" aria-label="Entries">
@@ -881,6 +883,25 @@ defmodule Tayori.Admin.EntryLive do
             </div>
             <p :if={@entry.id && @page_path} class="ta-hint">
               Anyone with the link sees the last saved version, for a week.
+            </p>
+          </.card>
+
+          <.card :if={@from_inbox != []} title="From the inbox" icon="inbox" id="from-inbox">
+            <ul class="ta-inbox-changes">
+              <li :for={change <- @from_inbox}>
+                <span class="ta-inbox-change-title">
+                  <.icon :if={change.highlight} name="star" class="ta-star" />{change.title}
+                </span>
+                <span class="ta-hint">
+                  {Tayori.Admin.InboxLive.source_label(change.source)}<span :if={change.version}> · {change.version}</span>
+                  <a :if={change.url} href={change.url} target="_blank" rel="noopener noreferrer">
+                    {Tayori.Admin.InboxLive.short_url(change.url)}
+                  </a>
+                </span>
+              </li>
+            </ul>
+            <p class="ta-hint">
+              <.link navigate={~m"/inbox?state=drafted"}>Open the inbox</.link>
             </p>
           </.card>
 
