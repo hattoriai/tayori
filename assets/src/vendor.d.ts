@@ -2,6 +2,12 @@
 
 declare module "phoenix" {
   export const Socket: unknown;
+  export const LongPoll: unknown;
+}
+
+declare module "phoenix_mountable" {
+  export function connect(options: Record<string, unknown>): unknown;
+  export function path(relative: string): string;
 }
 
 declare module "phoenix_live_view" {

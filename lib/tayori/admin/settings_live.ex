@@ -4,6 +4,7 @@ defmodule Tayori.Admin.SettingsLive do
   # shown again), and what the product is, for the drafts.
 
   use Phoenix.LiveView, layout: false
+  use PhoenixMountable.Path, mountable: Tayori.Router
 
   import Tayori.Admin.Components
 
@@ -76,7 +77,7 @@ defmodule Tayori.Admin.SettingsLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <.page prefix={@prefix} page={:settings} flash={@flash}>
+    <.page page={:settings} flash={@flash}>
       <div class="ta-toolbar">
         <h1>Settings</h1>
       </div>

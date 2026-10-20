@@ -1,19 +1,18 @@
 // The admin's script: a page of its own, so it brings Phoenix, LiveView,
-// Kotoba and Koyomi, and joins the app's LiveView socket at the path the
-// layout names.
+// Kotoba and Koyomi, and joins the app's LiveView socket with the path and
+// transport of the mount (PhoenixMountable.Layout.meta/1).
 
-import { Socket } from "phoenix";
+import { LongPoll, Socket } from "phoenix";
 import { LiveSocket } from "phoenix_live_view";
+import { connect } from "phoenix_mountable";
 import { Kotoba } from "kotoba";
 import { Koyomi } from "koyomi";
 import { localizeTimes } from "./times";
 
-const meta = (name: string): string | null =>
-  document.querySelector(`meta[name='${name}']`)?.getAttribute("content") ?? null;
-
-const liveSocket = new LiveSocket(meta("tayori-socket") ?? "/live", Socket, {
+const liveSocket = connect({
+  Phoenix: { Socket, LongPoll },
+  LiveView: { LiveSocket },
   params: {
-    _csrf_token: meta("csrf-token"),
     // The admin's own time zone: the times of the admin are in it.
     time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     // And their language, for the order and names of the date picker.
@@ -21,8 +20,6 @@ const liveSocket = new LiveSocket(meta("tayori-socket") ?? "/live", Socket, {
   },
   hooks: { Kotoba, Koyomi },
 });
-
-liveSocket.connect();
 
 // The times of the page are written in UTC; each is shown in the admin's
 // time zone and language, as it appears.

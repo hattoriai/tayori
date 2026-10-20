@@ -1,8 +1,3 @@
-defmodule TayoriTest.ErrorHTML do
-  @moduledoc "Error pages for the test endpoint."
-  def render(template, _assigns), do: Phoenix.Controller.status_message_from_template(template)
-end
-
 defmodule TayoriTest.Resolver do
   @moduledoc "The resolver of the tests: the admin and the reader are in the session."
   @behaviour Tayori.Resolver
@@ -58,55 +53,33 @@ defmodule TayoriTest.AssignReader do
   end
 end
 
-defmodule TayoriTest.Router do
-  @moduledoc "The router of the test endpoint."
-  use Phoenix.Router
+defmodule TayoriTest.Host do
+  @moduledoc """
+  The app of the tests: the admin mounted with its definition, the API and
+  the public page with the macros `import Tayori.Router` gives, as an app
+  writes them, and a LiveView of the app's own with the news.
+  """
 
-  import Phoenix.LiveView.Router
-  import Tayori.Router
+  use PhoenixMountable.TestHost,
+    otp_app: :tayori,
+    mounts: [{Tayori.Router, "/admin/news", resolver: TayoriTest.Resolver}],
+    routes:
+      (quote do
+         import Tayori.Router
 
-  pipeline :browser do
-    plug :fetch_session
-    plug :fetch_live_flash
-    plug :protect_from_forgery
-  end
+         scope "/" do
+           pipe_through :browser
 
-  pipeline :api do
-    plug :accepts, ["json"]
-    plug :fetch_session
-    plug :protect_from_forgery
-  end
+           tayori_api "/api/news", resolver: TayoriTest.Resolver, page: "/changelog"
+           tayori_page "/changelog", title: "Test news", limit: 2
 
-  scope "/admin" do
-    pipe_through :browser
-    tayori_admin "/news", resolver: TayoriTest.Resolver
-  end
-
-  scope "/api" do
-    pipe_through :api
-    tayori_api "/news", resolver: TayoriTest.Resolver, page: "/changelog"
-  end
-
-  scope "/" do
-    pipe_through :browser
-
-    live_session :app,
-      on_mount: [TayoriTest.AssignReader, {Tayori.Live, resolver: TayoriTest.Resolver, limit: 2}] do
-      live "/", TayoriTest.NewsLive
-    end
-
-    tayori_page "/changelog", title: "Test news", limit: 2
-  end
-end
-
-defmodule TayoriTest.Endpoint do
-  @moduledoc "A Phoenix endpoint for the tests. It runs no server."
-  use Phoenix.Endpoint, otp_app: :tayori
-
-  @session [store: :cookie, key: "_tayori_test", signing_salt: "tayori-test"]
-
-  socket "/live", Phoenix.LiveView.Socket, websocket: [connect_info: [session: @session]]
-
-  plug Plug.Session, @session
-  plug TayoriTest.Router
+           live_session :app,
+             on_mount: [
+               TayoriTest.AssignReader,
+               {Tayori.Live, resolver: TayoriTest.Resolver, limit: 2}
+             ] do
+             live "/", TayoriTest.NewsLive
+           end
+         end
+       end)
 end

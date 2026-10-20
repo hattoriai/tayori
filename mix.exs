@@ -65,6 +65,11 @@ defmodule Tayori.MixProject do
       # The admin's forms of Ecto changesets; every Phoenix app with Ecto
       # has it.
       {:phoenix_ecto, "~> 4.6"},
+      # The mounts in the app's router, their assets and the migrations.
+      # Until phoenix_mountable 0.2 is on Hex: the installer and the edge cases
+      # Tayori found are on its feat/tayori-edge-cases branch.
+      {:phoenix_mountable, path: "../phoenix_mountable", override: true},
+      {:igniter, "~> 0.6", optional: true},
       {:phoenix, if(@oldest, do: "~> 1.7.14", else: "~> 1.7.14 or ~> 1.8")},
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_reload, "~> 1.6", only: :dev},
@@ -165,7 +170,7 @@ defmodule Tayori.MixProject do
           Tayori.Locales
         ],
         Mounting: [Tayori.Router, Tayori.API, Tayori.Page, Tayori.Notifier],
-        Database: [Tayori.Migration],
+        Database: [Tayori.Migrations],
         AI: [Tayori.AI],
         Testing: [Tayori.Test]
       ]

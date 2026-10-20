@@ -1,16 +1,10 @@
 defmodule Mix.Tasks.Tayori.Gen.MigrationTest do
   use ExUnit.Case, async: true
 
-  alias Mix.Tasks.Tayori.Gen.Migration
-
-  test "the migration calls Tayori.Migration" do
-    source = Migration.migration(MyApp.Repo, nil)
-    assert source =~ "defmodule MyApp.Repo.Migrations.AddTayori do"
-    assert source =~ "def up, do: Tayori.Migration.up(version: 1)"
-
-    assert Migration.migration(MyApp.Repo, "app") =~
-             ~s{Tayori.Migration.down(version: 1, prefix: "app")}
-
-    assert {_ast, []} = Code.string_to_quoted_with_comments!(source) |> then(&{&1, []})
+  # The task is phoenix_mountable's generator with Tayori's migrations; its
+  # own tests cover the files it writes. Here, that the migrations module
+  # pins a version the generator can read.
+  test "Tayori.Migrations has its versions, the latest first to install" do
+    assert Tayori.Migrations.latest_version() == 1
   end
 end

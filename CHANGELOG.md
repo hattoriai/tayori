@@ -7,6 +7,19 @@ and Tayori follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Tayori is mounted with [PhoenixMountable](https://hexdocs.pm/phoenix_mountable):
+  the admin's script and style sheet are served under the mount as
+  `js-<hash>` and `css-<hash>`, and every mount takes PhoenixMountable's
+  options (`:as`, `:on_mount`, `:csp_nonce_assign_key`, ...).
+- The tables are versioned migrations, `Tayori.Migrations`, in place of
+  `Tayori.Migration`: `Tayori.Migrations.up(version: 1)`. A forgotten
+  upgrade says so at boot.
+- The installer runs on Igniter (`mix igniter.install tayori`): it also
+  mounts the admin and the public page, and starts Tayori in the
+  application. `--dry-run` is Igniter's own.
+
 ## [0.1.0]
 
 The first release: the changelog.

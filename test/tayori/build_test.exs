@@ -6,8 +6,14 @@ defmodule Tayori.BuildTest do
   @moduletag :build
 
   test "the pages serve the files of the build" do
-    for key <- [:admin_js, :admin_css, :page_css, :page_sumi_css] do
-      assert Tayori.Assets.size(key) > 1000, "#{key} is empty"
+    for {definition, name} <- [
+          {Tayori.Router, :js},
+          {Tayori.Router, :css},
+          {Tayori.Router.Page, :css},
+          {Tayori.Router.Page, :sumi}
+        ] do
+      body = definition.__phoenix_mountable_asset__(name, :identity)
+      assert byte_size(body) > 1000, "#{inspect(definition)} #{name} is empty"
     end
   end
 end

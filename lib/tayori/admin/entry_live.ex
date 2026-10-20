@@ -5,6 +5,7 @@ defmodule Tayori.Admin.EntryLive do
   # segments, and when it is published.
 
   use Phoenix.LiveView, layout: false
+  use PhoenixMountable.Path, mountable: Tayori.Router
 
   import Tayori.Admin.Components
 
@@ -142,7 +143,7 @@ defmodule Tayori.Admin.EntryLive do
           |> assign_schedule(entry.published_at)
 
         if socket.assigns.live_action == :new do
-          {:noreply, push_navigate(socket, to: socket.assigns.prefix <> "/" <> entry.id)}
+          {:noreply, push_navigate(socket, to: ~m"/#{entry.id}")}
         else
           {:noreply, socket}
         end
@@ -162,7 +163,7 @@ defmodule Tayori.Admin.EntryLive do
     {:noreply,
      socket
      |> put_flash(:info, "The entry was deleted.")
-     |> push_navigate(to: socket.assigns.prefix)}
+     |> push_navigate(to: ~m"/")}
   end
 
   # The AI: a draft from notes, a translation from the first language, and
@@ -427,10 +428,10 @@ defmodule Tayori.Admin.EntryLive do
       )
 
     ~H"""
-    <.page prefix={@prefix} page={:entries} flash={@flash}>
+    <.page page={:entries} flash={@flash}>
       <div class="ta-toolbar">
         <h1>
-          <.link navigate={@prefix} class="ta-back" aria-label="Entries">←</.link>
+          <.link navigate={~m"/"} class="ta-back" aria-label="Entries">←</.link>
           {if @entry.id, do: "Edit entry", else: "New entry"}
         </h1>
         <div class="ta-toolbar-actions">

@@ -1,274 +1,154 @@
 defmodule Mix.Tasks.Tayori.InstallTest do
-  # async: false: the task works in the current working directory.
-  use ExUnit.Case, async: false
+  use ExUnit.Case, async: true
 
-  alias Mix.Tasks.Tayori.Install
+  import Igniter.Test
 
-  # The parts of the files of a new Phoenix 1.8 app that the edits read.
   @app_js """
-  // Include phoenix_html to handle method=PUT/DELETE in forms and buttons.
   import "phoenix_html"
-  // Establish Phoenix Socket and LiveView configuration.
   import {Socket} from "phoenix"
   import {LiveSocket} from "phoenix_live_view"
-  import {hooks as colocatedHooks} from "phoenix-colocated/my_app"
-  import topbar from "../vendor/topbar"
 
   const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
   const liveSocket = new LiveSocket("/live", Socket, {
-    longPollFallbackMs: 2500,
     params: {_csrf_token: csrfToken},
-    hooks: {...colocatedHooks},
+    hooks: {},
   })
 
-  // connect if there are any LiveViews on the page
   liveSocket.connect()
   """
 
   @app_css """
-  /* See the Tailwind configuration guide for advanced usage
-     https://tailwindcss.com/docs/configuration */
-
   @import "tailwindcss" source(none);
   @source "../css";
-  @source "../js";
-  @source "../../lib/my_app_web";
-
-  /* This file is for your main application CSS */
   """
 
-  @config_exs ~S"""
-  import Config
+  @router """
+  defmodule TestWeb.Router do
+    use Phoenix.Router
 
-  # Configure esbuild (the version is required)
-  config :esbuild,
-    version: "0.25.4",
-    my_app: [
-      args:
-        ~w(js/app.js --bundle --target=es2022 --outdir=../priv/static/assets/js --external:/fonts/* --external:/images/* --alias:@=.),
-      cd: Path.expand("../assets", __DIR__),
-      env: %{"NODE_PATH" => [Path.expand("../deps", __DIR__), Mix.Project.build_path()]}
+    pipeline :browser do
+      plug :accepts, ["html"]
+    end
+
+    scope "/", TestWeb do
+      pipe_through :browser
+    end
+  end
+  """
+
+  @application """
+  defmodule Test.Application do
+    use Application
+
+    def start(_type, _args) do
+      children = [
+        Test.Repo,
+        {Phoenix.PubSub, name: Test.PubSub},
+        TestWeb.Endpoint
+      ]
+
+      Supervisor.start_link(children, strategy: :one_for_one, name: Test.Supervisor)
+    end
+  end
+  """
+
+  @mix_exs """
+  defmodule Test.MixProject do
+    use Mix.Project
+
+    def project, do: [app: :test, version: "0.1.0", deps: []]
+
+    def application, do: [mod: {Test.Application, []}, extra_applications: [:logger]]
+  end
+  """
+
+  # A Phoenix app's files, written here rather than by phx_test_project/1,
+  # which needs the phx_new archive.
+  defp install(files \\ %{}) do
+    [
+      files:
+        Map.merge(
+          %{
+            ".formatter.exs" =>
+              "[import_deps: [:phoenix], inputs: [\"{lib,test}/**/*.{ex,exs}\"]]\n",
+            "lib/test_web/router.ex" => @router,
+            "mix.exs" => @mix_exs,
+            "lib/test/application.ex" => @application,
+            "assets/js/app.js" => @app_js,
+            "assets/css/app.css" => @app_css
+          },
+          files
+        ),
+      app_name: :test
     ]
-
-  import_config "#{config_env()}.exs"
-  """
-
-  # config/config.exs is read for the esbuild note, and never edited.
-  @files [
-    {@app_js, "assets/js/app.js"},
-    {@app_css, "assets/css/app.css"},
-    {@config_exs, "config/config.exs"}
-  ]
-
-  setup do
-    root = Path.join(System.tmp_dir!(), "tayori-install-#{System.unique_integer([:positive])}")
-
-    for {fixture, path} <- @files do
-      File.mkdir_p!(Path.dirname(Path.join(root, path)))
-      File.write!(Path.join(root, path), fixture)
-    end
-
-    Mix.shell(Mix.Shell.Process)
-
-    on_exit(fn ->
-      Mix.shell(Mix.Shell.IO)
-      File.rm_rf!(root)
-    end)
-
-    {:ok, root: root}
+    |> test_project()
+    |> Igniter.compose_task(Mix.Tasks.Tayori.Install, [])
   end
 
-  defp run(root, args \\ []) do
-    File.cd!(root, fn -> Install.run(args) end)
-    messages([])
+  defp file(igniter, path) do
+    igniter
+    |> apply_igniter!()
+    |> Map.fetch!(:rewrite)
+    |> Rewrite.source!(path)
+    |> Rewrite.Source.get(:content)
   end
 
-  defp messages(acc) do
-    receive do
-      {:mix_shell, :info, [message]} -> messages([message | acc])
-    after
-      0 -> acc |> Enum.reverse() |> Enum.join("\n")
-    end
+  test "mounts the admin and the page in the router" do
+    router = install() |> file("lib/test_web/router.ex")
+
+    assert router =~ "import Tayori.Router"
+
+    assert router =~
+             ~r/scope "\/admin" do.*tayori_admin[ (]"\/news", resolver: TestWeb.TayoriResolver/s
+
+    assert router =~ ~r/tayori_page[ (]"\/changelog"/
+    refute router =~ "import Tayori.Router.Page"
   end
 
-  defp read(root, path), do: File.read!(Path.join(root, path))
+  test "adds the hook and the style sheets" do
+    igniter = install()
 
-  defp snapshot(root), do: Map.new(@files, fn {_fixture, path} -> {path, read(root, path)} end)
+    assert file(igniter, "assets/js/app.js") =~ ~s(import { Tayori } from "tayori")
+    assert file(igniter, "assets/js/app.js") =~ "hooks: {Tayori}"
 
-  test "edits the two files and prints the notes", %{root: root} do
-    config = read(root, "config/config.exs")
-    output = run(root)
-
-    assert read(root, "assets/js/app.js") =~ ~s(import { Tayori } from "tayori")
-    assert read(root, "assets/js/app.js") =~ "hooks: {...colocatedHooks, Tayori},"
-
-    assert read(root, "assets/css/app.css") =~
-             ~s(@import "../../deps/tayori/priv/static/tayori.css";)
-
-    assert read(root, "assets/css/app.css") =~
-             "/* @import \"../../deps/tayori/priv/static/tayori-sumi.css\"; */"
-
-    assert read(root, "config/config.exs") == config
-
-    assert output =~ "* updating assets/js/app.js"
-    assert output =~ "* updating assets/css/app.css"
-    refute output =~ "config/config.exs"
-    assert output =~ "+   hooks: {...colocatedHooks, Tayori},"
-    assert output =~ "Your esbuild config sets NODE_PATH to deps/"
-
-    # The resolver of the app (the app of this project is :tayori).
-    assert read(root, "lib/tayori_web/tayori_resolver.ex") =~
-             "defmodule TayoriWeb.TayoriResolver do"
-
-    assert read(root, "lib/tayori_web/tayori_resolver.ex") =~ "@behaviour Tayori.Resolver"
-    assert output =~ "* creating lib/tayori_web/tayori_resolver.ex"
-    assert output =~ "tayori_admin \"/news\", resolver: MyAppWeb.TayoriResolver"
+    css = file(igniter, "assets/css/app.css")
+    assert css =~ ~r/@import "[^"]*kotoba\/priv\/static\/kotoba.css";/
+    assert css =~ ~r/@import "[^"]*tayori\/priv\/static\/tayori.css";/
+    assert css =~ ~r/\/\* @import "[^"]*tayori-sumi.css"; \*\//
   end
 
-  test "a second run changes nothing and says so", %{root: root} do
-    run(root)
-    before = snapshot(root)
+  test "starts Tayori after the repo and the PubSub" do
+    application = install() |> file("lib/test/application.ex")
 
-    output = run(root)
-    assert snapshot(root) == before
-    assert output =~ "Tayori is already installed. Nothing changed."
-    assert output =~ "* unchanged assets/js/app.js"
-    assert output =~ "* unchanged assets/css/app.css"
-    refute output =~ "* updating"
+    assert application =~ ~r/name: Test.PubSub\},.*\{Tayori,/s
+    assert application =~ "repo: Test.Repo"
+    assert application =~ "pubsub: Test.PubSub"
+
+    assert application =~
+             "Application.fetch_env!(:test, TestWeb.Endpoint)[:secret_key_base]"
   end
 
-  test "--dry-run prints the diff and writes nothing", %{root: root} do
-    before = snapshot(root)
-    output = run(root, ["--dry-run"])
+  test "writes the resolver, which lets no one in" do
+    igniter = install()
 
-    assert snapshot(root) == before
-    assert output =~ "* would update assets/js/app.js"
-    assert output =~ "--- assets/css/app.css"
-    assert output =~ ~s(+ @import "../../deps/tayori/priv/static/tayori.css";)
+    assert_creates(igniter, "lib/test_web/tayori_resolver.ex")
+    resolver = file(igniter, "lib/test_web/tayori_resolver.ex")
+    assert resolver =~ "defmodule TestWeb.TayoriResolver"
+    assert resolver =~ "def resolve_access(_user), do: :forbidden"
+    assert resolver =~ ~S|id: "user:#{user.id}"|
   end
 
-  test "prints the lines when it cannot edit app.js, and the NODE_PATH line when it is missing",
-       %{root: root} do
-    File.write!(Path.join(root, "assets/js/app.js"), "console.log(\"custom\")\n")
-    File.write!(Path.join(root, "config/config.exs"), "import Config\n")
-
-    output = run(root)
-
-    assert read(root, "assets/js/app.js") == "console.log(\"custom\")\n"
-    assert output =~ "* skipping assets/js/app.js"
-    assert output =~ ~s(    import { Tayori } from "tayori")
-
-    assert output =~
-             ~S|env: %{"NODE_PATH" => [Path.expand("../deps", __DIR__), Mix.Project.build_path()]}|
+  test "leaves the app's own resolver alone" do
+    install(%{
+      "lib/test_web/tayori_resolver.ex" => "defmodule TestWeb.TayoriResolver do\nend\n"
+    })
+    |> refute_creates("lib/test_web/tayori_resolver.ex")
   end
 
-  # Mix does not copy a path dependency into deps/, so the imports and the
-  # NODE_PATH note must point at the dependency's own directory.
-  test "points at the directory of a path dependency", %{root: root} do
-    app = Path.join(root, "app")
-    File.mkdir_p!(app)
-    for dir <- ~w(assets config), do: File.rename!(Path.join(root, dir), Path.join(app, dir))
-
-    install_beside(app)
-    output = messages([])
-
-    assert read(app, "assets/css/app.css") =~
-             ~s(@import "../../../tayori/priv/static/tayori.css";)
-
-    assert read(app, "assets/css/app.css") =~
-             ~s(/* @import "../../../tayori/priv/static/tayori-sumi.css"; */)
-
-    refute read(app, "assets/css/app.css") =~ "deps/tayori"
-    refute output =~ "Your esbuild config sets NODE_PATH to deps/"
-    assert output =~ "Tayori is a path dependency (../tayori), so it is not in deps/."
-    assert output =~ ~S|Path.expand("../..", __DIR__),|
-
-    # Once NODE_PATH has the directory, the note says the import resolves.
-    config = read(app, "config/config.exs")
-
-    File.write!(
-      Path.join(app, "config/config.exs"),
-      String.replace(
-        config,
-        ~S|Path.expand("../deps", __DIR__),|,
-        ~S|Path.expand("../deps", __DIR__), Path.expand("../..", __DIR__),|
-      )
-    )
-
-    File.write!(Path.join(app, "assets/css/app.css"), @app_css)
-    install_beside(app)
-    assert messages([]) =~ "has the directory of the Tayori path dependency in NODE_PATH"
-  end
-
-  # The package beside the app, as Mix gives a path dependency: expanded
-  # from the working directory (the temporary directory can be a symbolic
-  # link, as on macOS).
-  defp install_beside(app) do
-    File.cd!(app, fn -> Install.install([], Path.expand("../tayori")) end)
-  end
-
-  # An umbrella child keeps its Hex dependencies in the deps directory of
-  # the umbrella, ../../deps: Tayori there is not a path dependency.
-  test "follows the deps directory of an umbrella child", %{root: root} do
-    app = Path.join(root, "apps/web")
-    File.mkdir_p!(app)
-    for dir <- ~w(assets config), do: File.rename!(Path.join(root, dir), Path.join(app, dir))
-
-    install_umbrella_child(app)
-    output = messages([])
-
-    assert read(app, "assets/css/app.css") =~
-             ~s(@import "../../../../deps/tayori/priv/static/tayori.css";)
-
-    refute output =~ "path dependency"
-    assert output =~ "must resolve `tayori` from ../../deps/."
-    assert output =~ ~S|Path.expand("../../../deps", __DIR__)|
-
-    config = read(app, "config/config.exs")
-
-    File.write!(
-      Path.join(app, "config/config.exs"),
-      String.replace(
-        config,
-        ~S|Path.expand("../deps", __DIR__)|,
-        ~S|Path.expand("../../../deps", __DIR__)|
-      )
-    )
-
-    File.write!(Path.join(app, "assets/css/app.css"), @app_css)
-    install_umbrella_child(app)
-    assert messages([]) =~ "Your esbuild config sets NODE_PATH to ../../deps/, so"
-  end
-
-  defp install_umbrella_child(app) do
-    File.cd!(app, fn -> Install.install([], Path.expand("../../deps/tayori"), "../../deps") end)
-  end
-
-  test "follows MIX_DEPS_PATH", %{root: root} do
-    System.put_env("MIX_DEPS_PATH", "vendor/deps")
-    output = try do: run(root), after: System.delete_env("MIX_DEPS_PATH")
-
-    assert read(root, "assets/css/app.css") =~
-             ~s(@import "../../vendor/deps/tayori/priv/static/tayori.css";)
-
-    refute output =~ "path dependency"
-    assert output =~ ~S|Path.expand("../vendor/deps", __DIR__)|
-  end
-
-  test "package_path/2 reads the path of the dependency", %{root: root} do
-    File.cd!(root, fn ->
-      assert Install.package_path(%{}) == Path.join(File.cwd!(), "deps/tayori")
-      assert Install.package_path(%{}, "../../deps") == Path.expand("../../deps/tayori")
-      assert Install.package_path(%{tayori: "../tayori"}) == Path.expand("../tayori")
-    end)
-  end
-
-  test "says what to add for a file that is not there", %{root: root} do
-    File.rm!(Path.join(root, "assets/css/app.css"))
-    output = run(root)
-
-    refute File.exists?(Path.join(root, "assets/css/app.css"))
-    assert output =~ "* skipping assets/css/app.css (not found)"
-    assert output =~ ~s(@import "../../deps/tayori/priv/static/tayori.css";)
+  test "changes nothing the second time" do
+    install()
+    |> apply_igniter!()
+    |> Igniter.compose_task(Mix.Tasks.Tayori.Install, [])
+    |> assert_unchanged()
   end
 end

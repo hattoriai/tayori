@@ -34,7 +34,7 @@ defmodule Tayori.Page do
   import Plug.Conn
 
   alias Phoenix.HTML.Safe
-  alias Tayori.{API, Assets, Components, Config, Messages, Reader, Resolver}
+  alias Tayori.{API, Components, Config, Messages, Reader, Resolver}
 
   @feed_size 20
 
@@ -43,7 +43,8 @@ defmodule Tayori.Page do
 
   @impl Plug
   def call(conn, action) do
-    opts = conn.private.tayori_page
+    mount = conn.assigns.mount
+    opts = Map.put(mount.options, :mount, mount)
     conn = fetch_query_params(conn)
     reader = opts.resolver && Resolver.reader(opts.resolver, conn)
     locale = API.locale(conn, reader)
@@ -189,9 +190,9 @@ defmodule Tayori.Page do
             inner_content: inner,
             title: title,
             locale: locale,
-            css: base_path(conn, opts) <> "/assets/" <> css(opts.theme),
+            css: css(opts.mount, opts.theme),
             feed: base_path(conn, opts) <> "/feed.xml",
-            nonce: opts.csp_nonce_assign_key && conn.assigns[opts.csp_nonce_assign_key]
+            nonce: opts.mount.csp_nonces[:style]
           })
       end
 
@@ -201,10 +202,11 @@ defmodule Tayori.Page do
     |> halt()
   end
 
-  defp css(:sumi), do: Assets.name(:page_sumi_css)
-  defp css(_tayori), do: Assets.name(:page_css)
+  # The style sheet of the theme, among the mount's assets.
+  defp css(mount, :sumi), do: PhoenixMountable.Assets.url(mount, :sumi)
+  defp css(mount, _tayori), do: PhoenixMountable.Assets.url(mount, :css)
 
-  defp base_path(conn, opts), do: (conn.script_name |> Enum.map_join(&("/" <> &1))) <> opts.prefix
+  defp base_path(conn, _opts), do: PhoenixMountable.Path.path(conn, "/")
 
   defp base_url(conn, opts) do
     case opts.url do
@@ -217,7 +219,7 @@ defmodule Tayori.Page do
         "#{conn.scheme}://#{conn.host}#{port}" <> base_path(conn, opts)
 
       url ->
-        String.trim_trailing(url, "/") <> opts.prefix
+        String.trim_trailing(url, "/") <> opts.mount.path
     end
   end
 

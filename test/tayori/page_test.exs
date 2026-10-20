@@ -11,7 +11,7 @@ defmodule Tayori.PageTest do
     refute html =~ "Hidden"
     refute html =~ "Entry 1"
     assert html =~ ~s(href="/changelog?before=entry-2&amp;lang=en")
-    assert html =~ ~r"/changelog/assets/page-[0-9a-f]{32}\.css"
+    assert html =~ ~r"/changelog/css-[0-9a-f]{32}"
 
     html = build_conn() |> get("/changelog?before=entry-2") |> html_response(200)
     assert html =~ "Entry 1"

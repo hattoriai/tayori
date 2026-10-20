@@ -1,7 +1,8 @@
 defmodule Tayori.AdminTest do
   use TayoriTest.ConnCase
 
-  alias Tayori.Assets
+  alias PhoenixMountable.Assets
+  alias TayoriTest.Host.Router
 
   describe "access" do
     test "an admin opens the admin", %{conn: conn} do
@@ -174,8 +175,10 @@ defmodule Tayori.AdminTest do
   end
 
   describe "assets" do
+    defp mount, do: Router.__phoenix_mountable_mount__(:tayori_admin)
+
     test "the script and the style sheet of this build, cached for good", %{conn: conn} do
-      conn = get(conn, "/admin/news/assets/" <> Assets.name(:admin_css))
+      conn = get(conn, Assets.url(mount(), :css))
       assert conn.status == 200
       assert get_resp_header(conn, "cache-control") == ["public, max-age=31536000, immutable"]
       assert get_resp_header(conn, "content-type") |> hd() =~ "text/css"
@@ -183,21 +186,22 @@ defmodule Tayori.AdminTest do
       conn =
         build_conn()
         |> put_req_header("accept-encoding", "gzip")
-        |> get("/admin/news/assets/" <> Assets.name(:admin_js))
+        |> get(Assets.url(mount(), :js))
 
       assert conn.status == 200
       assert get_resp_header(conn, "content-encoding") == ["gzip"]
     end
 
     test "another build's file is a 404", %{conn: conn} do
-      conn = get(conn, "/admin/news/assets/admin-00000000000000000000000000000000.js")
+      conn = get(conn, "/admin/news/js-00000000000000000000000000000000")
       assert conn.status == 404
+    end
 
-      assert Assets.stale?([
-               "https://x/admin/news/assets/admin-00000000000000000000000000000000.js"
-             ])
-
-      refute Assets.stale?(["https://x/admin/news/assets/" <> Assets.name(:admin_js), "/app.js"])
+    test "the page links them, with the meta tags of the socket", %{conn: conn} do
+      {:ok, _view, html} = conn |> as_admin() |> live("/admin/news")
+      assert html =~ Assets.url(mount(), :css)
+      assert html =~ Assets.url(mount(), :js)
+      assert html =~ ~s(<meta name="live-path" content="/live")
     end
   end
 end

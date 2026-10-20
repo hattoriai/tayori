@@ -3,11 +3,11 @@ defmodule Tayori.Scheduler do
   # Announces each entry once when it is published, at once or at its
   # scheduled time: it tells the PubSub, and the app's notifier.
   #
-  # Every node runs one. The announcement is claimed in the database (the
-  # row whose announced_at is still nil), so that one node announces an
-  # entry, whatever the number of nodes. It wakes at the next scheduled
-  # time, when an entry changes on this node, and every minute, for the
-  # entries changed on another node.
+  # One runs in the cluster, a PhoenixMountable.Singleton. The announcement
+  # is also claimed in the database (the row whose announced_at is still
+  # nil), so that an entry is announced once even while a node takes the
+  # scheduler over from another. It wakes at the next scheduled time, when
+  # an entry changes, and every minute.
 
   use GenServer
 
@@ -23,11 +23,11 @@ defmodule Tayori.Scheduler do
     GenServer.start_link(__MODULE__, config, name: __MODULE__)
   end
 
-  @doc "Looks for entries to announce now."
+  @doc "Looks for entries to announce now, on whichever node the scheduler runs."
   def wake do
-    case Process.whereis(__MODULE__) do
+    case PhoenixMountable.Singleton.whereis(__MODULE__) do
+      pid when is_pid(pid) -> send(pid, :tick)
       nil -> :ok
-      pid -> send(pid, :tick)
     end
 
     :ok
