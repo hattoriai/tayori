@@ -42,6 +42,7 @@ defmodule Tayori.API.Machines do
          {:ok, changes} <- change_list(params, conn) do
       {valid, invalid} = split(changes)
       result = Inbox.add_many(Enum.map(valid, &elem(&1, 0)), source: "api")
+      Tayori.Digest.after_ingest(result.added)
 
       errors =
         Enum.map(result.errors, fn {i, changeset} ->
@@ -156,6 +157,7 @@ defmodule Tayori.API.Machines do
 
   defp add(conn, event, changes) do
     result = Inbox.add_many(changes, source: "github")
+    Tayori.Digest.after_ingest(result.added)
 
     errors =
       for {i, changeset} <- result.errors do

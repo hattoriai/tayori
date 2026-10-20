@@ -70,13 +70,30 @@ defmodule Tayori.Digest do
         publish = Keyword.get(opts, :publish, config.digest.publish)
         ai? = Keyword.get(opts, :ai, true) != false and AI.configured?()
 
-        with {:ok, entry} <- Entries.create(attrs(changes, config, now, ai?)),
+        with {:ok, entry} <- create(changes, config, now, ai?),
              {:ok, entry} <- maybe_publish(entry, publish, now) do
           Inbox.drafted(Enum.map(changes, & &1.id), entry.id)
           {:ok, entry}
         end
     end
   end
+
+  # An entry the model wrote that the entry refuses is made plain.
+  defp create(changes, config, now, true) do
+    case Entries.create(attrs(changes, config, now, true)) do
+      {:ok, entry} ->
+        {:ok, entry}
+
+      {:error, changeset} ->
+        Logger.warning(
+          "Tayori made the digest plain, the model's was refused: #{inspect(changeset.errors)}"
+        )
+
+        create(changes, config, now, false)
+    end
+  end
+
+  defp create(changes, config, now, false), do: Entries.create(attrs(changes, config, now, false))
 
   defp maybe_publish(entry, :publish, now), do: Entries.publish(entry, now)
   defp maybe_publish(entry, _draft, _now), do: {:ok, entry}

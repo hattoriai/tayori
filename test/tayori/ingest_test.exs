@@ -96,6 +96,25 @@ defmodule Tayori.IngestTest do
              ]
     end
 
+    test "POST /changes starts the digest of a config that makes one on ingest",
+         %{config: config, repo: repo} do
+      oban =
+        if repo == TayoriTest.SQLiteRepo,
+          do: %{name: TayoriTest.SQLiteOban, queue: :default},
+          else: %{name: TayoriTest.PostgresOban, queue: :default}
+
+      put_config(config, oban: oban, digest: [every: :ingest])
+      {:ok, token} = Ingest.new_token()
+
+      assert post_changes(%{change: %{ref: "pr-1", title: "Exports"}}, token).status == 201
+      assert %DateTime{} = Tayori.Digest.status().last_run_at
+
+      # Nothing new, no digest asked for again.
+      last = Tayori.Digest.status().last_run_at
+      assert post_changes(%{change: %{ref: "pr-1", title: "Exports"}}, token).status == 200
+      assert Tayori.Digest.status().last_run_at == last
+    end
+
     test "POST /changes: no token made, no token, a wrong one" do
       conn = post_changes(%{changes: []}, "tyi_guess")
       assert {conn.status, json!(conn)} == {404, %{"error" => "not_found"}}
