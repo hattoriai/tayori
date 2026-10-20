@@ -53,12 +53,6 @@ defmodule Tayori do
     config = Config.new(opts)
     Config.put(config)
 
-    # PhoenixMountable asks whether Tayori.Router has session/3 without
-    # loading it: until something loads it, the admin's sessions have no
-    # access, and the first visit after the app starts in dev or test is a
-    # 404 (a release loads every module at boot).
-    Code.ensure_loaded!(Tayori.Router)
-
     children = [
       {Task.Supervisor, name: Tayori.TaskSupervisor},
       # One scheduler for the cluster: the node that registers it runs it,
