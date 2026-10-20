@@ -39,7 +39,8 @@ defmodule Tayori.Config do
         * `:subscriptions` - readers subscribe by email on the public
           page, and an entry can be sent to them.
         * `:webhooks` - webhooks, Slack and Discord, told of each entry.
-        * `:embed` - the news on another domain than the app's.
+        * `:embed` - the news on another origin than the app's, with a
+          reader's signed token (`Tayori.Embed`).
     * `:mailer` - the app's `Swoosh.Mailer`, which sends the emails of
       the `:subscriptions` feature (required with it).
     * `:email_from` - who the emails are from: `{"Atelier", "news@atelier.app"}`
@@ -55,6 +56,14 @@ defmodule Tayori.Config do
       another instance or queue (`:default`). The queue must be one the
       app runs. Without it, they are sent by tasks in the node, as
       `Tayori.Jobs` explains.
+    * `:embed` - the sites of the `:embed` feature (required with it):
+        * `:origins` - the origins the JSON API answers, each a scheme
+          and a host, with a port if not the default
+          (`["https://www.atelier.app"]`): no path, no wildcard.
+        * `:max_age` - how long a reader token is valid, in seconds
+          (86400, a day).
+
+      The feature also needs `:secret_key_base`, which signs the tokens.
   """
 
   @features [:reactions, :announcements, :analytics, :subscriptions, :webhooks, :embed]
@@ -72,6 +81,7 @@ defmodule Tayori.Config do
     :email_from,
     :page_url,
     :oban,
+    :embed,
     locales: ["en"],
     features: [],
     reactions: @reactions
@@ -88,6 +98,7 @@ defmodule Tayori.Config do
           email_from: String.t() | {String.t(), String.t()} | nil,
           page_url: String.t() | nil,
           oban: %{name: term(), queue: atom()} | nil,
+          embed: %{origins: [String.t(), ...], max_age: pos_integer()} | nil,
           locales: [String.t(), ...],
           features: [feature()],
           reactions: [String.t(), ...]
@@ -109,6 +120,7 @@ defmodule Tayori.Config do
 
     %__MODULE__{
       oban: oban(opts[:oban]),
+      embed: embed(opts[:embed]),
       mailer: opts[:mailer],
       email_from: opts[:email_from],
       page_url: opts[:page_url] && String.trim_trailing(opts[:page_url], "/"),
@@ -172,6 +184,65 @@ defmodule Tayori.Config do
     if :webhooks in features and not Code.ensure_loaded?(Req) do
       raise ArgumentError, "the :webhooks feature needs the :req dependency"
     end
+
+    if :embed in features do
+      if opts[:embed] == nil do
+        raise ArgumentError,
+              "the :embed feature needs the :embed option, with the origins of the sites: " <>
+                ~s(embed: [origins: ["https://www.example.com"]])
+      end
+
+      if opts[:secret_key_base] == nil do
+        raise ArgumentError,
+              "the :embed feature needs the :secret_key_base option, which signs the reader tokens"
+      end
+    end
+  end
+
+  defp embed(nil), do: nil
+
+  defp embed(opts) when is_list(opts) do
+    case Keyword.split(opts, [:origins, :max_age]) do
+      {opts, []} ->
+        %{origins: origins(opts[:origins]), max_age: max_age(Keyword.get(opts, :max_age, 86_400))}
+
+      {_opts, other} ->
+        raise ArgumentError,
+              ":embed takes :origins and :max_age, got: #{inspect(Keyword.keys(other))}"
+    end
+  end
+
+  defp embed(other) do
+    raise ArgumentError,
+          ~s(:embed must be [origins: ["https://www.example.com"]], got: #{inspect(other)})
+  end
+
+  defp origins(origins) when is_list(origins) and origins != [] do
+    origins
+    |> Enum.map(fn origin ->
+      case Tayori.Embed.normalize_origin(origin) do
+        {:ok, origin} ->
+          origin
+
+        :error ->
+          raise ArgumentError,
+                "each origin of :embed is a scheme and a host, with a port if not the default " <>
+                  "(\"https://www.example.com\"): no path, no wildcard; got: #{inspect(origin)}"
+      end
+    end)
+    |> Enum.uniq()
+  end
+
+  defp origins(other) do
+    raise ArgumentError,
+          ":origins of :embed must be a list of the sites' origins, got: #{inspect(other)}"
+  end
+
+  defp max_age(seconds) when is_integer(seconds) and seconds > 0, do: seconds
+
+  defp max_age(other) do
+    raise ArgumentError,
+          ":max_age of :embed must be a number of seconds, got: #{inspect(other)}"
   end
 
   defp oban(nil), do: nil

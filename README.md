@@ -13,7 +13,8 @@ gives your app:
 * the news in your LiveViews: a button with the count of what each person
   has not seen, and a panel of the news, live as entries are published;
 * `<tayori-news>` and a JSON API, for a frontend that Phoenix does not
-  render (React, Vue, Svelte, a mobile app);
+  render (React, Vue, Svelte, a mobile app), and for a site on another
+  origin, with a token your server signs for the reader;
 * a public page of the news, a page for each entry, and Atom and JSON
   feeds;
 * segments: an entry for everyone, or for the readers your app says it is
@@ -47,7 +48,7 @@ the hook and one style sheet.
 | Extras | yours to turn on: reactions, announcements, analytics, email subscriptions, webhooks and Slack and Discord, the embed |
 | Readers | `Tayori.Reader`, built by your resolver from your own user: an id, segments, a language, the time they joined |
 | In the app | a button with the count of unread entries, a panel with category filters, cards and each entry whole inside it; announcements as a popup, a toast or a banner; live over PubSub, and across tabs |
-| Any frontend | a JSON API (`tayori_api`) and `<tayori-news>`, the same button and panel |
+| Any frontend | a JSON API (`tayori_api`) and `<tayori-news>`, the same button, panel and announcement; on another origin with the `:embed` feature: CORS for your sites and a signed reader token |
 | Public page | `tayori_page`: the news for everyone, with filters, a search, pinned entries and email subscriptions; a page for each entry with previous and next; Atom and JSON Feed; shared-link cards, JSON-LD and a sitemap; in the reader's language |
 | AI | any model of ReqLLM with your key, kept encrypted; draft, translate, rewrite, shorter, warmer, fix the spelling; suggestions you accept or reject |
 | Words | eight languages (`Tayori.Messages`), your own in the config |
@@ -149,7 +150,7 @@ end
 ```
 
 For a frontend that Phoenix does not render, mount `tayori_api` and use
-`<tayori-news src="/api/news">` (see [Any frontend](guides/any_frontend.md)).
+`<tayori-news api="/api/news">` (see [Any frontend](guides/any_frontend.md)).
 
 ## Guides
 

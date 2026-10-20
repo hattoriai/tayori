@@ -40,8 +40,11 @@ so.
 
 ## The JSON API
 
-It reads the reader from your app's session: it answers the pages of
-your app's origin. See [Any frontend](any_frontend.md).
+It reads the reader from your app's session, on your app's origin. On
+another origin (the `:embed` feature), from a token your server signs,
+valid for a day: a reader's segments are those of when it was signed.
+The element asks the count every few minutes; it has no socket. See
+[Any frontend](any_frontend.md).
 
 ## AI
 

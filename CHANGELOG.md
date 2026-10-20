@@ -48,12 +48,29 @@ and Tayori follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `mix tayori.install` sets it when the app has Oban.
 - `Tayori.Test.announce!/0` announces the entries whose time has come, in
   the test's process.
+- The JSON API has what the panel has: an entry's cover, categories
+  (names and colours), pin and reactions; `?category=` and `?q=`;
+  `GET /categories`, `POST /:id/reactions`, `GET /announcement` and
+  `POST /announcement/:id/dismiss`; a view from `"widget"` for each entry
+  read.
+- The `:embed` feature: the news on another origin. The API answers the
+  CORS of the sites of `embed: [origins: [...]]`, without credentials,
+  reads the reader from a token the app signs (`Tayori.Embed.token/1`),
+  and serves the element's script and style sheets. The admin's settings
+  have its snippet.
 
 ### Changed
 
 - The news, the public page and the admin are redesigned in the style of
   Hattori AI's libraries, in Tayori's theme or Sumi's, light and dark.
 - An entry's headings in its body stay below its title.
+- `<tayori-news>` is the LiveView panel: the same markup and classes,
+  categories, covers, an entry opened in the panel with its reactions,
+  Escape and the focus as there, and the announcement. Its attribute is
+  `api` (`src` still works).
+- The API's entries have their categories as `{"key", "name", "color"}`,
+  not keys, and its first page keeps every pinned entry besides the
+  limit.
 - Tayori is mounted with [PhoenixMountable](https://hexdocs.pm/phoenix_mountable):
   the admin's script and style sheet are served under the mount as
   `js-<hash>` and `css-<hash>`, and every mount takes PhoenixMountable's
