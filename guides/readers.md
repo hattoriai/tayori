@@ -56,6 +56,16 @@ too.
 that language, else in the first of Tayori's `:locales`. The words around
 the news (the button, the panel) follow it (`Tayori.Messages`).
 
+A visitor has no reader: the public page and the JSON API speak the
+request's `?lang=`, else the browser's `Accept-Language`. If your app
+keeps its own choice of language (a cookie, the session, a locale plug),
+say it with `resolve_locale/1`, which comes before the browser's:
+
+```elixir
+@impl true
+def resolve_locale(_conn), do: Gettext.get_locale(MyAppWeb.Gettext)
+```
+
 ## What is unread
 
 Tayori keeps one time for each reader: when they last saw the news. An

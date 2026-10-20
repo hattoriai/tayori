@@ -19,6 +19,10 @@ defmodule TayoriTest.Resolver do
     [{"Plan", [{"plan:free", "Free"}, {"plan:pro", "Pro"}]}, {"role:owner", "Owners"}]
   end
 
+  # The app's own choice of language, for a visitor.
+  @impl true
+  def resolve_locale(conn), do: Plug.Conn.get_session(conn, "locale")
+
   @impl true
   def resolve_reader(%Plug.Conn{} = conn), do: reader(Plug.Conn.get_session(conn, "reader"))
   def resolve_reader(%{assigns: assigns}), do: reader(assigns[:current_reader])
@@ -28,6 +32,29 @@ defmodule TayoriTest.Resolver do
   end
 
   defp reader(_visitor), do: nil
+end
+
+defmodule TayoriTest.Layout do
+  @moduledoc "The app's root layout, for the public page."
+  use Phoenix.Component
+
+  def root(assigns) do
+    ~H"""
+    <!DOCTYPE html>
+    <html lang={@locale}>
+      <head>
+        <title>{@page_title} · The app</title>
+        {@head}
+      </head>
+      <body>
+        <header class="app-header">The app</header>
+        <main class="tayori-page" data-description={@description} data-feed={@feed}>
+          {@inner_content}
+        </main>
+      </body>
+    </html>
+    """
+  end
 end
 
 defmodule TayoriTest.NewsLive do
@@ -82,6 +109,13 @@ defmodule TayoriTest.Host do
              limit: 2,
              description: "What we ship.",
              image: "https://cdn.test/news.png"
+
+           # The page in the app's own layout, its words by locale.
+           tayori_page "/app-news",
+             as: :layout_page,
+             layout: {TayoriTest.Layout, :root},
+             title: %{"en" => "App news", "pt-PT" => "Novidades da app"},
+             description: %{"en" => "What we ship.", "pt" => "O que fazemos."}
 
            live_session :app,
              on_mount: [

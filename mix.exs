@@ -76,6 +76,7 @@ defmodule Tayori.MixProject do
       # has it.
       {:phoenix_ecto, "~> 4.6"},
       # The mounts in the app's router, their assets and the migrations.
+      # 0.2.2 finds the callbacks of a definition not loaded yet.
       {:phoenix_mountable, "~> 0.2.2"},
       {:igniter, "~> 0.6", optional: true},
       {:phoenix, if(@oldest, do: "~> 1.7.14", else: "~> 1.7.14 or ~> 1.8")},
@@ -155,7 +156,9 @@ defmodule Tayori.MixProject do
         "guides/testing.md",
         "guides/theming.md",
         "guides/limits.md",
-        "CHANGELOG.md"
+        "CHANGELOG.md",
+        "CONTRIBUTING.md",
+        "SECURITY.md"
       ],
       groups_for_extras: [
         Guides: [

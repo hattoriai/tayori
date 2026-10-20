@@ -58,6 +58,82 @@ defmodule Tayori.PageTest do
              feed["items"]
   end
 
+  describe "in the app's layout" do
+    test "the layout gets the page, its language and its tags", %{conn: conn} do
+      entry!("Exports", %{published_at: minutes(-1), summary: "Exports, one click away."})
+
+      html = conn |> get("/app-news") |> html_response(200)
+      doc = LazyHTML.from_document(html)
+
+      assert html =~ "<title>App news · The app</title>"
+      assert attribute(doc, "html", "lang") == ["en"]
+      assert attribute(doc, "link[rel=canonical]", "href") == ["http://www.example.com/app-news"]
+      assert attribute(doc, "meta[name=description]", "content") == ["What we ship."]
+      assert attribute(doc, "main", "data-description") == ["What we ship."]
+      assert attribute(doc, "main", "data-feed") == ["/app-news/feed.xml"]
+
+      assert attribute(doc, "link[type='application/atom+xml']", "href") == [
+               "/app-news/feed.xml"
+             ]
+
+      assert text(LazyHTML.query(doc, ".app-header")) == "The app"
+      assert text(LazyHTML.query(doc, "main .tayori-page-title")) == "App news"
+      assert titles(doc) == ["Exports"]
+      refute html =~ ~r"/app-news/css-"
+    end
+
+    test "an entry's JSON-LD goes in the layout's head", %{conn: conn} do
+      entry!("Exports", %{published_at: minutes(-1)})
+
+      doc = page(conn, "/app-news/exports")
+
+      assert [json] =
+               doc
+               |> LazyHTML.query("head script[type='application/ld+json']")
+               |> Enum.map(&LazyHTML.text/1)
+
+      assert %{"@type" => "BlogPosting", "headline" => "Exports"} = JSON.decode!(json)
+
+      assert attribute(doc, "link[rel=canonical]", "href") == [
+               "http://www.example.com/app-news/exports"
+             ]
+    end
+
+    test "the title and the description in the reader's language", %{conn: conn} do
+      doc = page(conn, "/app-news?lang=pt-PT")
+
+      assert attribute(doc, "html", "lang") == ["pt-PT"]
+      assert text(LazyHTML.query(doc, ".tayori-page-title")) == "Novidades da app"
+      # "pt" is the description of every Portuguese.
+      assert text(LazyHTML.query(doc, ".tayori-page-description")) == "O que fazemos."
+
+      feed = build_conn() |> get("/app-news/feed.json?lang=pt-PT") |> response(200)
+
+      assert %{"title" => "Novidades da app", "description" => "O que fazemos."} =
+               JSON.decode!(feed)
+    end
+  end
+
+  test "a visitor gets the app's language, unless ?lang= says another", %{conn: conn} do
+    conn = with_session(conn, %{"locale" => "pt_PT"})
+    assert conn |> page("/news") |> attribute("html", "lang") == ["pt-PT"]
+    assert conn |> page("/news?lang=en") |> attribute("html", "lang") == ["en"]
+
+    # The page without the resolver does not ask the app.
+    assert conn |> page("/changelog") |> attribute("html", "lang") == ["en"]
+  end
+
+  test "localized/2 picks the locale, its language, then the app's first" do
+    texts = %{"en" => "News", "pt-PT" => "Novidades"}
+
+    assert Tayori.Page.localized("News", "pt-PT") == "News"
+    assert Tayori.Page.localized(nil, "en") == nil
+    assert Tayori.Page.localized(texts, "pt-PT") == "Novidades"
+    assert Tayori.Page.localized(texts, "pt-BR") == "Novidades"
+    assert Tayori.Page.localized(texts, "en-GB") == "News"
+    assert Tayori.Page.localized(texts, "ja") == "News"
+  end
+
   defp as_reader(conn, reader), do: with_session(conn, %{"reader" => reader})
 
   defp page(conn, path), do: conn |> get(path) |> html_response(200) |> LazyHTML.from_document()

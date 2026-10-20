@@ -32,17 +32,18 @@ defmodule Tayori.Router.Page do
 
   options(
     title: [
-      type: :string,
-      doc: "The title of the page and the feeds (\"What's new\", in the reader's language)."
+      type: {:or, [:string, {:map, :string, :string}]},
+      doc:
+        "The title of the page and the feeds (\"What's new\", in the reader's language). A string, or a map of a locale to a string for each language (`%{\"en\" => \"Changelog\", \"pt-PT\" => \"Novidades\"}`)."
     ],
     description: [
-      type: :string,
+      type: {:or, [:string, {:map, :string, :string}]},
       doc:
-        "A line under the title, and the description of the page for search engines and shared links."
+        "A line under the title, and the description of the page for search engines and shared links. A string, or a map by locale."
     ],
     eyebrow: [
-      type: :string,
-      doc: "A short line above the title: the app's name, say."
+      type: {:or, [:string, {:map, :string, :string}]},
+      doc: "A short line above the title: the app's name, say. A string, or a map by locale."
     ],
     image: [
       type: :string,
@@ -57,7 +58,8 @@ defmodule Tayori.Router.Page do
     ],
     layout: [
       type: {:tuple, [:atom, :atom]},
-      doc: "The app's root layout, `{module, function}`, instead of Tayori's own document."
+      doc:
+        "The app's root layout, `{module, function}`, instead of Tayori's own document. It gets `@inner_content`, `@conn`, `@page_title`, `@locale`, `@description`, `@canonical`, `@feed`, `@meta` and `@head` (see `Tayori.Page.head/1`)."
     ],
     theme: [
       type: {:in, [:tayori, :sumi]},

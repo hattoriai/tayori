@@ -106,6 +106,10 @@ defmodule Tayori.Config do
           images, in the call.
         * `:storage` - the `Kotoba.Storage` of the uploads (Kotoba's own
           config when not given), the one of the admin's editor.
+    * `:scheduler` - `false` runs no scheduler: nothing is announced, and
+      no schedule runs, by itself. For an app's tests, where the
+      scheduler's queries would outlive a test's sandbox, and
+      `Tayori.Test.announce!/0` announces in the test's process (`true`).
     * `:embed` - the sites of the `:embed` feature (required with it):
         * `:origins` - the origins the JSON API answers, each a scheme
           and a host, with a port if not the default
@@ -136,6 +140,7 @@ defmodule Tayori.Config do
     :emails,
     :embed,
     :mcp,
+    scheduler: true,
     locales: ["en"],
     features: [],
     reactions: @reactions
@@ -157,6 +162,7 @@ defmodule Tayori.Config do
           emails: emails(),
           embed: %{origins: [String.t(), ...], max_age: pos_integer()} | nil,
           mcp: mcp() | nil,
+          scheduler: boolean(),
           locales: [String.t(), ...],
           features: [feature()],
           reactions: [String.t(), ...]
@@ -194,9 +200,15 @@ defmodule Tayori.Config do
       vault: opts[:vault],
       prefix: opts[:prefix],
       notifier: opts[:notifier],
+      scheduler: scheduler(Keyword.get(opts, :scheduler, true)),
       locales: locales(Keyword.get(opts, :locales, ["en"]))
     }
   end
+
+  defp scheduler(scheduler) when is_boolean(scheduler), do: scheduler
+
+  defp scheduler(other),
+    do: raise(ArgumentError, ":scheduler must be true or false, got: #{inspect(other)}")
 
   defp locales(locales) do
     unless is_list(locales) and locales != [] and Enum.all?(locales, &is_binary/1) do

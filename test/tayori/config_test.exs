@@ -28,6 +28,15 @@ defmodule Tayori.ConfigTest do
            ]
   end
 
+  test "the scheduler runs unless the app says not to" do
+    assert Config.new(@base).scheduler
+    refute Config.new(@base ++ [scheduler: false]).scheduler
+
+    assert_raise ArgumentError, ~r/:scheduler must be true or false/, fn ->
+      Config.new(@base ++ [scheduler: :no])
+    end
+  end
+
   test "an unknown feature is refused" do
     assert_raise ArgumentError, ~r/:features must be a list of/, fn ->
       Config.new(@base ++ [features: [:reactions, :polls]])

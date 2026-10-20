@@ -170,7 +170,7 @@ defmodule Tayori.API do
 
     case reader(conn, opts) do
       {:ok, reader} ->
-        handle(action, conn, reader, locale(conn, reader), opts)
+        handle(action, conn, reader, locale(conn, reader, opts.resolver), opts)
 
       {:error, :expired} ->
         conn
@@ -557,10 +557,12 @@ defmodule Tayori.API do
     end
   end
 
-  # The language of the news: the reader's, else the first of the request's
-  # Accept-Language that the entries are written in, else the first.
+  # The language of the news: the reader's, else the request's `?lang=`,
+  # else the app's (the resolver's resolve_locale/1), else the first of the
+  # request's Accept-Language that the entries are written in, else the
+  # first.
   @doc false
-  def locale(conn, reader) do
+  def locale(conn, reader, resolver \\ nil) do
     config = Config.get()
 
     cond do
@@ -569,6 +571,9 @@ defmodule Tayori.API do
 
       lang = conn |> fetch_query_params() |> Map.get(:query_params) |> Map.get("lang") ->
         best([lang], config)
+
+      app = resolver && Tayori.Resolver.locale(resolver, conn) ->
+        best([app], config)
 
       true ->
         conn |> get_req_header("accept-language") |> accepted() |> best(config)
