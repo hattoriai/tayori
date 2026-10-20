@@ -148,7 +148,8 @@ defmodule Tayori.InboxTest do
              sources: [],
              ingest_on_start: true,
              audience: "public",
-             kinds: %{}
+             kinds: %{},
+             github: %{label_prefix: "changelog:", only_labeled: false}
            }
 
     assert Tayori.Config.new(base).digest == %{
