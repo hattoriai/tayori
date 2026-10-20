@@ -377,6 +377,10 @@ tayori-news {
   animation: tayori-pop 240ms cubic-bezier(0.2, 0.8, 0.2, 1.4);
 }
 
+.tayori-badge[hidden] {
+  display: none;
+}
+
 .tayori-button-labelled .tayori-badge {
   position: static;
   border: 0;

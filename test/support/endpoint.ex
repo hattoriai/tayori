@@ -81,5 +81,21 @@ defmodule TayoriTest.Host do
              live "/", TayoriTest.NewsLive
            end
          end
+
+         # The API for the :embed feature, as the guide mounts it: no
+         # CSRF protection, the readers come with a token.
+         pipeline :embed do
+           plug :accepts, ["json"]
+           plug :fetch_session
+         end
+
+         scope "/embed" do
+           pipe_through :embed
+
+           tayori_api "/news",
+             resolver: TayoriTest.Resolver,
+             page: "https://app.test/changelog",
+             as: :tayori_embed
+         end
        end)
 end
