@@ -16,7 +16,7 @@ defmodule Tayori.EntriesTest do
       assert Entry.status(entry) == :draft
     end
 
-    test "every entry has the first language, and slugs are unique" do
+    test "every entry has the first language, and slugs are unique, numbered when made" do
       assert {:error, changeset} =
                Entries.create(%{translations: [%{locale: "pt-PT", title: "Só em português"}]})
 
@@ -24,8 +24,14 @@ defmodule Tayori.EntriesTest do
 
       entry!("Same")
 
-      assert {:error, changeset} =
+      assert {:ok, %{slug: "same-2"}} =
                Entries.create(%{translations: [%{locale: "en", title: "Same"}]})
+
+      assert {:ok, %{slug: "same-3"}} =
+               Entries.create(%{"slug" => "", "translations" => [%{locale: "en", title: "Same"}]})
+
+      assert {:error, changeset} =
+               Entries.create(%{slug: "same", translations: [%{locale: "en", title: "Other"}]})
 
       assert "has already been taken" in errors_on(changeset).slug
     end

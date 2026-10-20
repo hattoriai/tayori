@@ -69,6 +69,29 @@ defmodule Tayori.DigestTest do
       assert [%{ref: "d", state: "new"}] = Inbox.list(state: "new")
     end
 
+    test "two digests of a day: the second's slug takes a number" do
+      now = ~U[2026-10-20 09:00:00Z]
+
+      [a, b, _c, _d] =
+        for ref <- ~w(a b c d) do
+          {:ok, change} = Inbox.add(%{ref: ref, title: "Change #{ref}"})
+          change
+        end
+
+      assert {:ok, first} = Digest.run(ids: [a.id, b.id], now: now)
+      assert {:ok, second} = Digest.run(now: now)
+      assert {first.slug, second.slug} == {"20-october-2026", "20-october-2026-2"}
+
+      # A slug given is the entry's, or an error.
+      assert {:error, changeset} =
+               Tayori.Entries.create(%{
+                 slug: "20-october-2026",
+                 translations: [%{locale: "en", title: "Again"}]
+               })
+
+      assert %{slug: ["has already been taken"]} = errors_on(changeset)
+    end
+
     test "only the changes asked for, and the segments of an entry for some" do
       {:ok, a} = Inbox.add(%{ref: "a", title: "A", segments: ["plan:pro"]})
       {:ok, b} = Inbox.add(%{ref: "b", title: "B", segments: ["plan:team"]})

@@ -352,8 +352,7 @@ if Code.ensure_loaded?(Sake.Server) do
 
         entry!("Exports")
 
-        assert tool_error(client(), "create_entry", %{"title" => "Exports"}) ==
-                 "slug has already been taken."
+        assert %{"slug" => "exports-2"} = call!(client(), "create_entry", %{"title" => "Exports"})
 
         assert tool_error(client(), "update_entry", %{"id" => "exports", "title" => ""}) ==
                  "A title cannot be empty."
