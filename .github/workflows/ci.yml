@@ -139,7 +139,10 @@ jobs:
 
       - run: mix deps.get
 
-      - run: mix compile --warnings-as-errors
+      # --force: a _build restored from an older lock may hold modules
+      # compiled without an optional dependency (Tayori.MCP without Sake),
+      # and Mix does not know to compile them again.
+      - run: mix compile --warnings-as-errors --force
         env:
           MIX_ENV: test
 

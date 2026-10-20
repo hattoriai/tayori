@@ -61,6 +61,14 @@ What every tool keeps to:
 {:sake, "~> 0.4.2"}
 ```
 
+If Tayori was already compiled without it, compile Tayori again, or
+`Tayori.MCP` stays missing (Sake then says `mount needs a Sake.Server,
+got Tayori.MCP`):
+
+```sh
+mix deps.compile tayori --force
+```
+
 ### 2. Say who may use it
 
 Your login is not enough: it may be your customers' too. Tayori lets
