@@ -13,9 +13,8 @@ defmodule Tayori.Views do
 
   import Ecto.Query
 
-  alias Tayori.{Config, Reader}
+  alias Tayori.{Config, Reader, View}
 
-  @table "tayori_views"
   @sources ~w(panel page widget email feed)
 
   @doc "The places an entry can be read."
@@ -32,14 +31,14 @@ defmodule Tayori.Views do
 
     if Config.feature?(config, :analytics) do
       row = %{
-        entry_id: Ecto.UUID.dump!(entry_id),
+        entry_id: entry_id,
         reader: (reader && reader.id) || "",
         source: source,
         day: Date.utc_today(),
         count: 1
       }
 
-      config.repo.insert_all(@table, [row],
+      config.repo.insert_all(View, [row],
         on_conflict: [inc: [count: 1]],
         conflict_target: [:entry_id, :reader, :source, :day],
         prefix: config.prefix
@@ -60,12 +59,10 @@ defmodule Tayori.Views do
   def totals(entry_ids) do
     config = Config.get()
 
-    from(v in @table,
-      where: v.entry_id in type(^entry_ids, {:array, :binary_id}),
+    from(v in View,
+      where: v.entry_id in ^entry_ids,
       group_by: v.entry_id,
-      select:
-        {type(v.entry_id, :binary_id), sum(v.count),
-         fragment("COUNT(DISTINCT NULLIF(?, ''))", v.reader)}
+      select: {v.entry_id, sum(v.count), fragment("COUNT(DISTINCT NULLIF(?, ''))", v.reader)}
     )
     |> config.repo.all(prefix: config.prefix)
     |> Map.new(fn {id, views, readers} -> {id, %{views: views || 0, readers: readers}} end)
@@ -80,8 +77,8 @@ defmodule Tayori.Views do
     config = Config.get()
 
     rows =
-      from(v in @table,
-        where: v.entry_id == type(^entry_id, :binary_id) and v.day >= ^since,
+      from(v in View,
+        where: v.entry_id == ^entry_id and v.day >= ^since,
         group_by: [v.day, v.source],
         select: {v.day, v.source, sum(v.count)}
       )

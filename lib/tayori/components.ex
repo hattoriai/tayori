@@ -315,7 +315,9 @@ defmodule Tayori.Components do
       <span :if={@entry.pinned_at} class="tayori-pinned">
         <.icon name="pin" />{@messages["pinned"]}
       </span>
-      <span :if={@new} class="tayori-new">{@messages["new"]}</span>
+      <span :if={@new} class="tayori-new" title={@messages["new"]}>
+        <span class="tayori-visually-hidden">{@messages["new"]}</span>
+      </span>
       <.category
         :for={key <- @entry.categories}
         key={key}
@@ -482,6 +484,11 @@ defmodule Tayori.Components do
   remembered for the reader on every device.
   """
   def announcement(%{tayori: %{announcement: nil}} = assigns), do: ~H""
+
+  # The open panel has the news: a popup or a toast would cover it.
+  def announcement(%{tayori: %{open: true, announcement: %{announce: kind}}} = assigns)
+      when kind != "banner",
+      do: ~H""
 
   def announcement(assigns) do
     entry = assigns.tayori.announcement

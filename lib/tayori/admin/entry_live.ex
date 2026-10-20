@@ -132,10 +132,14 @@ defmodule Tayori.Admin.EntryLive do
     end
   end
 
-  defp assign_stats(%{assigns: %{entry: %Entry{id: id}, config: config}} = socket)
+  # Only a published entry has readers to count.
+  defp assign_stats(%{assigns: %{entry: %Entry{id: id} = entry, config: config}} = socket)
        when is_binary(id) do
-    if Config.feature?(config, :analytics) do
-      days = Tayori.Views.by_day(id, Date.add(Date.utc_today(), -29))
+    if Config.feature?(config, :analytics) and published?(entry) do
+      since =
+        Enum.max([Date.add(Date.utc_today(), -29), DateTime.to_date(entry.published_at)], Date)
+
+      days = Tayori.Views.by_day(id, since)
 
       by_source =
         Enum.reduce(days, %{}, fn {_date, sources}, acc ->
@@ -150,6 +154,11 @@ defmodule Tayori.Admin.EntryLive do
   end
 
   defp assign_stats(socket), do: assign(socket, :stats, nil)
+
+  defp published?(%Entry{published_at: nil}), do: false
+
+  defp published?(%Entry{published_at: at}),
+    do: DateTime.compare(at, DateTime.utc_now()) != :gt
 
   # The upload names are made from the configured languages, never from a
   # request, so they are a short, known list of atoms.
@@ -1067,7 +1076,7 @@ defmodule Tayori.Admin.EntryLive do
               <div><dt>Views</dt><dd>{@stats.totals.views}</dd></div>
               <div><dt>Readers</dt><dd>{@stats.totals.readers}</dd></div>
             </dl>
-            <div class="ta-sparkline" aria-hidden="true">
+            <div :if={length(@stats.days) > 1} class="ta-sparkline" aria-hidden="true">
               <span
                 :for={{_date, sources} <- @stats.days}
                 style={"--h: #{bar_height(sources, @stats.days)}"}

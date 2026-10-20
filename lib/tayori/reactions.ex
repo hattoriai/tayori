@@ -10,9 +10,7 @@ defmodule Tayori.Reactions do
 
   import Ecto.Query
 
-  alias Tayori.{Config, Reader}
-
-  @table "tayori_reactions"
+  alias Tayori.{Config, Reaction, Reader}
 
   @doc """
   Turns a reaction of the reader on or off, and returns the entry's counts
@@ -31,8 +29,8 @@ defmodule Tayori.Reactions do
         {:error, :unknown_emoji}
 
       mine(config, reader, [entry_id]) |> Map.get(entry_id, []) |> Enum.member?(emoji) ->
-        from(r in @table,
-          where: r.entry_id == type(^entry_id, :binary_id) and r.reader == ^reader,
+        from(r in Reaction,
+          where: r.entry_id == ^entry_id and r.reader == ^reader,
           where: r.emoji == ^emoji
         )
         |> config.repo.delete_all(prefix: config.prefix)
@@ -41,10 +39,10 @@ defmodule Tayori.Reactions do
 
       true ->
         config.repo.insert_all(
-          @table,
+          Reaction,
           [
             %{
-              entry_id: Ecto.UUID.dump!(entry_id),
+              entry_id: entry_id,
               reader: reader,
               emoji: emoji,
               inserted_at: DateTime.utc_now()
@@ -81,10 +79,10 @@ defmodule Tayori.Reactions do
   end
 
   defp counts(config, entry_ids) do
-    from(r in @table,
-      where: r.entry_id in type(^entry_ids, {:array, :binary_id}),
+    from(r in Reaction,
+      where: r.entry_id in ^entry_ids,
       group_by: [r.entry_id, r.emoji],
-      select: {type(r.entry_id, :binary_id), r.emoji, count()}
+      select: {r.entry_id, r.emoji, count()}
     )
     |> config.repo.all(prefix: config.prefix)
     |> Enum.group_by(&elem(&1, 0), fn {_id, emoji, n} -> {emoji, n} end)
@@ -92,10 +90,10 @@ defmodule Tayori.Reactions do
   end
 
   defp mine(config, reader, entry_ids) do
-    from(r in @table,
-      where: r.entry_id in type(^entry_ids, {:array, :binary_id}) and r.reader == ^reader,
+    from(r in Reaction,
+      where: r.entry_id in ^entry_ids and r.reader == ^reader,
       order_by: r.inserted_at,
-      select: {type(r.entry_id, :binary_id), r.emoji}
+      select: {r.entry_id, r.emoji}
     )
     |> config.repo.all(prefix: config.prefix)
     |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
@@ -108,10 +106,10 @@ defmodule Tayori.Reactions do
   def totals(entry_ids) do
     config = Config.get()
 
-    from(r in @table,
-      where: r.entry_id in type(^entry_ids, {:array, :binary_id}),
+    from(r in Reaction,
+      where: r.entry_id in ^entry_ids,
       group_by: r.entry_id,
-      select: {type(r.entry_id, :binary_id), count()}
+      select: {r.entry_id, count()}
     )
     |> config.repo.all(prefix: config.prefix)
     |> Map.new()

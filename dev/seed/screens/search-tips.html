@@ -1,0 +1,137 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Search tips · Atelier</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#fbfaf8;--panel:#f5f2ee;--surface:#fff;--line:#ece7e0;--line-2:#ddd6cc;--line-3:#f3f0eb;
+  --text:#1f1c18;--text-2:#524d46;--muted:#8b847a;--faint:#b5aea4;
+  --accent:#2e6b5c;--accent-2:#245548;--accent-soft:#e5f0eb;--accent-line:#b9d6cb;
+  --amber:#e2981a;--amber-soft:#fdf1da;--purple:#7353c2;--purple-soft:#efe9fb;
+  --red:#c2493d;--red-soft:#fbe9e6;--green:#3c7d4f;--green-soft:#e6f2e8;--orange:#c06a1f;--orange-soft:#fcefe0;
+  --hover:#f0ece6;
+  --shadow:0 1px 2px rgba(31,28,24,.05),0 2px 8px rgba(31,28,24,.04);
+  --pop:0 0 0 1px rgba(31,28,24,.07),0 16px 40px -8px rgba(31,28,24,.22),0 4px 10px -2px rgba(31,28,24,.08);
+}
+html,body{height:100%}
+body{font-family:Inter,-apple-system,"Segoe UI",system-ui,sans-serif;font-size:13px;line-height:1.45;color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased;font-feature-settings:"cv11","ss03","tnum" 0;letter-spacing:-.006em}
+.i{flex:none;display:block}
+.app{display:grid;grid-template-columns:236px 1fr;height:100vh;overflow:hidden}
+.side{background:var(--panel);border-right:1px solid var(--line);padding:10px 8px;display:flex;flex-direction:column;gap:1px;min-width:0}
+.ws{display:flex;align-items:center;gap:8px;padding:5px 8px 5px 6px;border-radius:7px;font-weight:600;font-size:13.5px;margin-bottom:6px}
+.ws .chev{color:var(--muted)}
+.ws-logo{width:24px;height:24px;border-radius:7px;background:#1f1c18;color:#f5efe6;display:grid;place-items:center;font-size:11px;font-weight:700;letter-spacing:.02em}
+.side .tools{margin-left:auto;display:flex;gap:2px;color:var(--muted)}
+.side .tools span{width:26px;height:26px;border-radius:6px;display:grid;place-items:center}
+.nav a{display:flex;align-items:center;gap:9px;padding:0 8px;border-radius:6px;color:var(--text-2);text-decoration:none;font-weight:500;height:29px;white-space:nowrap;overflow:hidden}
+.nav a.on{background:var(--surface);color:var(--text);box-shadow:0 0 0 1px var(--line),0 1px 2px rgba(31,28,24,.05)}
+.nav .i{color:var(--muted)}
+.nav a.on .i{color:var(--text-2)}
+.nav .count{margin-left:auto;font-size:11px;color:var(--muted);font-weight:500}
+.nav .count.hot{background:var(--accent);color:#fff;border-radius:9px;padding:0 6px;line-height:17px}
+.sec{font-size:11.5px;font-weight:600;color:var(--muted);padding:16px 8px 5px;display:flex;align-items:center;justify-content:space-between}
+.pdot{width:9px;height:9px;border-radius:3px;flex:none;margin:0 3px}
+.side-foot{margin-top:auto;display:flex;flex-direction:column;gap:6px}
+.plan-card{border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:10px 11px;font-size:12px;color:var(--text-2)}
+.plan-card b{color:var(--text);font-weight:600}
+.meter{height:4px;border-radius:2px;background:var(--line);margin-top:8px;overflow:hidden}
+.meter i{display:block;height:100%;background:var(--accent);border-radius:2px}
+.main{display:flex;flex-direction:column;min-width:0;background:var(--surface);position:relative}
+.top{height:48px;flex:none;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 14px 0 18px;gap:10px}
+.crumbs{display:flex;align-items:center;gap:7px;color:var(--muted);font-weight:500;white-space:nowrap}
+.crumbs b{color:var(--text);font-weight:600}
+.crumbs .i{color:var(--faint)}
+.spacer{flex:1}
+.tabs{display:flex;gap:4px;height:40px;flex:none;align-items:stretch;padding:0 12px;border-bottom:1px solid var(--line)}
+.tab{display:flex;align-items:center;gap:7px;padding:0 8px;color:var(--muted);font-weight:500;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab .i{color:var(--faint)}
+.tab.on{color:var(--text);border-color:var(--text)}
+.tab.on .i{color:var(--text-2)}
+.btn{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:7px;border:1px solid var(--line-2);background:var(--surface);font-weight:500;color:var(--text);font-size:12.5px;box-shadow:0 1px 1px rgba(31,28,24,.04);white-space:nowrap;font-family:inherit}
+.btn .i{color:var(--text-2)}
+.btn.primary{background:var(--accent);border-color:var(--accent-2);color:#fff;box-shadow:0 1px 2px rgba(36,85,72,.35),inset 0 1px 0 rgba(255,255,255,.12)}
+.btn.primary .i{color:#fff}
+.btn.ghost{border-color:transparent;box-shadow:none;background:transparent;color:var(--text-2)}
+.btn.icon{width:28px;padding:0;justify-content:center}
+.btn.lg{height:34px;padding:0 14px;font-size:13px}
+.av{width:var(--s);height:var(--s);border-radius:50%;display:inline-grid;place-items:center;color:#fff;font-size:calc(var(--s) * .38);font-weight:600;flex:none;letter-spacing:.01em}
+.stack{display:inline-flex;padding-left:5px}
+.stack .av{box-shadow:0 0 0 2px var(--surface);margin-left:-3px}
+.kbd{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;font:500 10.5px/1 Inter,sans-serif;padding:0 4px;border:1px solid var(--line-2);border-bottom-width:1.5px;border-radius:4px;color:var(--text-2);background:var(--surface)}
+.chip{display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 7px;border-radius:5px;font-size:11px;font-weight:500;background:var(--line-3);color:var(--text-2);white-space:nowrap}
+.chip.green{background:var(--green-soft);color:var(--green)}
+.chip.orange{background:var(--orange-soft);color:var(--orange)}
+.chip.red{background:var(--red-soft);color:var(--red)}
+.chip.purple{background:var(--purple-soft);color:var(--purple)}
+.chip.accent{background:var(--accent-soft);color:var(--accent-2)}
+.chip.line{background:transparent;box-shadow:inset 0 0 0 1px var(--line-2)}
+.sdot{width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
+.seg{display:inline-flex;background:var(--line-3);border:1px solid var(--line);border-radius:8px;padding:2px;gap:2px}
+.seg span{height:22px;padding:0 9px;border-radius:6px;display:flex;align-items:center;font-size:12px;font-weight:500;color:var(--muted)}
+.seg span.on{background:var(--surface);color:var(--text);box-shadow:0 0 0 1px var(--line-2),0 1px 2px rgba(31,28,24,.06)}
+.toolbar{height:48px;flex:none;display:flex;align-items:center;gap:8px;padding:0 14px 0 18px;border-bottom:1px solid var(--line)}
+.toolbar h2{font-size:14px;font-weight:600;letter-spacing:-.01em;margin:0 4px}
+.scrim{position:absolute;inset:0;background:rgba(28,25,21,.38);z-index:50}
+.dialog{position:absolute;z-index:60;background:var(--surface);border-radius:14px;box-shadow:var(--pop)}
+.dialog h3{font-size:15px;font-weight:600;letter-spacing:-.012em}
+.field{display:flex;flex-direction:column;gap:6px}
+.label{font-size:12px;font-weight:500;color:var(--text-2)}
+.input{height:34px;border:1px solid var(--line-2);border-radius:8px;padding:0 11px;display:flex;align-items:center;gap:8px;background:var(--surface);font-size:13px;box-shadow:inset 0 1px 1px rgba(31,28,24,.03)}
+.input.focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(46,107,92,.16)}
+.cb{width:16px;height:16px;border-radius:4.5px;border:1.5px solid var(--line-2);display:grid;place-items:center;flex:none;background:var(--surface)}
+.cb.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.toggle{width:30px;height:18px;border-radius:9px;background:var(--line-2);position:relative;flex:none}
+.toggle::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.toggle.on{background:var(--accent)}
+.toggle.on::after{left:14px}
+.toast{position:absolute;z-index:70;background:#23201c;color:#f3efe9;border-radius:11px;box-shadow:0 12px 32px -6px rgba(0,0,0,.35);display:flex;align-items:center;gap:10px;padding:11px 12px 11px 14px;font-size:12.5px;font-weight:500}
+.toast .muted{color:#a8a197;font-weight:400}
+.toast .act{color:#fff;font-weight:600;padding:4px 9px;border-radius:6px;background:rgba(255,255,255,.1)}
+mark{background:#fbe7a6;color:inherit;border-radius:3px;padding:0 1px;box-shadow:0 0 0 1px #fbe7a6}
+
+@page{size:A4;margin:0}
+html,body{background:#fff;height:auto}
+.sheet{width:210mm;height:297mm;padding:20mm 20mm 16mm;display:flex;flex-direction:column;position:relative;overflow:hidden}
+.band{position:absolute;left:0;right:0;top:0;height:6mm;background:var(--accent)}
+.brand{display:flex;align-items:center;gap:9px;font-weight:600;font-size:14px;margin-top:4mm}
+h1{font-family:"Inter Display",Inter,sans-serif;font-size:38px;font-weight:650;letter-spacing:-.035em;margin:12mm 0 3mm}
+.lead{font-size:14px;color:var(--text-2);max-width:135mm;line-height:1.55}
+h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);margin:10mm 0 4mm;font-weight:700}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+td{padding:9px 0;border-top:1px solid var(--line);vertical-align:top}
+td:first-child{width:62mm}
+code{font-family:"JetBrains Mono",monospace;font-size:11.5px;background:var(--line-3);border:1px solid var(--line);border-radius:5px;padding:2px 6px;color:var(--text)}
+.ex{color:var(--muted);font-size:11.5px;margin-top:2px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:8mm}
+.box{border:1px solid var(--line);border-radius:10px;padding:5mm;font-size:12.5px;line-height:1.55;color:var(--text-2)}
+.box b{color:var(--text)}
+.keys{display:flex;flex-direction:column;gap:8px;font-size:12.5px}
+.keys div{display:flex;align-items:center;gap:6px}
+.keys .kbd{height:22px;min-width:22px;font-size:11.5px}
+.keys span.t{margin-left:auto;color:var(--text-2)}
+mark{background:#fbe7a6}
+.foot{margin-top:auto;display:flex;justify-content:space-between;color:var(--muted);font-size:10.5px;border-top:1px solid var(--line);padding-top:4mm}
+</style></head><body><div class="sheet"><div class="band"></div>
+<div class="brand"><svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="6.5" fill="#2e6b5c"/><path d="M7 18.5v-6.2a5 5 0 0 1 10 0v6.2" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M12 7.4v11.1" stroke="#fff" stroke-width="1.6" stroke-linecap="round" opacity=".55"/></svg>Atelier</div>
+<h1>Search tips</h1>
+<p class="lead">Search answers as you type, forgives a typo and reads the words inside your PDFs. Press <span class="kbd">⌘</span> <span class="kbd">K</span> anywhere, then narrow it down with the filters below.</p>
+<h2>Filters</h2>
+<table>
+<tr><td><code>in:files</code></td><td>Only files, including words inside PDFs.<div class="ex">brochure in:files</div></td></tr>
+<tr><td><code>project:harbour</code></td><td>Only one project. A part of its name is enough.<div class="ex">poster project:harbour</div></td></tr>
+<tr><td><code>from:aiko</code></td><td>Cards, notes and comments by one person.<div class="ex">approved from:sofia</div></td></tr>
+<tr><td><code>due:this-week</code></td><td>Cards due this week. Also <code>due:overdue</code> and <code>due:2026-11</code>.</td></tr>
+<tr><td><code>type:pdf</code></td><td>Files of one type: pdf, image, video, sketch.</td></tr>
+<tr><td><code>"exact words"</code></td><td>Quotes match the words in that order.<div class="ex">"harbour blue"</div></td></tr>
+<tr><td><code>-word</code></td><td>Leave out results with that word.<div class="ex">logo -draft</div></td></tr>
+</table>
+<div class="cols" style="margin-top:10mm">
+<div><h2 style="margin-top:0">Keyboard</h2><div class="keys">
+<div><span class="kbd">⌘</span><span class="kbd">K</span><span class="t">Open search</span></div>
+<div><span class="kbd">/</span><span class="t">Search this project</span></div>
+<div><span class="kbd">↑</span><span class="kbd">↓</span><span class="t">Move through results</span></div>
+<div><span class="kbd">⌘</span><span class="kbd">↵</span><span class="t">Open in a new tab</span></div>
+<div><span class="kbd">Tab</span><span class="t">Next filter</span></div>
+</div></div>
+<div><h2 style="margin-top:0">Typos and PDFs</h2><div class="box">Search for <b>harbur</b> and Atelier shows results for <mark>harbour</mark>. Results from inside a PDF show the page they're on: open one and Atelier jumps to that page with the words marked.</div></div>
+</div>
+<div class="foot"><span>Atelier 3.2 · October 2026</span><span>atelier.test/docs/search</span></div>
+</div></body></html>

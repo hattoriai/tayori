@@ -281,21 +281,18 @@
   letter-spacing: 0.01em;
 }
 
+/* An unread entry: a dot, named for screen readers. A word would read
+   as one more category beside them. */
 .tayori-new {
   display: inline-flex;
   align-items: center;
-  gap: 0.3125rem;
   color: var(--tayori-attention);
-  font-size: var(--tayori-tiny);
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
 }
 
 .tayori-new::before {
   content: "";
-  width: 0.4375rem;
-  height: 0.4375rem;
+  width: 0.5rem;
+  height: 0.5rem;
   border-radius: 999px;
   background: currentColor;
 }
@@ -362,19 +359,20 @@ tayori-news {
 
 .tayori-badge {
   position: absolute;
-  top: -0.25rem;
-  right: -0.375rem;
+  /* Off the icon's corner, so that the icon stays whole. */
+  top: -0.4375rem;
+  right: -0.625rem;
   display: grid;
   place-items: center;
-  min-width: 1.125rem;
-  height: 1.125rem;
-  padding: 0 0.3125rem;
+  min-width: 1rem;
+  height: 1rem;
+  padding: 0 0.25rem;
   border: 2px solid var(--tayori-background);
   border-radius: 999px;
   box-sizing: content-box;
   background: var(--tayori-attention);
   color: var(--tayori-attention-text);
-  font: 600 0.6875rem / 1 var(--tayori-font);
+  font: 600 0.625rem / 1 var(--tayori-font);
   font-variant-numeric: tabular-nums;
   animation: tayori-pop 240ms cubic-bezier(0.2, 0.8, 0.2, 1.4);
 }
@@ -458,6 +456,8 @@ tayori-news {
   gap: 0.375rem;
   overflow-x: auto;
   scrollbar-width: none;
+  /* The chips that do not fit fade at the edge, a sign they scroll. */
+  mask-image: linear-gradient(to right, #000 calc(100% - 2.5rem), transparent);
 }
 
 .tayori-filter::-webkit-scrollbar {
@@ -671,6 +671,11 @@ tayori-news {
   margin: 0.25rem 0;
 }
 
+/* An entry shows its cover whole; the cards crop it to 16:9. */
+.tayori-entry-cover img {
+  aspect-ratio: auto;
+}
+
 .tayori-entry-body {
   min-width: 0;
 }
@@ -682,6 +687,32 @@ tayori-news {
 
 .tayori-entry-body > :last-child {
   margin-bottom: 0;
+}
+
+/* Screenshots and films in an entry: the width of the text, framed. */
+.tayori-entry-body figure.kotoba-attachment {
+  margin: 1.5rem 0;
+}
+
+.tayori-entry-body figure.kotoba-attachment > img,
+.tayori-entry-body figure.kotoba-attachment > video,
+.tayori-entry-body .kotoba-image img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--tayori-rule);
+  border-radius: var(--tayori-radius-media);
+}
+
+.tayori-entry-body figure.kotoba-attachment > figcaption {
+  margin-top: 0.5rem;
+  color: var(--tayori-muted);
+  font-size: 0.8125rem;
+  text-align: center;
+}
+
+.tayori-entry-body .kotoba-gallery {
+  margin: 1.5rem 0;
 }
 
 .tayori-entry-footer {
@@ -828,8 +859,24 @@ tayori-news {
 
 .tayori-announcement-close {
   position: absolute;
+  z-index: 1;
   top: 0.5rem;
   right: 0.5rem;
+}
+
+/* Over a cover, the button keeps a ground of its own. */
+.tayori-announcement-popup .tayori-announcement-close,
+.tayori-announcement-toast .tayori-announcement-close {
+  border: 1px solid var(--tayori-border);
+  background: color-mix(in oklab, var(--tayori-background) 88%, transparent);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+  backdrop-filter: blur(6px);
+}
+
+.tayori-announcement-popup .tayori-announcement-close:hover,
+.tayori-announcement-toast .tayori-announcement-close:hover {
+  background: var(--tayori-surface);
+  color: var(--tayori-text);
 }
 
 /* A popup: in the middle of the page, over a backdrop. */

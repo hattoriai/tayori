@@ -9,7 +9,7 @@ defmodule Tayori.Announcements do
 
   import Ecto.Query
 
-  alias Tayori.{Config, Entry, Query, Reader}
+  alias Tayori.{Config, Dismissal, Entry, Query, Reader}
 
   @doc """
   The announcement the reader sees now, with its translation, or nil.
@@ -40,12 +40,7 @@ defmodule Tayori.Announcements do
     where(
       query,
       [e],
-      e.id not in subquery(
-        from(d in "tayori_dismissals",
-          where: d.reader == ^id,
-          select: type(d.entry_id, :binary_id)
-        )
-      )
+      e.id not in subquery(from(d in Dismissal, where: d.reader == ^id, select: d.entry_id))
     )
   end
 
@@ -60,8 +55,8 @@ defmodule Tayori.Announcements do
     config = Config.get()
 
     config.repo.insert_all(
-      "tayori_dismissals",
-      [%{reader: id, entry_id: Ecto.UUID.dump!(entry_id), inserted_at: DateTime.utc_now()}],
+      Dismissal,
+      [%{reader: id, entry_id: entry_id, inserted_at: DateTime.utc_now()}],
       on_conflict: :nothing,
       prefix: config.prefix
     )

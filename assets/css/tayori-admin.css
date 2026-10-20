@@ -538,14 +538,18 @@ select.ta-input {
 }
 
 .ta-hint {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.25rem 0.375rem;
   margin: 0;
   color: var(--tayori-muted);
   font-size: 0.8125rem;
   line-height: 1.45;
+}
+
+/* A hint led by an icon keeps the icon beside its first line. */
+.ta-hint:has(> .tayori-icon) {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.375rem;
 }
 
 .ta-hint .tayori-icon {
@@ -1351,12 +1355,9 @@ select.ta-input {
 }
 
 .ta-editor-side {
-  position: sticky;
-  top: calc(var(--ta-bar-height) + 1.25rem);
-  max-height: calc(100vh - var(--ta-bar-height) - 2.5rem);
-  overflow-y: auto;
-  padding-bottom: 1rem;
-  scrollbar-width: thin;
+  min-width: 0;
+  /* A date, a time, the zone and the clear button fit the column. */
+  --koyomi-font-size: 0.875rem;
 }
 
 .ta-ai {
@@ -2012,12 +2013,6 @@ select.ta-input {
 @media (max-width: 1080px) {
   .ta-editor {
     grid-template-columns: 1fr;
-  }
-
-  .ta-editor-side {
-    position: static;
-    max-height: none;
-    overflow: visible;
   }
 }
 

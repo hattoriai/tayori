@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Search · Atelier</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#fbfaf8;--panel:#f5f2ee;--surface:#fff;--line:#ece7e0;--line-2:#ddd6cc;--line-3:#f3f0eb;
+  --text:#1f1c18;--text-2:#524d46;--muted:#8b847a;--faint:#b5aea4;
+  --accent:#2e6b5c;--accent-2:#245548;--accent-soft:#e5f0eb;--accent-line:#b9d6cb;
+  --amber:#e2981a;--amber-soft:#fdf1da;--purple:#7353c2;--purple-soft:#efe9fb;
+  --red:#c2493d;--red-soft:#fbe9e6;--green:#3c7d4f;--green-soft:#e6f2e8;--orange:#c06a1f;--orange-soft:#fcefe0;
+  --hover:#f0ece6;
+  --shadow:0 1px 2px rgba(31,28,24,.05),0 2px 8px rgba(31,28,24,.04);
+  --pop:0 0 0 1px rgba(31,28,24,.07),0 16px 40px -8px rgba(31,28,24,.22),0 4px 10px -2px rgba(31,28,24,.08);
+}
+html,body{height:100%}
+body{font-family:Inter,-apple-system,"Segoe UI",system-ui,sans-serif;font-size:13px;line-height:1.45;color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased;font-feature-settings:"cv11","ss03","tnum" 0;letter-spacing:-.006em}
+.i{flex:none;display:block}
+.app{display:grid;grid-template-columns:236px 1fr;height:100vh;overflow:hidden}
+.side{background:var(--panel);border-right:1px solid var(--line);padding:10px 8px;display:flex;flex-direction:column;gap:1px;min-width:0}
+.ws{display:flex;align-items:center;gap:8px;padding:5px 8px 5px 6px;border-radius:7px;font-weight:600;font-size:13.5px;margin-bottom:6px}
+.ws .chev{color:var(--muted)}
+.ws-logo{width:24px;height:24px;border-radius:7px;background:#1f1c18;color:#f5efe6;display:grid;place-items:center;font-size:11px;font-weight:700;letter-spacing:.02em}
+.side .tools{margin-left:auto;display:flex;gap:2px;color:var(--muted)}
+.side .tools span{width:26px;height:26px;border-radius:6px;display:grid;place-items:center}
+.nav a{display:flex;align-items:center;gap:9px;padding:0 8px;border-radius:6px;color:var(--text-2);text-decoration:none;font-weight:500;height:29px;white-space:nowrap;overflow:hidden}
+.nav a.on{background:var(--surface);color:var(--text);box-shadow:0 0 0 1px var(--line),0 1px 2px rgba(31,28,24,.05)}
+.nav .i{color:var(--muted)}
+.nav a.on .i{color:var(--text-2)}
+.nav .count{margin-left:auto;font-size:11px;color:var(--muted);font-weight:500}
+.nav .count.hot{background:var(--accent);color:#fff;border-radius:9px;padding:0 6px;line-height:17px}
+.sec{font-size:11.5px;font-weight:600;color:var(--muted);padding:16px 8px 5px;display:flex;align-items:center;justify-content:space-between}
+.pdot{width:9px;height:9px;border-radius:3px;flex:none;margin:0 3px}
+.side-foot{margin-top:auto;display:flex;flex-direction:column;gap:6px}
+.plan-card{border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:10px 11px;font-size:12px;color:var(--text-2)}
+.plan-card b{color:var(--text);font-weight:600}
+.meter{height:4px;border-radius:2px;background:var(--line);margin-top:8px;overflow:hidden}
+.meter i{display:block;height:100%;background:var(--accent);border-radius:2px}
+.main{display:flex;flex-direction:column;min-width:0;background:var(--surface);position:relative}
+.top{height:48px;flex:none;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 14px 0 18px;gap:10px}
+.crumbs{display:flex;align-items:center;gap:7px;color:var(--muted);font-weight:500;white-space:nowrap}
+.crumbs b{color:var(--text);font-weight:600}
+.crumbs .i{color:var(--faint)}
+.spacer{flex:1}
+.tabs{display:flex;gap:4px;height:40px;flex:none;align-items:stretch;padding:0 12px;border-bottom:1px solid var(--line)}
+.tab{display:flex;align-items:center;gap:7px;padding:0 8px;color:var(--muted);font-weight:500;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab .i{color:var(--faint)}
+.tab.on{color:var(--text);border-color:var(--text)}
+.tab.on .i{color:var(--text-2)}
+.btn{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:7px;border:1px solid var(--line-2);background:var(--surface);font-weight:500;color:var(--text);font-size:12.5px;box-shadow:0 1px 1px rgba(31,28,24,.04);white-space:nowrap;font-family:inherit}
+.btn .i{color:var(--text-2)}
+.btn.primary{background:var(--accent);border-color:var(--accent-2);color:#fff;box-shadow:0 1px 2px rgba(36,85,72,.35),inset 0 1px 0 rgba(255,255,255,.12)}
+.btn.primary .i{color:#fff}
+.btn.ghost{border-color:transparent;box-shadow:none;background:transparent;color:var(--text-2)}
+.btn.icon{width:28px;padding:0;justify-content:center}
+.btn.lg{height:34px;padding:0 14px;font-size:13px}
+.av{width:var(--s);height:var(--s);border-radius:50%;display:inline-grid;place-items:center;color:#fff;font-size:calc(var(--s) * .38);font-weight:600;flex:none;letter-spacing:.01em}
+.stack{display:inline-flex;padding-left:5px}
+.stack .av{box-shadow:0 0 0 2px var(--surface);margin-left:-3px}
+.kbd{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;font:500 10.5px/1 Inter,sans-serif;padding:0 4px;border:1px solid var(--line-2);border-bottom-width:1.5px;border-radius:4px;color:var(--text-2);background:var(--surface)}
+.chip{display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 7px;border-radius:5px;font-size:11px;font-weight:500;background:var(--line-3);color:var(--text-2);white-space:nowrap}
+.chip.green{background:var(--green-soft);color:var(--green)}
+.chip.orange{background:var(--orange-soft);color:var(--orange)}
+.chip.red{background:var(--red-soft);color:var(--red)}
+.chip.purple{background:var(--purple-soft);color:var(--purple)}
+.chip.accent{background:var(--accent-soft);color:var(--accent-2)}
+.chip.line{background:transparent;box-shadow:inset 0 0 0 1px var(--line-2)}
+.sdot{width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
+.seg{display:inline-flex;background:var(--line-3);border:1px solid var(--line);border-radius:8px;padding:2px;gap:2px}
+.seg span{height:22px;padding:0 9px;border-radius:6px;display:flex;align-items:center;font-size:12px;font-weight:500;color:var(--muted)}
+.seg span.on{background:var(--surface);color:var(--text);box-shadow:0 0 0 1px var(--line-2),0 1px 2px rgba(31,28,24,.06)}
+.toolbar{height:48px;flex:none;display:flex;align-items:center;gap:8px;padding:0 14px 0 18px;border-bottom:1px solid var(--line)}
+.toolbar h2{font-size:14px;font-weight:600;letter-spacing:-.01em;margin:0 4px}
+.scrim{position:absolute;inset:0;background:rgba(28,25,21,.38);z-index:50}
+.dialog{position:absolute;z-index:60;background:var(--surface);border-radius:14px;box-shadow:var(--pop)}
+.dialog h3{font-size:15px;font-weight:600;letter-spacing:-.012em}
+.field{display:flex;flex-direction:column;gap:6px}
+.label{font-size:12px;font-weight:500;color:var(--text-2)}
+.input{height:34px;border:1px solid var(--line-2);border-radius:8px;padding:0 11px;display:flex;align-items:center;gap:8px;background:var(--surface);font-size:13px;box-shadow:inset 0 1px 1px rgba(31,28,24,.03)}
+.input.focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(46,107,92,.16)}
+.cb{width:16px;height:16px;border-radius:4.5px;border:1.5px solid var(--line-2);display:grid;place-items:center;flex:none;background:var(--surface)}
+.cb.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.toggle{width:30px;height:18px;border-radius:9px;background:var(--line-2);position:relative;flex:none}
+.toggle::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.toggle.on{background:var(--accent)}
+.toggle.on::after{left:14px}
+.toast{position:absolute;z-index:70;background:#23201c;color:#f3efe9;border-radius:11px;box-shadow:0 12px 32px -6px rgba(0,0,0,.35);display:flex;align-items:center;gap:10px;padding:11px 12px 11px 14px;font-size:12.5px;font-weight:500}
+.toast .muted{color:#a8a197;font-weight:400}
+.toast .act{color:#fff;font-weight:600;padding:4px 9px;border-radius:6px;background:rgba(255,255,255,.1)}
+mark{background:#fbe7a6;color:inherit;border-radius:3px;padding:0 1px;box-shadow:0 0 0 1px #fbe7a6}
+
+.kb{flex:1;display:flex;gap:14px;padding:16px 18px;overflow:hidden;background:var(--bg);align-items:flex-start}
+.kcol{width:252px;flex:none;display:flex;flex-direction:column;gap:8px}
+.kh{display:flex;align-items:center;gap:7px;padding:2px 4px 4px;font-weight:600;font-size:12.5px}
+.kh .n{color:var(--muted);font-weight:500}
+.kh .spacer{flex:1}
+.kh .i{color:var(--faint)}
+.kc{background:var(--surface);border-radius:10px;box-shadow:0 0 0 1px var(--line),0 1px 2px rgba(31,28,24,.04);overflow:hidden}
+.kc-art{height:118px;border-bottom:1px solid var(--line-3)}
+.kc-art svg{display:block}
+.kc-b{padding:10px 11px 10px;display:flex;flex-direction:column;gap:7px}
+.kc-l{display:flex;gap:5px;flex-wrap:wrap}
+.kc-t{font-weight:550;font-size:13px;line-height:1.35;letter-spacing:-.008em}
+.kc-m{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:11.5px}
+.kc-m>span{display:inline-flex;align-items:center;gap:4px}
+.due.soon{color:#a8690a}
+.due.late{color:var(--red)}
+.kadd{display:flex;align-items:center;gap:6px;color:var(--muted);padding:6px 6px;font-weight:500}
+
+  .pal{position:absolute;z-index:60;left:50%;top:76px;transform:translateX(-50%);width:640px;background:var(--surface);border-radius:14px;box-shadow:var(--pop);overflow:hidden}
+  .q{height:56px;display:flex;align-items:center;gap:12px;padding:0 16px 0 18px;border-bottom:1px solid var(--line);font-size:16px}
+  .q .i{color:var(--muted)}
+  .q .typed{font-weight:450;letter-spacing:-.01em}
+  .caret{display:inline-block;width:1.5px;height:20px;background:var(--accent);vertical-align:middle;margin-left:1px}
+  .scope{display:flex;gap:6px;padding:10px 16px;border-bottom:1px solid var(--line)}
+  .scope .chip{height:24px;padding:0 9px;font-size:12px}
+  .scope .chip.on{background:var(--text);color:#fff}
+  .spin{width:16px;height:16px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--muted)}
+  .timing{display:inline-flex;align-items:center;gap:4px;color:var(--green);font-size:12px;font-weight:600;background:var(--green-soft);border-radius:6px;padding:2px 7px}
+  .body{padding:6px 8px 8px}
+  .note{display:flex;align-items:center;gap:7px;padding:8px 10px 6px;font-size:12.5px;color:var(--text-2)}
+  .note .i{color:var(--purple)}
+  .note .m{color:var(--muted)}
+  .grp{font-size:11.5px;font-weight:600;color:var(--muted);padding:9px 10px 5px}
+  .res{display:flex;align-items:flex-start;gap:11px;padding:8px 10px;border-radius:9px}
+  .res.on{background:var(--line-3);box-shadow:inset 0 0 0 1px var(--line)}
+  .ri{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:var(--line-3);color:var(--text-2);flex:none}
+  .pdfi{background:#fbe9e6;color:#b3392f;font-size:9.5px;font-weight:700;letter-spacing:.04em}
+  .rb{flex:1;min-width:0}
+  .rt{font-weight:550;font-size:13px}
+  .rm{color:var(--muted);font-size:12px;margin-top:1px}
+  .pg{margin-left:6px;font-size:11px;font-weight:600;color:#b3392f;background:#fbe9e6;border-radius:5px;padding:1px 6px}
+  .snip{font-size:12.5px;color:var(--text-2);margin:5px 0 4px;padding:7px 10px;background:var(--bg);border-radius:7px;border-left:2px solid #e3b4ad;line-height:1.5}
+  .res .kbd{margin-top:6px}
+  .foot{display:flex;align-items:center;gap:14px;padding:9px 16px;border-top:1px solid var(--line);color:var(--muted);font-size:11.5px;background:var(--bg)}
+  .foot span{display:inline-flex;align-items:center;gap:5px}
+  .empty{padding:56px 20px 62px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:8px}
+  .eic{width:48px;height:48px;border-radius:14px;background:var(--line-3);display:grid;place-items:center;color:var(--faint);margin-bottom:6px}
+  .et{font-weight:600;font-size:14px}
+  .es{color:var(--muted);font-size:12.5px;line-height:1.55}
+  </style>
+</head>
+<body>
+<div class="app"><aside class="side">
+  <div class="ws"><span class="ws-logo">H</span><span>Hattori Studio</span><svg class="i chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+    <span class="tools"><span><svg class="i " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7.5"/><path d="m20.5 20.5-4.2-4.2"/></svg></span><span><svg class="i " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></span></span></div>
+  <nav class="nav">
+    <a class=""><svg class="i " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg><span>Inbox</span><span class="count hot">4</span></a>
+    <a class=""><svg class="i " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg><span>My work</span><span class="count">12</span></a>
+    <a class=""><svg class="i " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="17" x="3" y="4.5" rx="2.5"/><path d="M16 2.5v4M8 2.5v4M3 10h18"/></svg><span>Calendar</span></a>
+    <a class=""><svg class="i " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg><span>Clients</span></a>
+  </nav>
+  <div class="sec"><span>Projects</span><svg class="i " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></div>
+  <nav class="nav">
+    <a class="on"><span class="pdot" style="background:#2e6b5c"></span><span>Harbour Museum rebrand</span></a><a class=""><span class="pdot" style="background:#c07a3b"></span><span>Kiln &amp; Co. catalogue</span></a><a class=""><span class="pdot" style="background:#4c6a9e"></span><span>Northfield Library signage</span></a><a class=""><span class="pdot" style="background:#b05a6f"></span><span>Tamsin Ceramics shop</span></a><a class=""><span class="pdot" style="background:#7a6a9b"></span><span>Orchard Street Bakery</span></a>
+  </nav>
+  <div class="sec"><span>Favourites</span></div>
+  <nav class="nav">
+    <a><svg class="i " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 2.5H6.5a2 2 0 0 0-2 2v15a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7.5z"/><path d="M14 2.5v5.5h5.5M8.5 13h7M8.5 17h5"/></svg><span>Studio rituals</span></a>
+    <a><svg class="i " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 2.5H6.5a2 2 0 0 0-2 2v15a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7.5z"/><path d="M14 2.5v5.5h5.5"/></svg><span>Type licences</span></a>
+  </nav>
+  <div class="side-foot">
+    <div class="plan-card"><div style="display:flex;justify-content:space-between"><b>Pro plan</b><span>6 seats</span></div>
+      <div style="margin-top:3px">48.2 GB of 200 GB</div><div class="meter"><i style="width:24%"></i></div></div>
+    <nav class="nav"><a class=""><svg class="i " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1.5 14h5M9.5 8h5M17.5 16h5"/></svg><span>Settings</span></a></nav>
+  </div>
+</aside>
+  <main class="main"><header class="top">
+  <div class="crumbs"><svg class="i " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Projects</span><svg class="i " width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg><span class="pdot" style="background:#2e6b5c"></span><b>Harbour Museum rebrand</b>
+    <span style="color:var(--faint);margin-left:2px"><svg class="i " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2.5 2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9z"/></svg></span></div>
+  <div class="spacer"></div>
+  <span class="stack"><span class="av" style="--s:24px;background:#b8674a">AH</span><span class="av" style="--s:24px;background:#4f7a6b">TO</span><span class="av" style="--s:24px;background:#8a5d8f">IM</span><span class="av" style="--s:24px;background:#4c6a9e">RS</span><span class="av" style="--s:24px;background:#a07a3c">LB</span></span>
+  <span class="btn"><svg class="i " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="m16 6-4-4-4 4M12 2v13"/></svg>Share</span>
+  <span class="btn icon"><svg class="i " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="19" cy="12" r="1.2" fill="currentColor"/></svg></span>
+</header><div class="tabs"><span class="tab "><svg class="i " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="7" height="9" x="3" y="3" rx="1.5"/><rect width="7" height="5" x="14" y="3" rx="1.5"/><rect width="7" height="9" x="14" y="12" rx="1.5"/><rect width="7" height="5" x="3" y="16" rx="1.5"/></svg>Overview</span><span class="tab on"><svg class="i " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2.5"/><path d="M9 3v18M15 3v12"/></svg>Board</span><span class="tab "><svg class="i " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6.5h9M8 12h11M6 17.5h8"/></svg>Timeline</span><span class="tab "><svg class="i " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="17" x="3" y="4.5" rx="2.5"/><path d="M16 2.5v4M8 2.5v4M3 10h18"/></svg>Calendar</span><span class="tab "><svg class="i " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 2.5H6.5a2 2 0 0 0-2 2v15a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7.5z"/><path d="M14 2.5v5.5h5.5"/></svg>Files<span style="color:var(--faint);font-size:11px">86</span></span><span class="tab "><svg class="i " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 2.5H6.5a2 2 0 0 0-2 2v15a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7.5z"/><path d="M14 2.5v5.5h5.5M8.5 13h7M8.5 17h5"/></svg>Notes</span></div><div class="toolbar">
+    <span class="btn"><svg class="i " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18M6.5 12h11M10 19h4"/></svg>Filter</span>
+    <span class="btn"><svg class="i " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>Everyone</span>
+    <span class="btn ghost"><svg class="i " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.2" fill="currentColor"/></svg>Labels</span>
+    <div style="flex:1"></div>
+    <span class="seg"><span class="on">Status</span><span>Person</span><span>Phase</span></span>
+    <span class="btn primary"><svg class="i " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New card</span>
+  </div><div class="kb"><div class="kcol"><div class="kh"><span class="sdot" style="color:#b5aea4"></span>Backlog<span class="n">9</span><span class="spacer"></span><svg class="i " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><svg class="i " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="19" cy="12" r="1.2" fill="currentColor"/></svg></div>
+      <div class="kc">
+    
+    <div class="kc-b">
+      <div class="kc-l"><span class="chip">Print</span></div>
+      <div class="kc-t">Shop bag and ticket stock</div>
+      <div class="kc-m">
+        <span class="due "><svg class="i " width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="17" x="3" y="4.5" rx="2.5"/><path d="M16 2.5v4M8 2.5v4M3 10h18"/></svg>12 Nov</span>
+        
+        <span><svg class="i " width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>2</span>
+        <span class="spacer" style="flex:1"></span><span class="stack"><span class="av" style="--s:20px;background:#4d8592">MS</span></span>
+      </div>
+    </div>
+  </div><div class="kc">
+    
+    <div class="kc-b">
+      <div class="kc-l"><span class="chip">Digital</span></div>
+      <div class="kc-t">Newsletter template in the new type</div>
+      <div class="kc-m">
+        <span class="due "><svg class="i " width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="17" x="3" y="4.5" rx="2.5"/><path d="M16 2.5v4M8 2.5v4M3 10h18"/></svg>18 Nov</span>
+        
+        
+        <span class="spacer" style="flex:1"></span><span class="stack"><span class="av" style="--s:20px;background:#4c6a9e">RS</span><span class="av" style="--s:20px;background:#a07a3c">LB</span></span>
+      </div>
+    </div>
+  </div><div class="kc">
+    
+    <div class="kc-b">
+      <div class="kc-l"><span class="chip">Signage</span></div>
+      <div class="kc-t">Café menu boards</div>
+      <div class="kc-m">
+        
+        
+        
+        <span class="spacer" style="flex:1"></span><span class="stack"><span class="av" style="--s:20px;background:#4f7a6b">TO</span></span>
+      </div>
+    </div>
+  </div><div class="kadd"><svg class="i " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add card</div></div><div class="kcol"><div class="kh"><span class="sdot" style="color:#c06a1f"></span>In progress<span class="n">6</span><span class="spacer"></span><svg class="i " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><svg class="i " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="19" cy="12" r="1.2" fill="currentColor"/></svg></div>
+      <div class="kc">
+    <div class="kc-art"><svg viewBox="-60 6 320 140" preserveAspectRatio="xMidYMid slice" width="100%" height="100%"><rect x="-60" width="320" height="150" fill="#e9dfd2"/><rect x="-60" y="104" width="320" height="46" fill="rgba(0,0,0,.05)"/><ellipse cx="100" cy="128" rx="34" ry="6" fill="rgba(0,0,0,.12)"/><path d="M90 22h20v14c0 8 16 14 18 40 2 28-8 50-28 50s-30-22-28-50c2-26 18-32 18-40z" fill="#335c74"/><path d="M84 66c-4 14-3 30 2 42" stroke="#f4ede3" stroke-opacity=".35" stroke-width="4" stroke-linecap="round" fill="none"/></svg></div>
+    <div class="kc-b">
+      <div class="kc-l"><span class="chip">Print</span><span class="chip">Exhibition</span></div>
+      <div class="kc-t">Exhibition poster series</div>
+      <div class="kc-m">
+        <span class="due soon"><svg class="i " width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="17" x="3" y="4.5" rx="2.5"/><path d="M16 2.5v4M8 2.5v4M3 10h18"/></svg>27 Oct</span>
+        <span><svg class="i " width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>4</span>
+        <span><svg class="i " width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>6</span>
+        <span class="spacer" style="flex:1"></span><span class="stack"><span class="av" style="--s:20px;background:#8a5d8f">IM</span><span class="av" style="--s:20px;background:#b8674a">AH</span></span>
+      </div>
+    </div>
+  </div><div class="kc">
+    
+    <div class="kc-b">
+      <div class="kc-l"><span class="chip">Signage</span></div>
+      <div class="kc-t">Wayfinding icon set</div>
+      <div class="kc-m">
+        <span class="due "><svg class="i " width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="17" x="3" y="4.5" rx="2.5"/><path d="M16 2.5v4M8 2.5v4M3 10h18"/></svg>13 Nov</span>
+        <span><svg class="i " width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>2</span>
+        
+        <span class="spacer" style="flex:1"></span><span class="stack"><span class="av" style="--s:20px;background:#4f7a6b">TO</span></span>
+      </div>
+    </div>
+  </div><div class="kc">
+    
+    <div class="kc-b">
+      <div class="kc-l"><span class="chip">Digital</span></div>
+      <div class="kc-t">Website wireframes</div>
+      <div class="kc-m">
+        <span class="due soon"><svg class="i " width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="17" x="3" y="4.5" rx="2.5"/><path d="M16 2.5v4M8 2.5v4M3 10h18"/></svg>23 Oct</span>
+        
+        <span><svg class="i " width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>3</span>
+        <span class="spacer" style="flex:1"></span><span class="stack"><span class="av" style="--s:20px;background:#4c6a9e">RS</span></span>
+      </div>
+    </div>
+  </div><div class="kadd"><svg class="i " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add card</div></div><div class="kcol"><div class="kh"><span class="sdot" style="color:#7353c2"></span>Review<span class="n">3</span><span class="spacer"></span><svg class="i " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><svg class="i " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="19" cy="12" r="1.2" fill="currentColor"/></svg></div>
+      <div class="kc">
+    
+    <div class="kc-b">
+      <div class="kc-l"><span class="chip">Identity</span></div>
+      <div class="kc-t">Wordmark — final weights</div>
+      <div class="kc-m">
+        <span class="due late"><svg class="i " width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="17" x="3" y="4.5" rx="2.5"/><path d="M16 2.5v4M8 2.5v4M3 10h18"/></svg>Today</span>
+        <span><svg class="i " width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>7</span>
+        <span><svg class="i " width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>4</span>
+        <span class="spacer" style="flex:1"></span><span class="stack"><span class="av" style="--s:20px;background:#4f7a6b">TO</span><span class="av" style="--s:20px;background:#b8674a">AH</span></span>
+      </div>
+    </div>
+  </div><div class="kc">
+    
+    <div class="kc-b">
+      <div class="kc-l"><span class="chip">Copy</span></div>
+      <div class="kc-t">Tone of voice guide v2</div>
+      <div class="kc-m">
+        <span class="due "><svg class="i " width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="17" x="3" y="4.5" rx="2.5"/><path d="M16 2.5v4M8 2.5v4M3 10h18"/></svg>22 Oct</span>
+        <span><svg class="i " width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>3</span>
+        
+        <span class="spacer" style="flex:1"></span><span class="stack"><span class="av" style="--s:20px;background:#a07a3c">LB</span></span>
+      </div>
+    </div>
+  </div><div class="kadd"><svg class="i " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add card</div></div><div class="kcol"><div class="kh"><span class="sdot" style="color:#3c7d4f"></span>Done<span class="n">14</span><span class="spacer"></span><svg class="i " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><svg class="i " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="19" cy="12" r="1.2" fill="currentColor"/></svg></div>
+      <div class="kc">
+    
+    <div class="kc-b">
+      <div class="kc-l"><span class="chip">Identity</span></div>
+      <div class="kc-t">Colour & type system</div>
+      <div class="kc-m">
+        <span class="due "><svg class="i " width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="17" x="3" y="4.5" rx="2.5"/><path d="M16 2.5v4M8 2.5v4M3 10h18"/></svg>20 Oct</span>
+        
+        <span><svg class="i " width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>9</span>
+        <span class="spacer" style="flex:1"></span><span class="stack"><span class="av" style="--s:20px;background:#8a5d8f">IM</span></span>
+      </div>
+    </div>
+  </div><div class="kc">
+    
+    <div class="kc-b">
+      <div class="kc-l"><span class="chip">Strategy</span></div>
+      <div class="kc-t">Brand strategy workshop</div>
+      <div class="kc-m">
+        
+        <span><svg class="i " width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>12</span>
+        
+        <span class="spacer" style="flex:1"></span><span class="stack"><span class="av" style="--s:20px;background:#b8674a">AH</span><span class="av" style="--s:20px;background:#a07a3c">LB</span><span class="av" style="--s:20px;background:#4d8592">MS</span></span>
+      </div>
+    </div>
+  </div><div class="kadd"><svg class="i " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add card</div></div></div><div class="scrim" style="background:rgba(28,25,21,.28)"></div>
+  <div class="pal">
+    <div class="q"><svg class="i " width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7.5"/><path d="m20.5 20.5-4.2-4.2"/></svg><span class="typed">harbur<span class="caret"></span></span><div style="flex:1"></div><span class="spin"></span><span style="font-size:12px;color:var(--muted)">Searching…</span><span class="kbd">esc</span></div>
+    <div class="scope"><span class="chip on">Everything</span><span class="chip line">Projects</span><span class="chip line">Cards</span><span class="chip line">Files</span><span class="chip line">Notes</span><span class="chip line">People</span></div>
+    <div class="body">
+    <div class="empty">
+      <div class="eic"><svg class="i " width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7.5"/><path d="m20.5 20.5-4.2-4.2"/></svg></div>
+      <div class="et">No results for “harbur”</div>
+      <div class="es">Check the spelling, or try fewer words.<br>Words inside files are not searched.</div>
+    </div></div>
+    <div class="foot"><span><span class="kbd">↑</span><span class="kbd">↓</span> to move</span><span><span class="kbd">↵</span> to open</span><span><span class="kbd">⌘</span><span class="kbd">↵</span> open in new tab</span><div style="flex:1"></div><span>0 results · 1.9 s</span></div>
+  </div></main></div>
+</body>
+</html>

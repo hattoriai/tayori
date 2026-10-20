@@ -68,8 +68,7 @@ defmodule Tayori.MixProject do
       {:esbuild, "~> 0.10", only: :dev, runtime: false},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false},
       # The body of an entry, and its editor in the admin.
-      # Until Kotoba releases Attachments.store/2 (hattoriai/kotoba#45).
-      {:kotoba, path: "../kotoba", override: true},
+      {:kotoba, "~> 0.4"},
       # The publication date's picker in the admin.
       {:koyomi, "~> 0.2"},
       {:lazy_html, "~> 0.1", only: :test},
