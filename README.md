@@ -33,9 +33,11 @@ looks the same in any app. The news in your app is a prebuilt JavaScript
 bundle in the Hex package: your app does not run Node.js for it, you add
 the hook and one style sheet.
 
-![The Tayori admin: an entry in English and Portuguese in Kotoba's editor, its publication and segments, and the notes of what shipped for a draft with AI](https://raw.githubusercontent.com/hattoriai/tayori/main/media/admin.png)
+![The Tayori admin: an entry with screenshots in Kotoba's editor, in English and Portuguese, beside its publication, cover and details](https://raw.githubusercontent.com/hattoriai/tayori/main/media/admin.png)
 
-![The news in a LiveView: the panel of a reader, in their language, with the entries for their plan](https://raw.githubusercontent.com/hattoriai/tayori/main/media/news.png)
+![The news in a LiveView: the panel of a reader, with category filters, a pinned announcement, covers and reactions](https://raw.githubusercontent.com/hattoriai/tayori/main/media/news.png)
+
+![The public page: What's new in Atelier, with a subscription form, category filters, a search and a pinned entry](https://raw.githubusercontent.com/hattoriai/tayori/main/media/changelog.png)
 
 ## What Tayori does
 
