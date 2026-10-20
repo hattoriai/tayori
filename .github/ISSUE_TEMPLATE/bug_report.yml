@@ -1,0 +1,121 @@
+name: Bug report
+description: Something in Tayori does not work as the docs say.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. A security problem goes to a private report instead (see SECURITY.md).
+
+  - type: input
+    id: tayori
+    attributes:
+      label: Tayori version
+      description: From `mix.lock`, or `mix deps | grep tayori`.
+      placeholder: "0.1.0"
+    validations:
+      required: true
+
+  - type: input
+    id: stack
+    attributes:
+      label: Elixir, OTP, Phoenix and LiveView versions
+      placeholder: "Elixir 1.20.1, OTP 29, Phoenix 1.8.1, LiveView 1.1.14"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: part
+    attributes:
+      label: Where it happens
+      options:
+        - The admin
+        - The news in a LiveView (Tayori.Live, Tayori.Components)
+        - The JSON API or <tayori-news>
+        - The embed, on another origin
+        - The public page or the feeds
+        - Publishing, emails, webhooks or the notifier
+        - The inbox, digests, CI or GitHub
+        - Writing with AI
+        - The MCP server
+        - The installer or the migrations
+        - Tayori.Test
+        - Somewhere else
+    validations:
+      required: true
+
+  - type: dropdown
+    id: database
+    attributes:
+      label: Database
+      options:
+        - PostgreSQL
+        - SQLite
+    validations:
+      required: true
+
+  - type: input
+    id: database_versions
+    attributes:
+      label: Database and adapter versions
+      placeholder: "PostgreSQL 16, postgrex 0.21"
+
+  - type: input
+    id: extras
+    attributes:
+      label: Features and optional dependencies
+      description: The `features:` you turned on, and the versions of Oban, Swoosh, ReqLLM (and the model) or Sake, when they take part.
+      placeholder: "features: [:reactions, :subscriptions]; Oban 2.19, Swoosh 1.19"
+
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and OS
+      description: For what the admin, the news or the page shows or does.
+      placeholder: "Safari 26, macOS 26"
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: The smallest setup that shows it
+      description: The mount in the router, the resolver, the options given to `Tayori` and, if it matters, the entry; or a link to a small repository.
+      render: elixir
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps
+      placeholder: |
+        1. Write an entry for the segment "plan:pro"
+        2. Publish it
+        3. Open the panel as a reader on the free plan
+        4. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+      description: The error and its stacktrace, from the server log or the browser console.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I use a release from Hex, not `main`.
+          required: true
+        - label: I searched the open and closed issues, and the known limits (guides/limits.md).
+          required: true

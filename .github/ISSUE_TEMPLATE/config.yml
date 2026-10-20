@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/hattoriai/tayori/security/advisories/new
+    about: Report a security problem privately, not in a public issue.
+  - name: Documentation
+    url: https://hexdocs.pm/tayori
+    about: The guides cover the admin, readers, the news in the app, any frontend, the public page, AI, automation and more.

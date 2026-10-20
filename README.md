@@ -212,6 +212,14 @@ The browser tests need their browsers once:
 `release` task) builds the bundles, checks `priv/static`, publishes to
 Hex, and tags and pushes `v<version>`.
 
+## Contributing
+
+See [CONTRIBUTING.md](https://github.com/hattoriai/tayori/blob/main/CONTRIBUTING.md):
+when a change needs an issue first, and what a pull request needs.
+Report a security problem privately, as
+[SECURITY.md](https://github.com/hattoriai/tayori/blob/main/SECURITY.md)
+says.
+
 ## License
 
 MIT, see `LICENSE`. The admin's script has Phoenix, Phoenix LiveView,
