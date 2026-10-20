@@ -31,7 +31,7 @@ defmodule Tayori.MixProject do
       # listener is Phoenix 1.8's, so the oldest versions go without it.
       listeners: if(@oldest, do: [], else: [Phoenix.CodeReloader]),
       dialyzer: [
-        plt_add_apps: [:mix, :ex_unit, :esbuild, :req_llm],
+        plt_add_apps: [:mix, :ex_unit, :esbuild, :req_llm, :sake],
         plt_core_path: "priv/plts",
         plt_file: {:no_warn, "priv/plts/project.plt"},
         ignore_warnings: ".dialyzer_ignore.exs"
@@ -98,8 +98,12 @@ defmodule Tayori.MixProject do
       {:telemetry, "~> 1.0"},
       # The time zones of the development server's date picker.
       {:tz, "~> 0.28", only: [:dev, :test]}
-    ]
+    ] ++ sake()
   end
+
+  # The MCP server (Tayori.MCP), for an app that serves one with Sake.
+  # Sake needs Phoenix 1.8: the oldest versions go without it.
+  defp sake, do: if(@oldest, do: [], else: [{:sake, "~> 0.4", optional: true}])
 
   defp description do
     "Product news for Phoenix: a changelog with an admin to write it, news in the app for LiveView and any frontend, a public page and feeds, and drafts written with AI."
@@ -149,6 +153,7 @@ defmodule Tayori.MixProject do
         "guides/public_page.md",
         "guides/features.md",
         "guides/ai.md",
+        "guides/mcp.md",
         "guides/notifications.md",
         "guides/testing.md",
         "guides/theming.md",
@@ -165,6 +170,7 @@ defmodule Tayori.MixProject do
           "guides/public_page.md",
           "guides/features.md",
           "guides/ai.md",
+          "guides/mcp.md",
           "guides/notifications.md",
           "guides/testing.md",
           "guides/theming.md"
@@ -192,6 +198,7 @@ defmodule Tayori.MixProject do
         Publishing: [Tayori.Notifier, Tayori.Jobs, Tayori.Worker],
         Database: [Tayori.Migrations],
         AI: [Tayori.AI],
+        MCP: [Tayori.MCP],
         Testing: [Tayori.Test]
       ]
     ]

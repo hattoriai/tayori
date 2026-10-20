@@ -41,6 +41,7 @@ defmodule Tayori.Router.API do
     get "/tayori.css", Tayori.API, :asset, as: :stylesheet
     get "/tayori-sumi.css", Tayori.API, :asset, as: :sumi_stylesheet
     post "/:id/reactions", Tayori.API, :react, as: :reactions
+    post "/uploads/:token", Tayori.API, :upload, as: :upload
     get "/:slug", Tayori.API, :show, as: :entry
     options "/", Tayori.API, :preflight, as: :preflight
     options "/*path", Tayori.API, :preflight, as: :preflight

@@ -78,6 +78,18 @@ defmodule Tayori.Config do
         * `:publish` - `:draft`, for the admin to read and publish, or
           `:publish`, at once (`:draft`).
         * `:minimum` - the changes a scheduled digest needs (`1`).
+    * `:mcp` - the MCP server, `Tayori.MCP`, for an app that serves it
+      with Sake (see the [MCP](mcp.md) guide):
+        * `:resolver` - the app's `Tayori.Resolver`, which says what the
+          principal of a request may do (`c:Tayori.Resolver.resolve_access/1`)
+          and who writes (`c:Tayori.Resolver.author/1`), as in the admin.
+          Without it, nobody may use the server.
+        * `:upload_url` - the address of the uploads route of `tayori_api`,
+          whole (`"https://atelier.app/api/news/uploads"`), where an agent
+          sends its screenshots. Without it, an agent sends only small
+          images, in the call.
+        * `:storage` - the `Kotoba.Storage` of the uploads (Kotoba's own
+          config when not given), the one of the admin's editor.
     * `:embed` - the sites of the `:embed` feature (required with it):
         * `:origins` - the origins the JSON API answers, each a scheme
           and a host, with a port if not the default
@@ -106,6 +118,7 @@ defmodule Tayori.Config do
     :inbox,
     :digest,
     :embed,
+    :mcp,
     locales: ["en"],
     features: [],
     reactions: @reactions
@@ -125,6 +138,7 @@ defmodule Tayori.Config do
           inbox: inbox(),
           digest: digest(),
           embed: %{origins: [String.t(), ...], max_age: pos_integer()} | nil,
+          mcp: mcp() | nil,
           locales: [String.t(), ...],
           features: [feature()],
           reactions: [String.t(), ...]
@@ -149,6 +163,7 @@ defmodule Tayori.Config do
       inbox: inbox(Keyword.get(opts, :inbox, [])),
       digest: digest(Keyword.get(opts, :digest, [])),
       embed: embed(opts[:embed]),
+      mcp: mcp(opts[:mcp]),
       mailer: opts[:mailer],
       email_from: opts[:email_from],
       page_url: opts[:page_url] && String.trim_trailing(opts[:page_url], "/"),
@@ -277,6 +292,7 @@ defmodule Tayori.Config do
   # An option checked as `new/1` checks it, for a config changed in tests.
   def option(:inbox, value), do: inbox(value)
   def option(:digest, value), do: digest(value)
+  def option(:mcp, value), do: mcp(value)
   def option(_key, value), do: value
 
   @typedoc "The `:inbox` option, checked."
@@ -372,6 +388,64 @@ defmodule Tayori.Config do
 
   defp digest(other),
     do: raise(ArgumentError, ":digest must be a keyword list, got: #{inspect(other)}")
+
+  @typedoc "The `:mcp` option, checked."
+  @type mcp :: %{
+          resolver: module() | nil,
+          upload_url: String.t() | nil,
+          storage: module() | nil
+        }
+
+  defp mcp(nil), do: nil
+
+  defp mcp(opts) when is_list(opts) do
+    case Keyword.split(opts, [:resolver, :upload_url, :storage]) do
+      {opts, []} ->
+        %{
+          resolver: mcp_resolver(opts[:resolver]),
+          upload_url: upload_url(opts[:upload_url]),
+          storage: opts[:storage]
+        }
+
+      {_opts, other} ->
+        raise ArgumentError,
+              ":mcp takes :resolver, :upload_url and :storage, got: #{inspect(Keyword.keys(other))}"
+    end
+  end
+
+  defp mcp(other),
+    do: raise(ArgumentError, ":mcp must be a keyword list, got: #{inspect(other)}")
+
+  defp mcp_resolver(nil), do: nil
+
+  defp mcp_resolver(resolver) when is_atom(resolver) do
+    unless Code.ensure_loaded?(resolver) and function_exported?(resolver, :resolve_access, 1) do
+      raise ArgumentError,
+            ":resolver of :mcp must be a Tayori.Resolver, got: #{inspect(resolver)}"
+    end
+
+    resolver
+  end
+
+  defp mcp_resolver(other),
+    do: raise(ArgumentError, ":resolver of :mcp must be a module, got: #{inspect(other)}")
+
+  defp upload_url(nil), do: nil
+
+  defp upload_url(url) when is_binary(url) do
+    case URI.parse(url) do
+      %URI{scheme: scheme, host: host, query: nil}
+      when scheme in ["http", "https"] and host not in [nil, ""] ->
+        String.trim_trailing(url, "/")
+
+      _ ->
+        raise ArgumentError,
+              ":upload_url of :mcp must be an http(s) address, with no query, got: #{inspect(url)}"
+    end
+  end
+
+  defp upload_url(other),
+    do: raise(ArgumentError, ":upload_url of :mcp must be a string, got: #{inspect(other)}")
 
   defp oban(nil), do: nil
   defp oban(name) when is_atom(name), do: oban(name: name)

@@ -107,6 +107,8 @@ defmodule Tayori.Translation do
        else: [{field, "must be a path of the app, or an http or https address"}]
   end
 
+  defp blank_to_nil(nil), do: nil
+
   defp blank_to_nil(value) do
     case String.trim(value) do
       "" -> nil
