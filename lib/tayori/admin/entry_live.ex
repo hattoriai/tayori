@@ -778,7 +778,7 @@ defmodule Tayori.Admin.EntryLive do
                   <div class="ta-more-body">
                     <.input
                       field={t[:seo_title]}
-                      label="Title"
+                      label="Shared title"
                       maxlength="255"
                       hint="When not the entry's title."
                     />
@@ -786,7 +786,7 @@ defmodule Tayori.Admin.EntryLive do
                       field={t[:seo_description]}
                       type="textarea"
                       rows="2"
-                      label="Description"
+                      label="Shared description"
                       maxlength="500"
                       hint="When not the summary. About 150 characters show."
                     />

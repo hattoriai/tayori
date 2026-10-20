@@ -377,6 +377,12 @@ tayori-news {
   animation: tayori-pop 240ms cubic-bezier(0.2, 0.8, 0.2, 1.4);
 }
 
+/* The element hides the badge at zero with `hidden`, which the grid above
+   would otherwise win over. */
+.tayori-badge[hidden] {
+  display: none;
+}
+
 .tayori-button-labelled .tayori-badge {
   position: static;
   border: 0;

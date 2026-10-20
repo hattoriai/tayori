@@ -16,7 +16,7 @@ export function unique(title: string): string {
 /** Writes and publishes an entry in the admin, as the admin. */
 export async function publish(page: Page, title: string, body: string): Promise<void> {
   await openLive(page, "/admin/news/new?as=admin");
-  await page.getByLabel("Title").fill(title);
+  await page.getByLabel("Title", { exact: true }).fill(title);
   const editor = page.locator('#tayori-body-en [contenteditable="true"]');
   await editor.click();
   await page.keyboard.type(body);
