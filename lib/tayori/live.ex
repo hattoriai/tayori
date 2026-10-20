@@ -200,14 +200,9 @@ defmodule Tayori.Live do
 
         # Reading the announcement is enough of an answer to it.
         state =
-          if state.announcement && state.announcement.id == entry.id do
-            if state.reader, do: Tayori.Announcements.dismiss(state.reader, entry.id)
-            state = %{state | announcement: nil, categories: Tayori.Categories.by_key()}
-            # The panel opens on it, with the list to go back to.
-            if state.open, do: state, else: load(state)
-          else
-            state
-          end
+          if state.announcement && state.announcement.id == entry.id,
+            do: read_announcement(state, entry),
+            else: state
 
         # The reactions of the entry and of the list, for the way back.
         state = %{state | open: true, entry: entry}
@@ -237,6 +232,13 @@ defmodule Tayori.Live do
   end
 
   defp handle_event(_event, _params, socket), do: {:cont, socket}
+
+  # The panel opens on the announcement, with the list to go back to.
+  defp read_announcement(state, entry) do
+    if state.reader, do: Tayori.Announcements.dismiss(state.reader, entry.id)
+    state = %{state | announcement: nil, categories: Tayori.Categories.by_key()}
+    if state.open, do: state, else: load(state)
+  end
 
   defp handle_info({Tayori, :seen, _id}, socket) do
     {:halt, put_state(socket, %{socket.assigns.tayori | unread: 0})}
