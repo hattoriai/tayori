@@ -53,6 +53,7 @@ defmodule Tayori.Digest do
     * `:publish` - `:draft` or `:publish`, instead of the config's.
     * `:ai` - `false` for a plain digest, even with AI set up.
     * `:now` - the time of the digest (now).
+    * `:author` - the entry's author, as the resolver's `author/1` gives it.
 
   Returns `{:ok, entry}`, `{:error, :nothing}` when no change is
   waiting, or `{:error, changeset}`.
@@ -70,7 +71,7 @@ defmodule Tayori.Digest do
         publish = Keyword.get(opts, :publish, config.digest.publish)
         ai? = Keyword.get(opts, :ai, true) != false and AI.configured?()
 
-        with {:ok, entry} <- create(changes, config, now, ai?),
+        with {:ok, entry} <- create(changes, config, now, ai?, opts),
              {:ok, entry} <- maybe_publish(entry, publish, now) do
           Inbox.drafted(Enum.map(changes, & &1.id), entry.id)
           {:ok, entry}
@@ -79,8 +80,8 @@ defmodule Tayori.Digest do
   end
 
   # An entry the model wrote that the entry refuses is made plain.
-  defp create(changes, config, now, true) do
-    case Entries.create(attrs(changes, config, now, true)) do
+  defp create(changes, config, now, true, opts) do
+    case Entries.create(attrs(changes, config, now, true), Keyword.take(opts, [:author])) do
       {:ok, entry} ->
         {:ok, entry}
 
@@ -89,11 +90,12 @@ defmodule Tayori.Digest do
           "Tayori made the digest plain, the model's was refused: #{inspect(changeset.errors)}"
         )
 
-        create(changes, config, now, false)
+        create(changes, config, now, false, opts)
     end
   end
 
-  defp create(changes, config, now, false), do: Entries.create(attrs(changes, config, now, false))
+  defp create(changes, config, now, false, opts),
+    do: Entries.create(attrs(changes, config, now, false), Keyword.take(opts, [:author]))
 
   defp maybe_publish(entry, :publish, now), do: Entries.publish(entry, now)
   defp maybe_publish(entry, _draft, _now), do: {:ok, entry}

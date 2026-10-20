@@ -283,7 +283,13 @@ if Code.ensure_loaded?(Sake.Server) do
 
         draft = call!(client(), "draft_entry", %{"change_ids" => [a.id]})
 
-        assert %{"status" => "draft", "translations" => [%{"title" => "Exports"}]} = draft
+        assert %{
+                 "status" => "draft",
+                 "author" => %{"name" => "Hanzo"},
+                 "translations" => [%{"title" => "Exports"}]
+               } =
+                 draft
+
         assert draft["change_ids"] == [a.id]
         assert Inbox.get(a.id).state == "drafted"
 

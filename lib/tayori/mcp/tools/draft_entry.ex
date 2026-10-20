@@ -19,9 +19,9 @@ if Code.ensure_loaded?(Sake.Server) do
     alias Tayori.MCP.Support
 
     @impl true
-    def execute(args, _ctx) do
+    def execute(args, ctx) do
       with {:ok, opts} <- ids(args[:change_ids]),
-           {:ok, entry} <- run(opts) do
+           {:ok, entry} <- run([author: Support.author(ctx)] ++ opts) do
         {:ok,
          entry
          |> Support.entry_detail(Config.get())
@@ -48,7 +48,7 @@ if Code.ensure_loaded?(Sake.Server) do
         {:error, :nothing} ->
           {:error,
            "No change waits for an entry: none of the inbox's changes " <>
-             if(opts == [], do: "is new and public.", else: "given is new and public.")}
+             if(opts[:ids] == nil, do: "is new and public.", else: "given is new and public.")}
 
         {:error, changeset} ->
           {:error, changeset}
