@@ -1,109 +1,89 @@
 /*
- * The Tayori admin.
+ * Tayori's admin: its shell, lists, editor, cards and settings.
  *
- * The admin is a page of its own: these styles never reach the app. Two
- * themes, chosen by the router (theme: :tayori or :sumi), in
- * data-tayori-theme on <html>: Tayori's own, the defaults that Kotoba,
- * Koyomi and Jumon share, and Sumi, the design system of Hattori AI. Each
- * follows the system's light and dark. The --kotoba-* and --koyomi-*
- * properties take the admin's colours, so the editor and the date picker
- * are part of the page.
+ * It loads after tayori.css (and tayori-sumi.css in Sumi), and reads the
+ * same --tayori-* tokens, so that the admin, its previews and the news in
+ * the app are one thing. Kotoba's editor and Koyomi's pickers take the
+ * admin's colours here, light and dark.
  */
 
-:root {
-  --ta-font: system-ui, -apple-system, "Segoe UI", sans-serif;
-  --ta-heading-font: var(--ta-font);
-  --ta-text: #1f1f23;
-  --ta-muted: #6b6b76;
-  --ta-background: #f6f6f7;
-  --ta-paper: #ffffff;
-  --ta-surface: #f0f0f2;
-  --ta-border: #d9d9de;
-  --ta-accent: #2f5bd3;
-  --ta-accent-text: #ffffff;
-  --ta-danger: #b42318;
-  --ta-scheduled: #8a5a00;
-  --ta-published: #1d7a46;
-  --ta-seal: #2f5bd3;
-  --ta-radius: 8px;
-  --ta-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --ta-focus: 0 0 0 2px var(--ta-paper), 0 0 0 4px var(--ta-accent);
-  color-scheme: light;
+/* The admin's own canvas: a quiet page, white cards. */
+:where(.tayori-admin) {
+  --ta-bar-height: 3.75rem;
+  --ta-side-width: 21rem;
+  --ta-canvas: var(--tayori-canvas);
+  --ta-card: var(--tayori-background);
+  --ta-published: var(--tayori-success);
+  --ta-scheduled: color-mix(in oklab, #b35900 85%, var(--tayori-text));
+  --ta-draft: var(--tayori-muted);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --ta-text: #ececf1;
-    --ta-muted: #9a9aa6;
-    --ta-background: #141417;
-    --ta-paper: #1b1b1f;
-    --ta-surface: #26262c;
-    --ta-border: #34343c;
-    --ta-accent: #7c9cff;
-    --ta-accent-text: #0e0e12;
-    --ta-danger: #ff7b72;
-    --ta-scheduled: #e3b341;
-    --ta-published: #56d364;
-    --ta-seal: #7c9cff;
-    color-scheme: dark;
-  }
+:where(.tayori-admin[data-theme="dark"], [data-theme="dark"] .tayori-admin) {
+  --ta-scheduled: #f2c14e;
 }
 
-:root[data-tayori-theme="sumi"] {
-  --ta-font: "Outfit", system-ui, sans-serif;
-  --ta-heading-font: "Cormorant Garamond", Georgia, serif;
-  --ta-text: oklch(15% 0.003 270);
-  --ta-muted: oklch(15% 0.003 270 / 0.62);
-  --ta-background: oklch(93% 0.012 85);
-  --ta-paper: oklch(96% 0.01 85);
-  --ta-surface: oklch(93% 0.012 85);
-  --ta-border: oklch(89% 0.014 80);
-  --ta-accent: #e84a1c;
-  --ta-accent-text: oklch(98% 0.005 85);
-  --ta-seal: #e84a1c;
-  --ta-radius: 0.375rem;
+.tayori-admin-sumi {
+  --ta-canvas: var(--tayori-canvas);
+  --ta-card: var(--tayori-background);
+  --ta-scheduled: color-mix(in oklab, oklch(70% 0.14 75) 85%, var(--tayori-text));
 }
 
-@media (prefers-color-scheme: dark) {
-  :root[data-tayori-theme="sumi"] {
-    --ta-text: oklch(95% 0.012 85);
-    --ta-muted: oklch(95% 0.012 85 / 0.55);
-    --ta-background: oklch(12% 0.003 270);
-    --ta-paper: oklch(16% 0.004 270);
-    --ta-surface: oklch(22% 0.005 270);
-    --ta-border: oklch(26% 0.005 270);
-  }
+/* Kotoba and Koyomi in the admin's colours, in both themes. */
+.tayori-admin {
+  --kotoba-font: var(--tayori-font);
+  --kotoba-text: var(--tayori-text);
+  --kotoba-muted: var(--tayori-muted);
+  --kotoba-background: var(--tayori-background);
+  --kotoba-surface: var(--tayori-surface);
+  --kotoba-border: var(--tayori-border);
+  --kotoba-accent: var(--tayori-accent);
+  --kotoba-accent-text: var(--tayori-accent-text);
+  --kotoba-focus-ring: var(--tayori-focus-ring);
+  --koyomi-font: var(--tayori-font);
+  --koyomi-text: var(--tayori-text);
+  --koyomi-muted: var(--tayori-muted);
+  --koyomi-background: var(--tayori-background);
+  --koyomi-surface: var(--tayori-surface);
+  --koyomi-border: var(--tayori-border);
+  --koyomi-accent: var(--tayori-accent);
+  --koyomi-accent-text: var(--tayori-accent-text);
+  --koyomi-focus-ring: var(--tayori-focus-ring);
+}
+
+[data-theme="dark"] .tayori-admin:not(.tayori-admin-sumi),
+.tayori-admin:not(.tayori-admin-sumi)[data-theme="dark"] {
+  --kotoba-selection: rgba(124, 156, 255, 0.24);
+  --kotoba-highlight: rgba(242, 193, 78, 0.28);
+  --kotoba-token-comment: #8b8b96;
+  --kotoba-token-keyword: #c792ea;
+  --kotoba-token-string: #7fd492;
+  --kotoba-token-constant: #f2a65a;
+  --kotoba-token-function: #82aaff;
+  --kotoba-token-attr: #f07178;
+  --kotoba-token-variable: #ececf1;
+  --kotoba-token-operator: #a6a6b0;
+  --kotoba-token-punctuation: #a6a6b0;
+  --kotoba-token-inserted: #7fd492;
+  --kotoba-token-deleted: #ff7b72;
+  --kotoba-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --kotoba-floating-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --koyomi-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --koyomi-range: rgba(124, 156, 255, 0.18);
+  --koyomi-range-preview: rgba(124, 156, 255, 0.1);
 }
 
 .tayori-admin {
-  --kotoba-font: var(--ta-font);
-  --kotoba-heading-font: var(--ta-heading-font);
-  --kotoba-text: var(--ta-text);
-  --kotoba-muted: var(--ta-muted);
-  --kotoba-background: var(--ta-paper);
-  --kotoba-surface: var(--ta-surface);
-  --kotoba-border: var(--ta-border);
-  --kotoba-accent: var(--ta-accent);
-  --kotoba-accent-text: var(--ta-accent-text);
-  --kotoba-radius: var(--ta-radius);
-  --kotoba-min-height: 18rem;
-  --koyomi-font: var(--ta-font);
-  --koyomi-text: var(--ta-text);
-  --koyomi-muted: var(--ta-muted);
-  --koyomi-background: var(--ta-paper);
-  --koyomi-surface: var(--ta-surface);
-  --koyomi-border: var(--ta-border);
-  --koyomi-accent: var(--ta-accent);
-  --koyomi-accent-text: var(--ta-accent-text);
-  --koyomi-radius: var(--ta-radius);
-
   margin: 0;
   min-height: 100vh;
-  background: var(--ta-background);
-  color: var(--ta-text);
-  font-family: var(--ta-font);
-  font-size: 0.9375rem;
-  line-height: 1.5;
+  background: var(--ta-canvas);
+  color: var(--tayori-text);
+  font: var(--tayori-weight) 0.9375rem / 1.5 var(--tayori-font);
+  -webkit-font-smoothing: antialiased;
+  color-scheme: light;
+}
+
+[data-theme="dark"] .tayori-admin {
+  color-scheme: dark;
 }
 
 .tayori-admin *,
@@ -112,57 +92,89 @@
   box-sizing: border-box;
 }
 
-.tayori-admin h1,
-.tayori-admin h2 {
-  font-family: var(--ta-heading-font);
-  font-weight: 600;
-  margin: 0;
-}
-
-.tayori-admin h1 {
-  font-size: 1.5rem;
-}
-
-[data-tayori-theme="sumi"] .tayori-admin h1 {
-  font-size: 1.875rem;
-  font-weight: 500;
-}
-
 .tayori-admin a {
   color: inherit;
 }
 
-.tayori-admin :focus-visible {
-  outline: none;
-  box-shadow: var(--ta-focus);
+.tayori-admin code {
+  padding: 0.0625rem 0.3125rem;
+  border-radius: var(--tayori-radius-inner);
+  background: color-mix(in oklab, var(--tayori-text) 7%, transparent);
+  font: 0.85em / 1.4 var(--tayori-mono);
 }
 
-/* The header. */
+.tayori-admin :focus-visible {
+  outline: none;
+  box-shadow: var(--tayori-focus-ring);
+}
 
-.ta-header {
+.ta-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ── The shell ──────────────────────────────────────────────────── */
+
+.ta-app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.ta-bar {
+  position: sticky;
+  z-index: 30;
+  top: 0;
+  height: var(--ta-bar-height);
+  border-bottom: 1px solid var(--tayori-rule);
+  background: color-mix(in oklab, var(--tayori-background) 92%, transparent);
+  backdrop-filter: saturate(1.4) blur(10px);
+}
+
+.ta-bar-inner {
   display: flex;
   align-items: center;
   gap: 1.5rem;
-  padding: 0.75rem 1.5rem;
-  background: var(--ta-paper);
-  border-bottom: 1px solid var(--ta-border);
+  height: 100%;
+  max-width: 82rem;
+  margin: 0 auto;
+  padding: 0 1.5rem;
 }
 
 .ta-brand {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  font-weight: 600;
+  gap: 0.625rem;
   text-decoration: none;
 }
 
 .ta-mark {
   width: 1.75rem;
   height: 1.75rem;
+  color: var(--tayori-text);
 }
 
 .ta-seal {
-  fill: var(--ta-seal);
+  fill: #e84a1c;
+}
+
+.ta-wordmark {
+  font: 600 1.0625rem / 1 var(--tayori-title-font);
+  letter-spacing: -0.01em;
+}
+
+.tayori-admin-sumi .ta-wordmark {
+  font-weight: 300;
+  font-size: 1.25rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 .ta-nav {
@@ -171,281 +183,641 @@
 }
 
 .ta-nav a {
-  padding: 0.375rem 0.75rem;
-  border-radius: var(--ta-radius);
-  color: var(--ta-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4375rem;
+  height: 2.125rem;
+  padding: 0 0.75rem;
+  border-radius: var(--tayori-radius);
+  color: var(--tayori-muted);
+  font-size: 0.875rem;
+  font-weight: 500;
   text-decoration: none;
+  transition:
+    background-color var(--tayori-transition),
+    color var(--tayori-transition);
 }
 
-.ta-nav a:hover,
+.ta-nav a:hover {
+  background: var(--tayori-hover);
+  color: var(--tayori-text);
+}
+
 .ta-nav a[aria-current="page"] {
-  color: var(--ta-text);
-  background: var(--ta-surface);
+  background: color-mix(in oklab, var(--tayori-text) 7%, transparent);
+  color: var(--tayori-text);
+}
+
+.ta-nav .tayori-icon,
+.ta-bar .tayori-icon {
+  --tayori-icon-size: 16px;
+}
+
+.ta-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
 }
 
 .ta-main {
-  max-width: 72rem;
+  flex: 1;
+  width: 100%;
+  max-width: 64rem;
   margin: 0 auto;
-  padding: 1.5rem;
+  padding: 2.25rem 1.5rem 4rem;
 }
 
-/* Messages. */
-
-.ta-flash {
-  margin-bottom: 1rem;
-  padding: 0.625rem 0.875rem;
-  border-radius: var(--ta-radius);
-  border: 1px solid var(--ta-border);
-  background: var(--ta-paper);
+.ta-main-wide {
+  max-width: 82rem;
 }
 
-.ta-flash-error {
-  border-color: var(--ta-danger);
-  color: var(--ta-danger);
-}
-
-/* Toolbars and buttons. */
-
-.ta-toolbar {
+.ta-footer {
   display: flex;
-  align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  margin-bottom: 1.25rem;
+  max-width: 82rem;
+  width: 100%;
+  margin: 0 auto;
+  padding: 1.5rem;
+  color: var(--tayori-muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
 }
 
-.ta-toolbar-actions {
+.ta-made {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ta-made::before {
+  content: "";
+  width: 0.75rem;
+  height: 1px;
+  background: #e84a1c;
+}
+
+/* The appearance menu. */
+.ta-appearance {
+  position: relative;
+}
+
+.ta-when-dark {
+  display: none;
+}
+
+[data-theme="dark"] .ta-when-dark {
+  display: block;
+}
+
+[data-theme="dark"] .ta-when-light {
+  display: none;
+}
+
+.ta-menu {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 0.375rem);
+  right: 0;
+  display: grid;
+  min-width: 11rem;
+  padding: 0.25rem;
+  border: 1px solid var(--tayori-border);
+  border-radius: calc(var(--tayori-radius) + 2px);
+  background: var(--tayori-background);
+  box-shadow: var(--tayori-shadow);
+  animation: tayori-rise var(--tayori-ease);
+}
+
+.ta-menu[hidden] {
+  display: none;
+}
+
+.ta-menu-label {
+  margin: 0;
+  padding: 0.375rem 0.625rem 0.25rem;
+  color: var(--tayori-muted);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.ta-menu button {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-}
-
-.ta-button.ta-pressed {
-  background: var(--ta-surface);
-  box-shadow: inset 0 0 0 1px var(--ta-accent);
-}
-
-.ta-ai {
-  margin-bottom: 1.25rem;
-}
-
-.ta-ok {
-  color: var(--ta-published);
-}
-
-.ta-notice {
-  padding: 0.75rem 1rem;
-  border: 1px dashed var(--ta-border);
-  border-radius: var(--ta-radius);
-  color: var(--ta-muted);
-}
-
-.ta-settings {
-  max-width: 40rem;
-}
-
-.ta-settings > .ta-hint {
-  margin: 0.25rem 0 1.25rem;
-}
-
-.ta-ai .ta-actions + .ta-hint {
-  margin-top: 0.75rem;
-}
-
-.ta-settings fieldset {
-  margin: 0;
-  padding: 0;
+  gap: 0.5rem;
+  height: 2rem;
+  padding: 0 0.625rem;
   border: 0;
+  border-radius: var(--tayori-radius-inner);
+  background: none;
+  color: var(--tayori-text);
+  font: inherit;
+  font-size: 0.875rem;
+  text-align: left;
+  cursor: pointer;
 }
 
-.ta-back {
-  margin-right: 0.5rem;
-  color: var(--ta-muted);
-  text-decoration: none;
+.ta-menu button:hover {
+  background: var(--tayori-surface);
 }
+
+.ta-menu button[aria-checked="true"] {
+  color: var(--tayori-accent);
+  font-weight: 500;
+}
+
+/* ── Buttons, fields, chips ─────────────────────────────────────── */
 
 .ta-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0.4375rem;
+  height: 2.25rem;
+  padding: 0 0.875rem;
+  border: 1px solid var(--tayori-border);
+  border-radius: var(--tayori-radius);
+  background: var(--tayori-background);
+  color: var(--tayori-text);
+  font: 500 0.875rem / 1 var(--tayori-font);
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    border-color var(--tayori-transition),
+    background-color var(--tayori-transition),
+    color var(--tayori-transition);
+}
+
+.ta-button .tayori-icon {
+  --tayori-icon-size: 16px;
+}
+
+.ta-button:hover {
+  border-color: color-mix(in oklab, var(--tayori-border) 60%, var(--tayori-text));
+  background: var(--tayori-surface);
+}
+
+.ta-button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.ta-primary {
+  border-color: var(--tayori-accent);
+  background: var(--tayori-accent);
+  color: var(--tayori-accent-text);
+}
+
+.ta-primary:hover {
+  border-color: color-mix(in oklab, var(--tayori-accent) 88%, black);
+  background: color-mix(in oklab, var(--tayori-accent) 88%, black);
+}
+
+.ta-quiet {
+  border-color: transparent;
+  background: transparent;
+  color: var(--tayori-muted);
+}
+
+.ta-quiet:hover {
+  border-color: transparent;
+  background: var(--tayori-hover);
+  color: var(--tayori-text);
+}
+
+.ta-danger {
+  color: var(--tayori-danger);
+}
+
+.ta-danger:not(.ta-quiet) {
+  border-color: var(--tayori-danger);
+  background: var(--tayori-danger);
+  color: var(--tayori-background);
+}
+
+.ta-danger.ta-quiet:hover {
+  background: color-mix(in oklab, var(--tayori-danger) 10%, transparent);
+  color: var(--tayori-danger);
+}
+
+.ta-small {
+  height: 1.875rem;
+  padding: 0 0.625rem;
+  font-size: 0.8125rem;
+}
+
+.ta-pressed {
+  border-color: color-mix(in oklab, var(--tayori-accent) 50%, var(--tayori-border));
+  background: color-mix(in oklab, var(--tayori-accent) 9%, var(--tayori-background));
+  color: color-mix(in oklab, var(--tayori-accent) 85%, var(--tayori-text));
+}
+
+.ta-push {
+  margin-left: auto;
+}
+
+.ta-icon-button {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 2.125rem;
+  height: 2.125rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--tayori-radius);
+  background: transparent;
+  color: var(--tayori-muted);
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    background-color var(--tayori-transition),
+    color var(--tayori-transition);
+}
+
+.ta-icon-button:hover {
+  background: var(--tayori-hover);
+  color: var(--tayori-text);
+}
+
+.ta-icon-button:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.ta-icon-button .tayori-icon {
+  --tayori-icon-size: 17px;
+}
+
+.ta-link-button,
+.ta-links a {
+  display: inline-flex;
+  align-items: center;
   gap: 0.375rem;
-  padding: 0.5rem 0.875rem;
-  border: 1px solid var(--ta-border);
-  border-radius: var(--ta-radius);
-  background: var(--ta-paper);
-  color: var(--ta-text);
-  font: inherit;
-  font-weight: 500;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--tayori-accent);
+  font: 500 0.8125rem / 1.4 var(--tayori-font);
   text-decoration: none;
   cursor: pointer;
 }
 
-.ta-button:hover {
-  background: var(--ta-surface);
+.tayori-admin-sumi .ta-link-button,
+.tayori-admin-sumi .ta-links a {
+  color: var(--tayori-text);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
 }
 
-.ta-button.ta-primary {
-  background: var(--ta-accent);
-  border-color: var(--ta-accent);
-  color: var(--ta-accent-text);
+.ta-link-button .tayori-icon,
+.ta-links a .tayori-icon {
+  --tayori-icon-size: 14px;
 }
 
-.ta-button.ta-primary:hover {
-  filter: brightness(1.08);
+.ta-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin-top: 0.875rem;
+  padding-top: 0.875rem;
+  border-top: 1px solid var(--tayori-rule);
 }
-
-.ta-button.ta-quiet {
-  border-color: transparent;
-  background: transparent;
-  color: var(--ta-muted);
-}
-
-.ta-button.ta-danger {
-  color: var(--ta-danger);
-}
-
-.ta-button[disabled] {
-  opacity: 0.5;
-  cursor: default;
-}
-
-/* Fields. */
 
 .ta-field {
   display: grid;
   gap: 0.375rem;
-  margin-bottom: 1rem;
+  margin: 0 0 1rem;
+}
+
+.ta-field:last-child {
+  margin-bottom: 0;
 }
 
 .ta-field > label,
 .ta-label {
+  font-size: 0.8125rem;
   font-weight: 500;
 }
 
 .ta-input {
   width: 100%;
-  padding: 0.5rem 0.625rem;
-  border: 1px solid var(--ta-border);
-  border-radius: var(--ta-radius);
-  background: var(--ta-paper);
-  color: var(--ta-text);
-  font: inherit;
+  min-height: 2.375rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--tayori-border);
+  border-radius: var(--tayori-radius);
+  background: var(--tayori-background);
+  color: var(--tayori-text);
+  font: 0.9375rem / 1.4 var(--tayori-font);
+  transition:
+    border-color var(--tayori-transition),
+    box-shadow var(--tayori-transition);
 }
 
 textarea.ta-input {
   resize: vertical;
 }
 
+select.ta-input {
+  padding-right: 2rem;
+}
+
+.ta-input::placeholder {
+  color: color-mix(in oklab, var(--tayori-muted) 80%, transparent);
+}
+
+.ta-input:hover {
+  border-color: color-mix(in oklab, var(--tayori-border) 60%, var(--tayori-text));
+}
+
+.ta-input:focus-visible {
+  border-color: var(--tayori-accent);
+}
+
 .ta-hint {
   margin: 0;
-  color: var(--ta-muted);
+  color: var(--tayori-muted);
   font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+/* A hint led by an icon keeps the icon beside its first line. */
+.ta-hint:has(> .tayori-icon) {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.375rem;
+}
+
+.ta-hint .tayori-icon {
+  --tayori-icon-size: 14px;
+}
+
+.ta-hint a {
+  color: var(--tayori-text);
 }
 
 .ta-error {
   margin: 0;
-  color: var(--ta-danger);
+  color: var(--tayori-danger);
   font-size: 0.8125rem;
+}
+
+.ta-ok {
+  color: var(--tayori-success);
+}
+
+.ta-warning {
+  color: color-mix(in oklab, var(--ta-scheduled) 85%, var(--tayori-text));
+}
+
+.ta-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ta-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0 1rem;
 }
 
 .ta-check {
   display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.ta-check input {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  margin: 0.125rem 0 0;
+  accent-color: var(--tayori-accent);
+}
+
+.ta-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  height: 1.375rem;
+  padding: 0 0.5rem;
+  border: 1px solid var(--tayori-rule);
+  border-radius: 999px;
+  color: var(--tayori-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.ta-tag .tayori-icon {
+  --tayori-icon-size: 12px;
+}
+
+.ta-tag code {
+  padding: 0;
+  background: none;
+  color: var(--tayori-muted);
+  font-size: 0.6875rem;
+}
+
+.ta-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 1.375rem;
+  padding: 0 0.5rem;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--tayori-text) 7%, transparent);
+  color: var(--tayori-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.ta-badge-on {
+  background: color-mix(in oklab, var(--tayori-success) 14%, transparent);
+  color: var(--tayori-success);
+}
+
+.ta-optional {
+  color: var(--tayori-muted);
+  font-size: 0.75rem;
+}
+
+.ta-spin {
+  animation: ta-spin 0.8s linear infinite;
+}
+
+@keyframes ta-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.ta-busy {
+  color: var(--tayori-text);
+}
+
+/* The flashes, at the top of the page. */
+.ta-flashes {
+  display: grid;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.ta-flash {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid color-mix(in oklab, var(--tayori-success) 30%, var(--tayori-rule));
+  border-left-width: 3px;
+  border-radius: var(--tayori-radius);
+  background: var(--ta-card);
+  font-size: 0.875rem;
+  cursor: pointer;
+  animation: tayori-rise var(--tayori-ease);
+}
+
+.ta-flash .tayori-icon {
+  color: var(--tayori-success);
+}
+
+.ta-flash-error {
+  border-color: color-mix(in oklab, var(--tayori-danger) 35%, var(--tayori-rule));
+}
+
+.ta-flash-error .tayori-icon {
+  color: var(--tayori-danger);
+}
+
+/* ── Page headings ──────────────────────────────────────────────── */
+
+.ta-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.75rem;
+}
+
+.ta-heading h1 {
+  margin: 0;
+  font: var(--tayori-title-weight) 1.75rem / 1.15 var(--tayori-title-font);
+  letter-spacing: -0.02em;
+}
+
+.tayori-admin-sumi .ta-heading h1 {
+  font-size: 2.125rem;
+  font-weight: 300;
+  line-height: 1;
+}
+
+.ta-subtitle {
+  margin: 0.375rem 0 0;
+  color: var(--tayori-muted);
+  font-size: 0.9375rem;
+}
+
+.ta-heading-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.ta-heading-title .ta-icon-button {
+  margin-left: -0.5rem;
+}
+
+.ta-heading-actions {
+  display: flex;
   align-items: center;
   gap: 0.5rem;
 }
 
-.ta-visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
+.ta-editor-heading {
+  align-items: center;
+}
+
+.ta-segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--tayori-border);
+  border-radius: calc(var(--tayori-radius) + 2px);
+  background: var(--tayori-surface);
+}
+
+.ta-segmented button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  height: 1.875rem;
+  padding: 0 0.75rem;
+  border: 0;
+  border-radius: var(--tayori-radius);
+  background: none;
+  color: var(--tayori-muted);
+  font: 500 0.8125rem / 1 var(--tayori-font);
+  cursor: pointer;
+  transition:
+    background-color var(--tayori-transition),
+    color var(--tayori-transition);
+}
+
+.ta-segmented button:hover {
+  color: var(--tayori-text);
+}
+
+.ta-segmented button[aria-selected="true"] {
+  background: var(--tayori-background);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.08),
+    0 0 0 1px var(--tayori-rule);
+  color: var(--tayori-text);
+}
+
+.ta-segmented .tayori-icon {
+  --tayori-icon-size: 15px;
+}
+
+.ta-segmented.ta-small button {
+  height: 1.625rem;
+  padding: 0 0.625rem;
+  font-size: 0.75rem;
+}
+
+/* ── Statuses ───────────────────────────────────────────────────── */
+
+.ta-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  color: var(--ta-draft);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
-/* The list of entries. */
-
-.ta-filters {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-}
-
-.ta-filters form {
-  min-width: 16rem;
-}
-
-.ta-tabs {
-  display: flex;
-  gap: 0.25rem;
-}
-
-.ta-tabs a {
-  padding: 0.375rem 0.75rem;
+.ta-status::before {
+  content: "";
+  width: 0.4375rem;
+  height: 0.4375rem;
   border-radius: 999px;
-  color: var(--ta-muted);
-  text-decoration: none;
+  background: currentColor;
 }
 
-.ta-tabs a[aria-current="page"] {
-  background: var(--ta-paper);
-  color: var(--ta-text);
-  box-shadow: inset 0 0 0 1px var(--ta-border);
-}
-
-.ta-entries {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  border: 1px solid var(--ta-border);
-  border-radius: var(--ta-radius);
-  background: var(--ta-paper);
-  overflow: hidden;
-}
-
-.ta-entries li + li {
-  border-top: 1px solid var(--ta-border);
-}
-
-.ta-entry {
-  display: grid;
-  gap: 0.25rem;
-  padding: 0.875rem 1rem;
-  text-decoration: none;
-}
-
-.ta-entry:hover {
-  background: var(--ta-surface);
-}
-
-.ta-entry-title {
-  font-weight: 600;
-}
-
-.ta-entry-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.8125rem;
-}
-
-.ta-muted {
-  color: var(--ta-muted);
-}
-
-.ta-chip {
-  padding: 0.0625rem 0.5rem;
-  border-radius: 999px;
-  background: var(--ta-surface);
-  color: var(--ta-muted);
-}
-
-.ta-status {
-  color: var(--ta-muted);
+.ta-status-draft::before {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px currentColor;
 }
 
 .ta-status-scheduled {
@@ -456,151 +828,1280 @@ textarea.ta-input {
   color: var(--ta-published);
 }
 
-.ta-empty {
-  padding: 3rem 1rem;
-  text-align: center;
-  color: var(--ta-muted);
-  border: 1px dashed var(--ta-border);
-  border-radius: var(--ta-radius);
+/* ── The list of entries ────────────────────────────────────────── */
+
+.ta-list-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--tayori-rule);
 }
 
-/* The editor. */
+.ta-tabs {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.ta-tabs a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: -1px;
+  padding: 0.625rem 0.75rem;
+  border-bottom: 2px solid transparent;
+  color: var(--tayori-muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition:
+    border-color var(--tayori-transition),
+    color var(--tayori-transition);
+}
+
+.ta-tabs a:hover {
+  color: var(--tayori-text);
+}
+
+.ta-tabs a[aria-current="page"] {
+  border-bottom-color: var(--tayori-text);
+  color: var(--tayori-text);
+}
+
+.ta-count {
+  min-width: 1.25rem;
+  padding: 0.0625rem 0.4375rem;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--tayori-text) 7%, transparent);
+  color: var(--tayori-muted);
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.ta-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.ta-search .tayori-icon {
+  --tayori-icon-size: 15px;
+  position: absolute;
+  left: 0.6875rem;
+  color: var(--tayori-muted);
+  pointer-events: none;
+}
+
+.ta-search .ta-input {
+  width: 15rem;
+  min-height: 2.125rem;
+  padding: 0.375rem 0.75rem 0.375rem 2.125rem;
+  font-size: 0.875rem;
+}
+
+.ta-entries {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--tayori-rule);
+  border-radius: var(--tayori-radius-card);
+  background: var(--ta-card);
+  box-shadow: var(--tayori-shadow-card);
+  list-style: none;
+}
+
+.ta-entries > li + li {
+  border-top: 1px solid var(--tayori-rule);
+}
+
+.ta-entry-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.875rem 1rem;
+  text-decoration: none;
+  transition: background-color var(--tayori-transition);
+}
+
+.ta-entry-row:hover {
+  background: color-mix(in oklab, var(--tayori-surface) 60%, var(--ta-card));
+}
+
+.ta-entry-row:hover::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: var(--tayori-attention);
+}
+
+.ta-thumb {
+  display: grid;
+  place-items: center;
+  width: 4.5rem;
+  height: 3rem;
+  overflow: hidden;
+  border-radius: var(--tayori-radius);
+  background: var(--tayori-surface);
+  color: var(--tayori-muted);
+  box-shadow: inset 0 0 0 1px var(--tayori-rule);
+}
+
+.ta-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ta-entry-main {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.ta-entry-title {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  overflow: hidden;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tayori-admin-sumi .ta-entry-title {
+  font-weight: 500;
+}
+
+.ta-pin {
+  --tayori-icon-size: 13px;
+  color: var(--tayori-attention);
+}
+
+.ta-entry-summary {
+  overflow: hidden;
+  color: var(--tayori-muted);
+  font-size: 0.8125rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ta-entry-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem 0.625rem;
+  margin-top: 0.125rem;
+}
+
+.ta-languages-used {
+  color: var(--tayori-muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+}
+
+.ta-entry-stats {
+  display: flex;
+  gap: 1rem;
+  color: var(--tayori-muted);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.ta-entry-stats span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  min-width: 2.75rem;
+}
+
+.ta-entry-stats .tayori-icon {
+  --tayori-icon-size: 14px;
+}
+
+.ta-row-chevron {
+  --tayori-icon-size: 16px;
+  color: var(--tayori-muted);
+  opacity: 0.6;
+}
+
+/* An empty list. */
+.ta-empty {
+  display: grid;
+  justify-items: center;
+  gap: 0.625rem;
+  padding: 4rem 1.5rem;
+  border: 1px dashed var(--tayori-border);
+  border-radius: var(--tayori-radius-card);
+  background: var(--ta-card);
+  text-align: center;
+}
+
+.ta-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 999px;
+  background: var(--tayori-surface);
+  color: var(--tayori-muted);
+}
+
+.ta-empty-icon .tayori-icon {
+  --tayori-icon-size: 22px;
+}
+
+.ta-empty-title {
+  margin: 0.25rem 0 0;
+  font: var(--tayori-title-weight) 1.125rem / 1.3 var(--tayori-title-font);
+}
+
+.ta-empty-body {
+  display: grid;
+  justify-items: center;
+  gap: 1rem;
+  color: var(--tayori-muted);
+  font-size: 0.875rem;
+}
+
+.ta-empty-body p {
+  margin: 0;
+}
+
+/* ── Cards ──────────────────────────────────────────────────────── */
+
+.ta-card {
+  margin: 0 0 1rem;
+  padding: 1.125rem 1.25rem 1.25rem;
+  border: 1px solid var(--tayori-rule);
+  border-radius: var(--tayori-radius-card);
+  background: var(--ta-card);
+  box-shadow: var(--tayori-shadow-card);
+}
+
+.ta-card fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.ta-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.875rem;
+}
+
+.ta-card-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.ta-card-header h2 .tayori-icon {
+  --tayori-icon-size: 15px;
+  color: var(--tayori-muted);
+}
+
+.ta-lead {
+  margin: 0 0 1rem;
+  color: color-mix(in oklab, var(--tayori-text) 80%, var(--tayori-muted));
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+
+.ta-notice {
+  display: flex;
+  gap: 0.625rem;
+  margin: 0 0 1rem;
+  padding: 0.75rem 0.875rem;
+  border: 1px solid var(--tayori-rule);
+  border-radius: var(--tayori-radius);
+  background: var(--tayori-surface);
+  font-size: 0.875rem;
+}
+
+.ta-notice > .tayori-icon {
+  --tayori-icon-size: 16px;
+  margin-top: 0.125rem;
+  color: var(--tayori-muted);
+}
+
+.ta-notice p {
+  margin: 0;
+}
+
+.ta-code {
+  margin: 0;
+  padding: 0.75rem 0.875rem;
+  overflow-x: auto;
+  border: 1px solid var(--tayori-rule);
+  border-radius: var(--tayori-radius);
+  background: var(--tayori-surface);
+  font: 0.8125rem / 1.55 var(--tayori-mono);
+}
+
+.ta-code code {
+  padding: 0;
+  background: none;
+}
+
+/* ── The editor ─────────────────────────────────────────────────── */
 
 .ta-editor {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 20rem;
-  gap: 1.5rem;
+  grid-template-columns: minmax(0, 1fr) var(--ta-side-width);
   align-items: start;
-}
-
-@media (max-width: 60rem) {
-  .ta-editor {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-.ta-editor fieldset {
-  min-width: 0;
-  margin: 0;
-  border: 0;
-  padding: 0;
-}
-
-.ta-editor fieldset.ta-editor-main,
-.ta-editor fieldset.ta-panel {
-  padding: 1.25rem;
+  gap: 1.5rem;
 }
 
 .ta-editor-main {
-  border: 1px solid var(--ta-border);
-  border-radius: var(--ta-radius);
-  background: var(--ta-paper);
+  min-width: 0;
+  padding: 1.5rem 1.75rem 1.75rem;
+  border: 1px solid var(--tayori-rule);
+  border-radius: var(--tayori-radius-card);
+  background: var(--ta-card);
+  box-shadow: var(--tayori-shadow-card);
 }
 
-.ta-editor-side {
-  display: grid;
-  gap: 1rem;
-}
-
-.ta-panel {
-  padding: 1.25rem;
-  border: 1px solid var(--ta-border) !important;
-  border-radius: var(--ta-radius);
-  background: var(--ta-paper);
-}
-
-.ta-panel legend {
-  float: left;
-  width: 100%;
-}
-
-.ta-panel legend + * {
-  clear: both;
-}
-
-.ta-panel h2,
-.ta-panel legend {
-  margin-bottom: 0.75rem;
+.ta-writing {
+  min-width: 0;
+  margin: 0;
   padding: 0;
-  font-size: 1rem;
-  font-weight: 600;
-  font-family: var(--ta-heading-font);
+  border: 0;
 }
 
-.ta-panel > .ta-hint + .ta-actions,
-.ta-panel > .ta-field + .ta-actions {
-  margin-top: 0.75rem;
-}
-
-.ta-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+.ta-writing[hidden] {
+  display: none;
 }
 
 .ta-languages {
   display: flex;
   flex-wrap: wrap;
   gap: 0.25rem;
-  margin-bottom: 1rem;
-  border-bottom: 1px solid var(--ta-border);
+  margin: -0.5rem 0 1.25rem;
+  border-bottom: 1px solid var(--tayori-rule);
 }
 
 .ta-languages button {
-  padding: 0.375rem 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-bottom: -1px;
+  padding: 0.625rem 0.75rem;
   border: 0;
   border-bottom: 2px solid transparent;
   background: none;
-  color: var(--ta-muted);
-  font: inherit;
+  color: var(--tayori-muted);
+  font: 500 0.875rem / 1 var(--tayori-font);
   cursor: pointer;
+}
+
+.ta-languages button:hover {
+  color: var(--tayori-text);
 }
 
 .ta-languages button[aria-selected="true"] {
-  border-bottom-color: var(--ta-accent);
-  color: var(--ta-text);
+  border-bottom-color: var(--tayori-text);
+  color: var(--tayori-text);
 }
 
-.ta-add-language {
+.ta-languages .ta-add-language {
+  color: color-mix(in oklab, var(--tayori-muted) 85%, transparent);
+}
+
+.ta-languages .tayori-icon {
+  --tayori-icon-size: 14px;
+}
+
+.ta-translation[hidden] {
+  display: none;
+}
+
+.ta-title-input {
+  width: 100%;
+  padding: 0.125rem 0;
+  border: 0;
+  background: none;
+  color: var(--tayori-text);
+  font: var(--tayori-title-weight) 2rem / 1.2 var(--tayori-title-font);
+  letter-spacing: -0.02em;
+}
+
+.tayori-admin-sumi .ta-title-input {
+  font-size: 2.375rem;
+  font-weight: 400;
+  line-height: 1.1;
+}
+
+.ta-title-input::placeholder,
+.ta-summary-input::placeholder {
+  color: color-mix(in oklab, var(--tayori-muted) 55%, transparent);
+}
+
+.ta-title-input:focus-visible,
+.ta-summary-input:focus-visible {
+  box-shadow: none;
+}
+
+.ta-summary-field {
+  margin-bottom: 1.25rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--tayori-rule);
+}
+
+.ta-summary-input {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: color-mix(in oklab, var(--tayori-text) 75%, var(--tayori-muted));
+  font: 1.0625rem / 1.55 var(--tayori-font);
+  resize: none;
+  field-sizing: content;
+}
+
+.ta-body-field .kotoba {
+  border-radius: var(--tayori-radius);
+}
+
+.ta-body-field .kotoba-content {
+  min-height: 18rem;
+}
+
+.ta-more {
+  margin: 1rem 0 0;
+  border: 1px solid var(--tayori-rule);
+  border-radius: var(--tayori-radius);
+}
+
+.ta-more summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 0.875rem;
+  color: var(--tayori-muted);
   font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  list-style: none;
+}
+
+.ta-more summary::-webkit-details-marker {
+  display: none;
+}
+
+.ta-more summary::after {
+  content: "";
+  width: 0.4375rem;
+  height: 0.4375rem;
+  margin-left: auto;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform var(--tayori-transition);
+}
+
+.ta-more[open] summary::after {
+  transform: rotate(225deg) translateY(-1px);
+}
+
+.ta-more summary:hover {
+  color: var(--tayori-text);
+}
+
+.ta-more summary .tayori-icon {
+  --tayori-icon-size: 15px;
+}
+
+.ta-more-body {
+  padding: 0.25rem 0.875rem 0.875rem;
 }
 
 .ta-remove-language {
-  display: inline-block;
-  color: var(--ta-danger);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-top: 1rem;
+  color: var(--tayori-muted);
   font-size: 0.8125rem;
   cursor: pointer;
+}
+
+.ta-remove-language:hover {
+  color: var(--tayori-danger);
+}
+
+.ta-remove-language:has(:checked) {
+  color: var(--tayori-danger);
+  text-decoration: line-through;
+}
+
+.ta-remove-language .tayori-icon {
+  --tayori-icon-size: 14px;
+}
+
+.ta-editor-side {
+  min-width: 0;
+  /* A date, a time, the zone and the clear button fit the column. */
+  --koyomi-font-size: 0.875rem;
+}
+
+.ta-ai {
+  margin-bottom: 1.5rem;
+}
+
+.ta-ai .ta-actions {
+  margin: 0.25rem 0 0.75rem;
+}
+
+/* The cover. */
+.ta-cover {
+  position: relative;
+  margin-bottom: 0.875rem;
+  overflow: hidden;
+  border-radius: var(--tayori-radius);
+  box-shadow: inset 0 0 0 1px var(--tayori-rule);
+}
+
+.ta-cover img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
+.ta-cover-actions {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  display: flex;
+  gap: 0.375rem;
+  opacity: 0;
+  transition: opacity var(--tayori-transition);
+}
+
+.ta-cover:hover .ta-cover-actions,
+.ta-cover:focus-within .ta-cover-actions {
+  opacity: 1;
+}
+
+.ta-cover-actions .ta-button {
+  background: color-mix(in oklab, var(--tayori-background) 92%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+.ta-dropzone {
+  display: grid;
+  justify-items: center;
+  gap: 0.375rem;
+  padding: 1.5rem 1rem;
+  border: 1.5px dashed var(--tayori-border);
+  border-radius: var(--tayori-radius);
+  color: var(--tayori-muted);
+  font-size: 0.875rem;
+  text-align: center;
+  cursor: pointer;
+  transition:
+    border-color var(--tayori-transition),
+    background-color var(--tayori-transition);
+}
+
+.ta-dropzone:hover,
+.ta-dropzone.phx-drop-target-active {
+  border-color: var(--tayori-accent);
+  background: color-mix(in oklab, var(--tayori-accent) 5%, transparent);
+}
+
+.ta-dropzone strong {
+  color: var(--tayori-text);
+  font-weight: 500;
+}
+
+.ta-dropzone .ta-hint {
+  justify-content: center;
+}
+
+/* The categories of an entry: toggles. */
+.ta-category-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.ta-category-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  height: 1.875rem;
+  padding: 0 0.6875rem;
+  border: 1px solid var(--tayori-border);
+  border-radius: 999px;
+  color: var(--tayori-muted);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    border-color var(--tayori-transition),
+    background-color var(--tayori-transition),
+    color var(--tayori-transition);
+}
+
+.ta-category-pick input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ta-category-pick:hover {
+  border-color: color-mix(in oklab, var(--tayori-border) 60%, var(--tayori-text));
+  color: var(--tayori-text);
+}
+
+.ta-category-pick:has(:checked) {
+  border-color: color-mix(in oklab, var(--tayori-hue) 45%, transparent);
+  background: color-mix(in oklab, var(--tayori-hue) 12%, transparent);
+  color: color-mix(in oklab, var(--tayori-hue) 80%, var(--tayori-text));
+}
+
+.ta-category-pick:has(:focus-visible) {
+  box-shadow: var(--tayori-focus-ring);
+}
+
+/* A switch. */
+.ta-switch {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--tayori-text);
+  font: inherit;
+  font-size: 0.875rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ta-switch > span:last-child {
+  display: grid;
+  gap: 0.125rem;
+}
+
+.ta-switch strong {
+  font-weight: 500;
+}
+
+.ta-switch-track {
+  position: relative;
+  flex: none;
+  width: 2.125rem;
+  height: 1.25rem;
+  margin-top: 0.0625rem;
+  border-radius: 999px;
+  background: var(--tayori-border);
+  transition: background-color var(--tayori-transition);
+}
+
+.ta-switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 999px;
+  background: var(--tayori-background);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: transform var(--tayori-ease);
+}
+
+.ta-switch[aria-checked="true"] .ta-switch-track {
+  background: var(--tayori-accent);
+}
+
+.ta-switch[aria-checked="true"] .ta-switch-thumb {
+  transform: translateX(0.875rem);
+}
+
+.ta-switch:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+/* The audience. */
+.ta-audience-summary {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0 0 0.875rem;
+  padding: 0.625rem 0.75rem;
+  border-radius: var(--tayori-radius);
+  background: var(--tayori-surface);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.ta-audience-summary .tayori-icon {
+  --tayori-icon-size: 15px;
+  margin-top: 0.0625rem;
+  color: var(--tayori-muted);
 }
 
 .ta-segments {
   display: grid;
-  gap: 0.25rem;
+  gap: 0.375rem;
+  margin-bottom: 0.875rem;
 }
 
 .ta-segment-group {
-  margin-top: 0.5rem;
-  color: var(--ta-muted);
-  font-size: 0.75rem;
+  color: var(--tayori-muted);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+}
+
+.ta-source {
+  display: block;
+  line-height: 1.55;
+}
+
+.ta-source a {
+  display: inline-block;
+  margin-top: 0.25rem;
+}
+
+/* The announcement. */
+.ta-choices {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.375rem;
+  margin-bottom: 1rem;
+}
+
+.ta-choice {
+  display: grid;
+  justify-items: center;
+  gap: 0.3125rem;
+  padding: 0.5rem 0.25rem;
+  border: 1px solid var(--tayori-border);
+  border-radius: var(--tayori-radius);
+  color: var(--tayori-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    border-color var(--tayori-transition),
+    background-color var(--tayori-transition),
+    color var(--tayori-transition);
+}
+
+.ta-choice input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ta-choice:hover {
+  color: var(--tayori-text);
+}
+
+.ta-choice:has(:checked) {
+  border-color: var(--tayori-text);
+  background: var(--tayori-surface);
+  color: var(--tayori-text);
+}
+
+.ta-choice:has(:focus-visible) {
+  box-shadow: var(--tayori-focus-ring);
+}
+
+/* The stats. */
+.ta-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+}
+
+.ta-stats div {
+  padding: 0.75rem;
+  border-radius: var(--tayori-radius);
+  background: var(--tayori-surface);
+}
+
+.ta-stats dt {
+  color: var(--tayori-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.ta-stats dd {
+  margin: 0.25rem 0 0;
+  font: var(--tayori-title-weight) 1.5rem / 1 var(--tayori-title-font);
+  font-variant-numeric: tabular-nums;
+}
+
+.ta-sparkline {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 2.5rem;
+  margin-bottom: 0.875rem;
+}
+
+.ta-sparkline span {
+  flex: 1;
+  height: max(2px, var(--h));
+  border-radius: 1px;
+  background: color-mix(in oklab, var(--tayori-accent) 70%, transparent);
+}
+
+.ta-sources {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  font-size: 0.8125rem;
+  list-style: none;
+}
+
+.ta-sources li {
+  display: flex;
+  justify-content: space-between;
+  color: var(--tayori-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.ta-sources li span:last-child {
+  color: var(--tayori-text);
+  font-weight: 500;
 }
 
 .ta-danger-zone {
-  border-style: dashed !important;
+  display: flex;
+  justify-content: center;
+  padding-top: 0.25rem;
 }
 
-@media (forced-colors: active) {
-  .ta-button.ta-primary {
-    border: 1px solid ButtonText;
+/* The preview. */
+.ta-preview {
+  margin: -0.25rem -0.5rem 0;
+}
+
+.ta-preview-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.ta-preview-stage {
+  min-height: 20rem;
+  overflow: hidden;
+  border: 1px solid var(--tayori-rule);
+  border-radius: var(--tayori-radius);
+}
+
+.ta-preview-stage.tayori-page {
+  min-height: auto;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.ta-preview-stage .tayori-article {
+  padding: 2rem 0;
+}
+
+.ta-preview-panel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+  gap: 1rem;
+  padding: 1.25rem;
+  background: var(--ta-canvas);
+}
+
+.tayori-panel.tayori-panel-static {
+  position: static;
+  width: auto;
+  max-height: 34rem;
+  animation: none;
+}
+
+.ta-preview-announcement {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 26rem;
+  padding: 1.5rem;
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      transparent 0 12px,
+      color-mix(in oklab, var(--tayori-text) 3%, transparent) 12px 13px
+    ),
+    var(--ta-canvas);
+}
+
+.ta-preview-announcement .tayori-announcement-popup,
+.ta-preview-announcement .tayori-announcement-toast,
+.ta-preview-announcement .tayori-announcement-banner {
+  position: absolute;
+}
+
+.ta-preview-announcement .tayori-announcement-banner {
+  inset: 0 0 auto;
+}
+
+/* ── Categories ─────────────────────────────────────────────────── */
+
+.ta-categories {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--tayori-rule);
+  border-radius: var(--tayori-radius-card);
+  background: var(--ta-card);
+  list-style: none;
+}
+
+.ta-categories > li + li {
+  border-top: 1px solid var(--tayori-rule);
+}
+
+.ta-categories .ta-card {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--tayori-surface);
+  box-shadow: none;
+}
+
+.ta-category-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 1rem;
+  min-height: 3.5rem;
+  padding: 0.625rem 0.75rem 0.625rem 1rem;
+}
+
+.ta-category-swatch {
+  width: 0.875rem;
+  height: 0.875rem;
+  border-radius: 999px;
+  background: var(--tayori-hue);
+}
+
+.ta-category-names {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.ta-category-count {
+  color: var(--tayori-muted);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.ta-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.ta-category-form {
+  margin-bottom: 1rem;
+}
+
+.ta-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.ta-swatch {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.ta-swatch > span[aria-hidden] {
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 999px;
+  background: var(--tayori-hue);
+  transition: transform var(--tayori-transition);
+}
+
+.ta-swatch:hover > span[aria-hidden] {
+  transform: scale(1.1);
+}
+
+.ta-swatch:has(:checked) {
+  box-shadow: 0 0 0 2px var(--tayori-text);
+}
+
+.ta-swatch:has(:focus-visible) {
+  box-shadow: var(--tayori-focus-ring);
+}
+
+/* ── Settings ───────────────────────────────────────────────────── */
+
+.ta-settings {
+  display: grid;
+  grid-template-columns: 13rem minmax(0, 1fr);
+  align-items: start;
+  gap: 2rem;
+}
+
+.ta-settings-nav {
+  position: sticky;
+  top: calc(var(--ta-bar-height) + 1.5rem);
+  display: grid;
+  gap: 0.125rem;
+}
+
+.ta-settings-nav a {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 2.125rem;
+  padding: 0 0.625rem;
+  border-radius: var(--tayori-radius);
+  color: var(--tayori-muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.ta-settings-nav a:hover {
+  background: var(--tayori-hover);
+  color: var(--tayori-text);
+}
+
+.ta-settings-nav .tayori-icon {
+  --tayori-icon-size: 15px;
+}
+
+.ta-settings-body .ta-card {
+  margin-bottom: 1.25rem;
+  padding: 1.5rem;
+  scroll-margin-top: calc(var(--ta-bar-height) + 1.5rem);
+}
+
+.ta-settings-body .ta-card-header h2 {
+  font-size: 1rem;
+}
+
+.ta-steps {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+  padding-left: 1.25rem;
+  font-size: 0.875rem;
+}
+
+.ta-segment-table {
+  display: grid;
+  margin-top: 1rem;
+  border: 1px solid var(--tayori-rule);
+  border-radius: var(--tayori-radius);
+}
+
+.ta-segment-row {
+  display: grid;
+  grid-template-columns: 8rem 1fr;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.625rem 0.875rem;
+}
+
+.ta-segment-row + .ta-segment-row {
+  border-top: 1px solid var(--tayori-rule);
+}
+
+.ta-segment-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.ta-features,
+.ta-hooks {
+  display: grid;
+  margin: 0 0 1rem;
+  padding: 0;
+  border: 1px solid var(--tayori-rule);
+  border-radius: var(--tayori-radius);
+  list-style: none;
+}
+
+.ta-features li,
+.ta-hooks li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.75rem 0.875rem;
+}
+
+.ta-features li + li,
+.ta-hooks li + li {
+  border-top: 1px solid var(--tayori-rule);
+}
+
+.ta-features li > span:nth-child(2),
+.ta-hooks li > span:nth-child(2) {
+  display: grid;
+  gap: 0.125rem;
+  font-size: 0.875rem;
+}
+
+.ta-feature-icon {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--tayori-radius);
+  background: var(--tayori-surface);
+  color: var(--tayori-muted);
+}
+
+.ta-feature-icon .tayori-icon {
+  --tayori-icon-size: 16px;
+}
+
+.ta-hook-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
+.ta-hook-form .ta-field {
+  margin: 0;
+}
+
+.ta-grow {
+  flex: 1;
+  min-width: 14rem;
+}
+
+/* ── Small screens, touch, motion, contrast ─────────────────────── */
+
+@media (max-width: 1080px) {
+  .ta-editor {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .ta-bar-inner {
+    gap: 0.75rem;
+    padding: 0 1rem;
   }
 
-  .ta-languages button[aria-selected="true"] {
-    text-decoration: underline;
+  .ta-wordmark,
+  .ta-nav a .tayori-icon + * {
+    display: none;
+  }
+
+  .ta-nav a {
+    padding: 0 0.5rem;
+  }
+
+  .ta-main {
+    padding: 1.5rem 1rem 3rem;
+  }
+
+  .ta-entry-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .ta-entry-stats,
+  .ta-row-chevron {
+    display: none;
+  }
+
+  .ta-settings {
+    grid-template-columns: 1fr;
+  }
+
+  .ta-settings-nav {
+    display: none;
+  }
+
+  .ta-editor-main {
+    padding: 1.25rem 1rem;
+  }
+
+  .ta-search,
+  .ta-search .ta-input {
+    width: 100%;
+  }
+}
+
+@media (pointer: coarse) {
+  .ta-button,
+  .ta-icon-button,
+  .ta-input,
+  .ta-nav a {
+    min-height: 2.75rem;
+  }
+
+  .ta-icon-button {
+    width: 2.75rem;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tayori-admin * {
+  .tayori-admin *,
+  .tayori-admin *::before,
+  .tayori-admin *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
     transition: none !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .ta-primary,
+  .ta-nav a[aria-current="page"],
+  .ta-tabs a[aria-current="page"],
+  .ta-segmented button[aria-selected="true"],
+  .ta-languages button[aria-selected="true"],
+  .ta-choice:has(:checked),
+  .ta-category-pick:has(:checked) {
+    forced-color-adjust: none;
+    border-color: Highlight;
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  .ta-card,
+  .ta-entries,
+  .ta-editor-main {
+    border: 1px solid CanvasText;
   }
 }

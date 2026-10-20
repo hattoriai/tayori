@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Timeline · Atelier</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#fbfaf8;--panel:#f5f2ee;--surface:#fff;--line:#ece7e0;--line-2:#ddd6cc;--line-3:#f3f0eb;
+  --text:#1f1c18;--text-2:#524d46;--muted:#8b847a;--faint:#b5aea4;
+  --accent:#2e6b5c;--accent-2:#245548;--accent-soft:#e5f0eb;--accent-line:#b9d6cb;
+  --amber:#e2981a;--amber-soft:#fdf1da;--purple:#7353c2;--purple-soft:#efe9fb;
+  --red:#c2493d;--red-soft:#fbe9e6;--green:#3c7d4f;--green-soft:#e6f2e8;--orange:#c06a1f;--orange-soft:#fcefe0;
+  --hover:#f0ece6;
+  --shadow:0 1px 2px rgba(31,28,24,.05),0 2px 8px rgba(31,28,24,.04);
+  --pop:0 0 0 1px rgba(31,28,24,.07),0 16px 40px -8px rgba(31,28,24,.22),0 4px 10px -2px rgba(31,28,24,.08);
+}
+html,body{height:100%}
+body{font-family:Inter,-apple-system,"Segoe UI",system-ui,sans-serif;font-size:13px;line-height:1.45;color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased;font-feature-settings:"cv11","ss03","tnum" 0;letter-spacing:-.006em}
+.i{flex:none;display:block}
+.app{display:grid;grid-template-columns:236px 1fr;height:100vh;overflow:hidden}
+.side{background:var(--panel);border-right:1px solid var(--line);padding:10px 8px;display:flex;flex-direction:column;gap:1px;min-width:0}
+.ws{display:flex;align-items:center;gap:8px;padding:5px 8px 5px 6px;border-radius:7px;font-weight:600;font-size:13.5px;margin-bottom:6px}
+.ws .chev{color:var(--muted)}
+.ws-logo{width:24px;height:24px;border-radius:7px;background:#1f1c18;color:#f5efe6;display:grid;place-items:center;font-size:11px;font-weight:700;letter-spacing:.02em}
+.side .tools{margin-left:auto;display:flex;gap:2px;color:var(--muted)}
+.side .tools span{width:26px;height:26px;border-radius:6px;display:grid;place-items:center}
+.nav a{display:flex;align-items:center;gap:9px;padding:0 8px;border-radius:6px;color:var(--text-2);text-decoration:none;font-weight:500;height:29px;white-space:nowrap;overflow:hidden}
+.nav a.on{background:var(--surface);color:var(--text);box-shadow:0 0 0 1px var(--line),0 1px 2px rgba(31,28,24,.05)}
+.nav .i{color:var(--muted)}
+.nav a.on .i{color:var(--text-2)}
+.nav .count{margin-left:auto;font-size:11px;color:var(--muted);font-weight:500}
+.nav .count.hot{background:var(--accent);color:#fff;border-radius:9px;padding:0 6px;line-height:17px}
+.sec{font-size:11.5px;font-weight:600;color:var(--muted);padding:16px 8px 5px;display:flex;align-items:center;justify-content:space-between}
+.pdot{width:9px;height:9px;border-radius:3px;flex:none;margin:0 3px}
+.side-foot{margin-top:auto;display:flex;flex-direction:column;gap:6px}
+.plan-card{border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:10px 11px;font-size:12px;color:var(--text-2)}
+.plan-card b{color:var(--text);font-weight:600}
+.meter{height:4px;border-radius:2px;background:var(--line);margin-top:8px;overflow:hidden}
+.meter i{display:block;height:100%;background:var(--accent);border-radius:2px}
+.main{display:flex;flex-direction:column;min-width:0;background:var(--surface);position:relative}
+.top{height:48px;flex:none;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 14px 0 18px;gap:10px}
+.crumbs{display:flex;align-items:center;gap:7px;color:var(--muted);font-weight:500;white-space:nowrap}
+.crumbs b{color:var(--text);font-weight:600}
+.crumbs .i{color:var(--faint)}
+.spacer{flex:1}
+.tabs{display:flex;gap:4px;height:40px;flex:none;align-items:stretch;padding:0 12px;border-bottom:1px solid var(--line)}
+.tab{display:flex;align-items:center;gap:7px;padding:0 8px;color:var(--muted);font-weight:500;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab .i{color:var(--faint)}
+.tab.on{color:var(--text);border-color:var(--text)}
+.tab.on .i{color:var(--text-2)}
+.btn{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:7px;border:1px solid var(--line-2);background:var(--surface);font-weight:500;color:var(--text);font-size:12.5px;box-shadow:0 1px 1px rgba(31,28,24,.04);white-space:nowrap;font-family:inherit}
+.btn .i{color:var(--text-2)}
+.btn.primary{background:var(--accent);border-color:var(--accent-2);color:#fff;box-shadow:0 1px 2px rgba(36,85,72,.35),inset 0 1px 0 rgba(255,255,255,.12)}
+.btn.primary .i{color:#fff}
+.btn.ghost{border-color:transparent;box-shadow:none;background:transparent;color:var(--text-2)}
+.btn.icon{width:28px;padding:0;justify-content:center}
+.btn.lg{height:34px;padding:0 14px;font-size:13px}
+.av{width:var(--s);height:var(--s);border-radius:50%;display:inline-grid;place-items:center;color:#fff;font-size:calc(var(--s) * .38);font-weight:600;flex:none;letter-spacing:.01em}
+.stack{display:inline-flex;padding-left:5px}
+.stack .av{box-shadow:0 0 0 2px var(--surface);margin-left:-3px}
+.kbd{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;font:500 10.5px/1 Inter,sans-serif;padding:0 4px;border:1px solid var(--line-2);border-bottom-width:1.5px;border-radius:4px;color:var(--text-2);background:var(--surface)}
+.chip{display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 7px;border-radius:5px;font-size:11px;font-weight:500;background:var(--line-3);color:var(--text-2);white-space:nowrap}
+.chip.green{background:var(--green-soft);color:var(--green)}
+.chip.orange{background:var(--orange-soft);color:var(--orange)}
+.chip.red{background:var(--red-soft);color:var(--red)}
+.chip.purple{background:var(--purple-soft);color:var(--purple)}
+.chip.accent{background:var(--accent-soft);color:var(--accent-2)}
+.chip.line{background:transparent;box-shadow:inset 0 0 0 1px var(--line-2)}
+.sdot{width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
+.seg{display:inline-flex;background:var(--line-3);border:1px solid var(--line);border-radius:8px;padding:2px;gap:2px}
+.seg span{height:22px;padding:0 9px;border-radius:6px;display:flex;align-items:center;font-size:12px;font-weight:500;color:var(--muted)}
+.seg span.on{background:var(--surface);color:var(--text);box-shadow:0 0 0 1px var(--line-2),0 1px 2px rgba(31,28,24,.06)}
+.toolbar{height:48px;flex:none;display:flex;align-items:center;gap:8px;padding:0 14px 0 18px;border-bottom:1px solid var(--line)}
+.toolbar h2{font-size:14px;font-weight:600;letter-spacing:-.01em;margin:0 4px}
+.scrim{position:absolute;inset:0;background:rgba(28,25,21,.38);z-index:50}
+.dialog{position:absolute;z-index:60;background:var(--surface);border-radius:14px;box-shadow:var(--pop)}
+.dialog h3{font-size:15px;font-weight:600;letter-spacing:-.012em}
+.field{display:flex;flex-direction:column;gap:6px}
+.label{font-size:12px;font-weight:500;color:var(--text-2)}
+.input{height:34px;border:1px solid var(--line-2);border-radius:8px;padding:0 11px;display:flex;align-items:center;gap:8px;background:var(--surface);font-size:13px;box-shadow:inset 0 1px 1px rgba(31,28,24,.03)}
+.input.focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(46,107,92,.16)}
+.cb{width:16px;height:16px;border-radius:4.5px;border:1.5px solid var(--line-2);display:grid;place-items:center;flex:none;background:var(--surface)}
+.cb.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.toggle{width:30px;height:18px;border-radius:9px;background:var(--line-2);position:relative;flex:none}
+.toggle::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.toggle.on{background:var(--accent)}
+.toggle.on::after{left:14px}
+.toast{position:absolute;z-index:70;background:#23201c;color:#f3efe9;border-radius:11px;box-shadow:0 12px 32px -6px rgba(0,0,0,.35);display:flex;align-items:center;gap:10px;padding:11px 12px 11px 14px;font-size:12.5px;font-weight:500}
+.toast .muted{color:#a8a197;font-weight:400}
+.toast .act{color:#fff;font-weight:600;padding:4px 9px;border-radius:6px;background:rgba(255,255,255,.1)}
+mark{background:#fbe7a6;color:inherit;border-radius:3px;padding:0 1px;box-shadow:0 0 0 1px #fbe7a6}
+
+.tl{position:relative;flex:1;overflow:hidden;font-size:12px;background:var(--surface)}
+.tl-head{display:flex;height:54px;border-bottom:1px solid var(--line);background:var(--surface);position:relative;z-index:5}
+.tl-corner{width:var(--lane);flex:none;border-right:1px solid var(--line);display:flex;align-items:flex-end;gap:5px;padding:0 14px 9px 16px;color:var(--muted);font-weight:500;font-size:11.5px}
+.tl-corner .spacer{flex:1}
+.tl-scale{position:relative;width:var(--w)}
+.tl-top,.tl-bot{position:relative;height:27px}
+.tl-top{border-bottom:1px solid var(--line-3)}
+.ht{position:absolute;top:0;height:27px;display:flex;align-items:center;gap:6px;padding-left:9px;font-weight:600;color:var(--text);border-left:1px solid var(--line);white-space:nowrap;font-size:11.5px;overflow:hidden}
+.ht em{font-style:normal;color:var(--muted);font-weight:500}
+.hc{position:absolute;top:0;height:27px;display:flex;align-items:center;justify-content:center;gap:4px;color:var(--muted);font-size:10.5px;font-weight:500;white-space:nowrap}
+.hc b{font-weight:600;color:var(--text-2);font-size:11px;min-width:18px;height:18px;display:inline-grid;place-items:center;border-radius:9px;padding:0 3px}
+.hc.we span,.hc.we b{color:var(--faint)}
+.hc.today b{background:var(--amber);color:#fff}
+.hc.today span{color:#a8690a}
+.hc.cur b{color:#a8690a}
+.hc.drag{background:var(--accent-soft)}
+.hc.drag b{color:var(--accent-2)}
+.today-flag{position:absolute;bottom:-1px;width:0;height:0}
+.today-flag:not(:empty){bottom:auto;top:30px;transform:translateX(-50%);width:auto;height:18px;background:var(--amber);color:#fff;font-size:10.5px;font-weight:600;padding:0 6px;border-radius:9px;display:grid;place-items:center}
+.tl-body{position:relative}
+.tl-layer{position:absolute;top:0;bottom:0;left:var(--lane);width:var(--w);pointer-events:none;z-index:0}
+.col-line{position:absolute;top:0;bottom:0;width:1px;background:var(--line-3)}
+.col-line.strong{background:var(--line)}
+.col-line.faint{background:#f7f5f1}
+.we-shade{position:absolute;top:0;bottom:0;background:repeating-linear-gradient(135deg,#faf8f4 0 6px,#f6f3ee 6px 7px)}
+.today-line{position:absolute;top:0;bottom:0;width:2px;background:var(--amber);z-index:3;box-shadow:0 0 0 3px rgba(226,152,26,.12)}
+.guide{position:absolute;top:0;bottom:0;width:0;border-left:1.5px dashed rgba(46,107,92,.55);z-index:3}
+.lane{display:flex;border-bottom:1px solid var(--line);position:relative}
+.lane-label{width:var(--lane);flex:none;border-right:1px solid var(--line);display:flex;align-items:flex-start;gap:10px;padding:13px 14px 0 16px;background:var(--surface);position:relative;z-index:4}
+.lane-label .nm{font-weight:600;font-size:12.5px;color:var(--text);line-height:1.25;white-space:nowrap}
+.lane-label .rl{font-size:11px;color:var(--muted);margin-top:1px;white-space:nowrap}
+.lane-track{position:relative;flex:1;z-index:2}
+.ms-lane{height:42px;background:linear-gradient(#fdfcfa,#fdfcfa)}
+.ms-label{align-items:center;padding-top:0;color:var(--muted);font-weight:500;gap:8px}
+.ms{position:absolute;top:14px;display:flex;align-items:center;gap:7px;transform:translateX(-6px);white-space:nowrap;font-size:11.5px;font-weight:500;color:var(--text-2)}
+.ms i{width:11px;height:11px;transform:rotate(45deg);border-radius:2px;background:var(--surface);border:2px solid var(--text-2)}
+.ms.done i{background:var(--accent);border-color:var(--accent)}
+.ms.done span{color:var(--muted)}
+.bar{position:absolute;height:25px;border-radius:7px;display:flex;align-items:center;padding:0 8px 0 11px;font-weight:550;font-size:11.5px;white-space:nowrap;background:var(--b);color:var(--t);box-shadow:inset 0 0 0 1px var(--bd);overflow:visible}
+.bar>span{overflow:hidden;text-overflow:ellipsis;min-width:0}
+.bar::before{content:"";position:absolute;left:3px;top:4px;bottom:4px;width:3px;border-radius:2px;background:var(--k)}
+.bar.cl{border-top-left-radius:0;border-bottom-left-radius:0}
+.bar.cl::before{display:none}
+.bar.cr{border-top-right-radius:0;border-bottom-right-radius:0}
+.bar-out{position:absolute;height:25px;display:flex;align-items:center;font-size:11.5px;font-weight:500;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ghostbar{position:absolute;height:25px;border-radius:7px;border:1.5px dashed #c9a4ad;background:rgba(246,228,230,.35)}
+.bar.lifted{box-shadow:inset 0 0 0 1.5px var(--k),0 10px 22px -6px rgba(111,47,62,.38),0 2px 5px rgba(31,28,24,.12);transform:translateY(-2px);z-index:6}
+.bar .handle{position:absolute;top:6px;bottom:6px;width:3px;border-radius:2px;background:var(--k);opacity:.55}
+.bar .handle.l{display:none}
+.bar .handle.r{right:4px}
+.tip{position:absolute;bottom:34px;left:50%;transform:translateX(-50%);background:#23201c;color:#f5f1ea;border-radius:8px;padding:6px 9px;display:flex;align-items:center;gap:8px;font-size:11.5px;white-space:nowrap;box-shadow:0 8px 18px -6px rgba(0,0,0,.35)}
+.tip b{font-weight:500}
+.tip em{font-style:normal;font-weight:600;color:#1f1c18;background:var(--amber);border-radius:5px;padding:1px 6px;font-size:11px}
+.tip::after{content:"";position:absolute;left:50%;bottom:-4px;width:8px;height:8px;background:#23201c;transform:translateX(-50%) rotate(45deg)}
+.grab{position:absolute;left:46%;top:11px;filter:drop-shadow(0 2px 2px rgba(0,0,0,.25))}
+</style>
+</head>
+<body>
+<div class="app"><aside class="side">
+  <div class="ws"><span class="ws-logo">H</span><span>Hattori Studio</span><svg class="i chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+    <span class="tools"><span><svg class="i " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7.5"/><path d="m20.5 20.5-4.2-4.2"/></svg></span><span><svg class="i " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></span></span></div>
+  <nav class="nav">
+    <a class=""><svg class="i " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg><span>Inbox</span><span class="count hot">4</span></a>
+    <a class=""><svg class="i " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg><span>My work</span><span class="count">12</span></a>
+    <a class=""><svg class="i " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="17" x="3" y="4.5" rx="2.5"/><path d="M16 2.5v4M8 2.5v4M3 10h18"/></svg><span>Calendar</span></a>
+    <a class=""><svg class="i " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg><span>Clients</span></a>
+  </nav>
+  <div class="sec"><span>Projects</span><svg class="i " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></div>
+  <nav class="nav">
+    <a class="on"><span class="pdot" style="background:#2e6b5c"></span><span>Harbour Museum rebrand</span></a><a class=""><span class="pdot" style="background:#c07a3b"></span><span>Kiln &amp; Co. catalogue</span></a><a class=""><span class="pdot" style="background:#4c6a9e"></span><span>Northfield Library signage</span></a><a class=""><span class="pdot" style="background:#b05a6f"></span><span>Tamsin Ceramics shop</span></a><a class=""><span class="pdot" style="background:#7a6a9b"></span><span>Orchard Street Bakery</span></a>
+  </nav>
+  <div class="sec"><span>Favourites</span></div>
+  <nav class="nav">
+    <a><svg class="i " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 2.5H6.5a2 2 0 0 0-2 2v15a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7.5z"/><path d="M14 2.5v5.5h5.5M8.5 13h7M8.5 17h5"/></svg><span>Studio rituals</span></a>
+    <a><svg class="i " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 2.5H6.5a2 2 0 0 0-2 2v15a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7.5z"/><path d="M14 2.5v5.5h5.5"/></svg><span>Type licences</span></a>
+  </nav>
+  <div class="side-foot">
+    <div class="plan-card"><div style="display:flex;justify-content:space-between"><b>Pro plan</b><span>6 seats</span></div>
+      <div style="margin-top:3px">48.2 GB of 200 GB</div><div class="meter"><i style="width:24%"></i></div></div>
+    <nav class="nav"><a class=""><svg class="i " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1.5 14h5M9.5 8h5M17.5 16h5"/></svg><span>Settings</span></a></nav>
+  </div>
+</aside>
+  <main class="main"><header class="top">
+  <div class="crumbs"><svg class="i " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Projects</span><svg class="i " width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg><span class="pdot" style="background:#2e6b5c"></span><b>Harbour Museum rebrand</b>
+    <span style="color:var(--faint);margin-left:2px"><svg class="i " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2.5 2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9z"/></svg></span></div>
+  <div class="spacer"></div>
+  <span class="stack"><span class="av" style="--s:24px;background:#b8674a">AH</span><span class="av" style="--s:24px;background:#4f7a6b">TO</span><span class="av" style="--s:24px;background:#8a5d8f">IM</span><span class="av" style="--s:24px;background:#4c6a9e">RS</span><span class="av" style="--s:24px;background:#a07a3c">LB</span></span>
+  <span class="btn"><svg class="i " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="m16 6-4-4-4 4M12 2v13"/></svg>Share</span>
+  <span class="btn icon"><svg class="i " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="19" cy="12" r="1.2" fill="currentColor"/></svg></span>
+</header><div class="tabs"><span class="tab "><svg class="i " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="7" height="9" x="3" y="3" rx="1.5"/><rect width="7" height="5" x="14" y="3" rx="1.5"/><rect width="7" height="9" x="14" y="12" rx="1.5"/><rect width="7" height="5" x="3" y="16" rx="1.5"/></svg>Overview</span><span class="tab "><svg class="i " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2.5"/><path d="M9 3v18M15 3v12"/></svg>Board</span><span class="tab on"><svg class="i " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6.5h9M8 12h11M6 17.5h8"/></svg>Timeline</span><span class="tab "><svg class="i " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="17" x="3" y="4.5" rx="2.5"/><path d="M16 2.5v4M8 2.5v4M3 10h18"/></svg>Calendar</span><span class="tab "><svg class="i " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 2.5H6.5a2 2 0 0 0-2 2v15a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7.5z"/><path d="M14 2.5v5.5h5.5"/></svg>Files<span style="color:var(--faint);font-size:11px">86</span></span><span class="tab "><svg class="i " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 2.5H6.5a2 2 0 0 0-2 2v15a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7.5z"/><path d="M14 2.5v5.5h5.5M8.5 13h7M8.5 17h5"/></svg>Notes</span></div><div class="toolbar">
+    <span class="btn">Today</span>
+    <span class="btn icon ghost"><svg class="i " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></span><span class="btn icon ghost"><svg class="i " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span>
+    <h2>Sep 2026 – Mar 2027</h2>
+    <div class="spacer" style="flex:1"></div>
+    <span class="seg"><span class="">Day</span><span class="">Week</span><span class="">Month</span><span class="on">Quarter</span></span>
+    <span class="btn"><svg class="i " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18M6.5 12h11M10 19h4"/></svg>Filter</span>
+    <span class="btn"><svg class="i " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>Group: Person</span>
+    <span class="btn primary"><svg class="i " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New task</span>
+  </div><div class="tl" style="--lane:200px;--w:844px">
+  <div class="tl-head">
+    <div class="tl-corner"><span>Person</span><svg class="i " width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg><span class="spacer"></span><span>7 people</span></div>
+    <div class="tl-scale"><div class="tl-top"><div class="ht" style="left:0px;width:119.43396226415094px">Q3 <em>2026</em></div><div class="ht" style="left:119.43396226415094px;width:366.2641509433962px">Q4 <em>2026</em></div><div class="ht" style="left:485.6981132075471px;width:358.3018867924528px">Q1 <em>2027</em></div></div><div class="tl-bot"><div class="hc" style="left:0px;width:119.43396226415094px"><b>Sep</b></div><div class="hc cur" style="left:119.43396226415094px;width:123.41509433962264px"><b>Oct</b></div><div class="hc" style="left:242.84905660377356px;width:119.43396226415094px"><b>Nov</b></div><div class="hc" style="left:362.2830188679245px;width:123.41509433962264px"><b>Dec</b></div><div class="hc" style="left:485.6981132075471px;width:123.41509433962264px"><b>Jan</b></div><div class="hc" style="left:609.1132075471697px;width:111.47169811320754px"><b>Feb</b></div><div class="hc" style="left:720.5849056603773px;width:123.41509433962264px"><b>Mar</b></div></div><div class="today-flag" style="left:197.06603773584905px"></div></div>
+  </div>
+  <div class="tl-body">
+    <div class="tl-layer"><div class="col-line" style="left:0px"></div><div class="col-line faint" style="left:23.886792452830186px"></div><div class="col-line faint" style="left:51.75471698113207px"></div><div class="col-line faint" style="left:79.62264150943396px"></div><div class="col-line faint" style="left:107.49056603773585px"></div><div class="col-line strong" style="left:119.43396226415094px"></div><div class="col-line faint" style="left:135.35849056603772px"></div><div class="col-line faint" style="left:163.22641509433961px"></div><div class="col-line faint" style="left:191.09433962264148px"></div><div class="col-line faint" style="left:218.96226415094338px"></div><div class="col-line" style="left:242.84905660377356px"></div><div class="col-line faint" style="left:246.83018867924528px"></div><div class="col-line faint" style="left:274.6981132075472px"></div><div class="col-line faint" style="left:302.566037735849px"></div><div class="col-line faint" style="left:330.4339622641509px"></div><div class="col-line faint" style="left:358.3018867924528px"></div><div class="col-line" style="left:362.2830188679245px"></div><div class="col-line faint" style="left:386.1698113207547px"></div><div class="col-line faint" style="left:414.03773584905656px"></div><div class="col-line faint" style="left:441.90566037735846px"></div><div class="col-line faint" style="left:469.77358490566036px"></div><div class="col-line strong" style="left:485.6981132075471px"></div><div class="col-line faint" style="left:497.64150943396226px"></div><div class="col-line faint" style="left:525.5094339622641px"></div><div class="col-line faint" style="left:553.377358490566px"></div><div class="col-line faint" style="left:581.2452830188679px"></div><div class="col-line" style="left:609.1132075471697px"></div><div class="col-line faint" style="left:609.1132075471697px"></div><div class="col-line faint" style="left:636.9811320754717px"></div><div class="col-line faint" style="left:664.8490566037735px"></div><div class="col-line faint" style="left:692.7169811320755px"></div><div class="col-line" style="left:720.5849056603773px"></div><div class="col-line faint" style="left:720.5849056603773px"></div><div class="col-line faint" style="left:748.4528301886792px"></div><div class="col-line faint" style="left:776.3207547169811px"></div><div class="col-line faint" style="left:804.188679245283px"></div><div class="col-line faint" style="left:832.0566037735848px"></div><div class="today-line" style="left:196.06603773584905px"></div></div>
+    <div class="lane ms-lane"><div class="lane-label ms-label"><svg class="i " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22V4M4 4h12l-2 4 2 4H4"/></svg><span>Milestones</span></div><div class="lane-track"><div class="ms done" style="left:181.14150943396226px"><i></i></div><div class="ms" style="left:232.89622641509433px"><i></i><span>Board presentation</span></div><div class="ms" style="left:400.10377358490564px"><i></i><span>Identity launch</span></div><div class="ms" style="left:798.2169811320755px"><i></i></div></div></div>
+    <div class="lane" style="height:58px">
+      <div class="lane-label"><span class="av" style="--s:26px;background:#b8674a">AH</span><div><div class="nm">Aiko Hattori</div><div class="rl">Creative director · 5 tasks</div></div></div>
+      <div class="lane-track"><div class="bar" style="left:80.62264150943396px;width:44.77358490566037px;top:12px;--b:#e6ecdd;--bd:#cbd8b9;--k:#6f8a4c;--t:#3f5228" title="Discovery interviews"></div><div class="bar" style="left:136.35849056603772px;width:16.905660377358487px;top:12px;--b:#ebe5f4;--bd:#d4c9e8;--k:#7a62ad;--t:#47376e" title="Brand strategy workshop"></div><div class="bar" style="left:192.09433962264148px;width:12.924528301886795px;top:12px;--b:#e0eee8;--bd:#bcd8cc;--k:#2e6b5c;--t:#1e4b40" title="Logo concepts review"></div><div class="bar" style="left:247.83018867924528px;width:12.924528301886767px;top:12px;--b:#e0eee8;--bd:#bcd8cc;--k:#2e6b5c;--t:#1e4b40"></div><div class="bar-out" style="left:266.75471698113205px;top:12px;max-width:255.75471698113205px">Final identity sign-off</div><div class="bar" style="left:526.5094339622641px;width:156.2452830188679px;top:12px;--b:#ebe5f4;--bd:#d4c9e8;--k:#7a62ad;--t:#47376e"><span>Reopening campaign</span></div></div></div><div class="lane" style="height:92px">
+      <div class="lane-label"><span class="av" style="--s:26px;background:#4f7a6b">TO</span><div><div class="nm">Tom Okafor</div><div class="rl">Designer · 5 tasks</div></div></div>
+      <div class="lane-track"><div class="bar" style="left:164.22641509433961px;width:44.77358490566036px;top:12px;--b:#e0eee8;--bd:#bcd8cc;--k:#2e6b5c;--t:#1e4b40" title="Wordmark refinement"></div><div class="bar" style="left:219.96226415094338px;width:72.64150943396226px;top:12px;--b:#f5ead7;--bd:#e6d1ad;--k:#b8862f;--t:#694816"><span>Wayfinding icon set</span></div><div class="bar" style="left:303.566037735849px;width:100.50943396226415px;top:12px;--b:#e0eee8;--bd:#bcd8cc;--k:#2e6b5c;--t:#1e4b40"><span>Brand guidelines</span></div><div class="bar" style="left:192.09433962264148px;width:36.811320754716974px;top:46px;--b:#ebe5f4;--bd:#d4c9e8;--k:#7a62ad;--t:#47376e"></div><div class="bar-out" style="left:234.90566037735846px;top:46px;max-width:606.0943396226415px">Logo animation</div><div class="bar" style="left:498.64150943396226px;width:128.37735849056605px;top:12px;--b:#f6e4e6;--bd:#e7c4c9;--k:#b05a6f;--t:#6f2f3e"></div><div class="bar-out" style="left:633.0188679245283px;top:12px;max-width:207.9811320754717px">Exhibition graphics</div></div></div><div class="lane" style="height:92px">
+      <div class="lane-label"><span class="av" style="--s:26px;background:#8a5d8f">IM</span><div><div class="nm">Inês Moreira</div><div class="rl">Designer · 6 tasks</div></div></div>
+      <div class="lane-track"><div class="bar" style="left:140.33962264150944px;width:56.71698113207546px;top:12px;--b:#e0eee8;--bd:#bcd8cc;--k:#2e6b5c;--t:#1e4b40" title="Colour & type system"></div><div class="bar" style="left:200.0566037735849px;width:24.86792452830187px;top:12px;--b:#f6e4e6;--bd:#e7c4c9;--k:#b05a6f;--t:#6f2f3e" title="Exhibition poster series"></div><div class="bar" style="left:247.83018867924528px;width:36.811320754716974px;top:12px;--b:#f6e4e6;--bd:#e7c4c9;--k:#b05a6f;--t:#6f2f3e" title="Merchandise mock-ups"></div><div class="bar" style="left:172.188679245283px;width:36.811320754716974px;top:46px;--b:#e2eaf5;--bd:#c3d3ea;--k:#4c6a9e;--t:#2b4570"></div><div class="bar-out" style="left:214.99999999999997px;top:46px;max-width:626px">Social templates</div><div class="bar" style="left:303.566037735849px;width:72.64150943396226px;top:12px;--b:#f5ead7;--bd:#e6d1ad;--k:#b8862f;--t:#694816"></div><div class="bar-out" style="left:382.2075471698113px;top:12px;max-width:140.30188679245282px">Gallery maps</div><div class="bar" style="left:526.5094339622641px;width:184.11320754716985px;top:12px;--b:#f6e4e6;--bd:#e7c4c9;--k:#b05a6f;--t:#6f2f3e"><span>Annual report layout</span></div></div></div><div class="lane" style="height:92px">
+      <div class="lane-label"><span class="av" style="--s:26px;background:#4c6a9e">RS</span><div><div class="nm">Ravi Shah</div><div class="rl">Developer · 5 tasks</div></div></div>
+      <div class="lane-track"><div class="bar" style="left:164.22641509433961px;width:44.77358490566036px;top:12px;--b:#e2eaf5;--bd:#c3d3ea;--k:#4c6a9e;--t:#2b4570" title="Website wireframes"></div><div class="bar" style="left:219.96226415094338px;width:100.50943396226415px;top:12px;--b:#e2eaf5;--bd:#c3d3ea;--k:#4c6a9e;--t:#2b4570"><span>CMS templates</span></div><div class="bar" style="left:227.92452830188677px;width:24.8679245283019px;top:46px;--b:#e6ecdd;--bd:#cbd8b9;--k:#6f8a4c;--t:#3f5228"></div><div class="bar-out" style="left:258.79245283018867px;top:46px;max-width:582.2075471698113px">Accessibility audit</div><div class="bar" style="left:331.4339622641509px;width:100.50943396226415px;top:12px;--b:#e2eaf5;--bd:#c3d3ea;--k:#4c6a9e;--t:#2b4570"><span>Ticketing integration</span></div><div class="bar" style="left:554.377358490566px;width:100.5094339622641px;top:12px;--b:#e2eaf5;--bd:#c3d3ea;--k:#4c6a9e;--t:#2b4570"><span>Website launch</span></div></div></div><div class="lane" style="height:58px">
+      <div class="lane-label"><span class="av" style="--s:26px;background:#a07a3c">LB</span><div><div class="nm">Lena Brandt</div><div class="rl">Copywriter · 4 tasks</div></div></div>
+      <div class="lane-track"><div class="bar" style="left:136.35849056603772px;width:44.773584905660385px;top:12px;--b:#ebe5f4;--bd:#d4c9e8;--k:#7a62ad;--t:#47376e" title="Tone of voice guide"></div><div class="bar" style="left:200.0566037735849px;width:56.71698113207546px;top:12px;--b:#e6ecdd;--bd:#cbd8b9;--k:#6f8a4c;--t:#3f5228" title="Gallery label copy"></div><div class="bar" style="left:275.6981132075472px;width:100.5094339622641px;top:12px;--b:#e6ecdd;--bd:#cbd8b9;--k:#6f8a4c;--t:#3f5228"><span>Website copy</span></div><div class="bar" style="left:610.1132075471697px;width:128.37735849056605px;top:12px;--b:#ebe5f4;--bd:#d4c9e8;--k:#7a62ad;--t:#47376e"><span>Press kit</span></div></div></div><div class="lane" style="height:58px">
+      <div class="lane-label"><span class="av" style="--s:26px;background:#4d8592">MS</span><div><div class="nm">Mariko Sato</div><div class="rl">Producer · 5 tasks</div></div></div>
+      <div class="lane-track"><div class="bar" style="left:164.22641509433961px;width:8.943396226415075px;top:12px;--b:#e6ecdd;--bd:#cbd8b9;--k:#6f8a4c;--t:#3f5228" title="Budget review"></div><div class="bar" style="left:192.09433962264148px;width:16.905660377358487px;top:12px;--b:#f5ead7;--bd:#e6d1ad;--k:#b8862f;--t:#694816" title="Print vendor quotes"></div><div class="bar" style="left:247.83018867924528px;width:40.792452830188665px;top:12px;--b:#f5ead7;--bd:#e6d1ad;--k:#b8862f;--t:#694816" title="Signage install plan"></div><div class="bar" style="left:303.566037735849px;width:128.37735849056605px;top:12px;--b:#f5ead7;--bd:#e6d1ad;--k:#b8862f;--t:#694816"></div><div class="bar-out" style="left:437.9433962264151px;top:12px;max-width:223.90566037735846px">Signage fabrication</div><div class="bar" style="left:665.8490566037735px;width:128.37735849056605px;top:12px;--b:#e6ecdd;--bd:#cbd8b9;--k:#6f8a4c;--t:#3f5228"><span>Reopening logistics</span></div></div></div><div class="lane" style="height:58px">
+      <div class="lane-label"><span class="av" style="--s:26px;background:#6b7a3f">NK</span><div><div class="nm">Noah Kim</div><div class="rl">Photographer · 4 tasks</div></div></div>
+      <div class="lane-track"><div class="bar" style="left:168.2075471698113px;width:12.924528301886795px;top:12px;--b:#ebe5f4;--bd:#d4c9e8;--k:#7a62ad;--t:#47376e" title="Staff portraits"></div><div class="bar" style="left:219.96226415094338px;width:44.77358490566036px;top:12px;--b:#f5ead7;--bd:#e6d1ad;--k:#b8862f;--t:#694816" title="Gallery photography"></div><div class="bar" style="left:303.566037735849px;width:100.50943396226415px;top:12px;--b:#f5ead7;--bd:#e6d1ad;--k:#b8862f;--t:#694816"></div><div class="bar-out" style="left:410.0754716981132px;top:12px;max-width:168.16981132075472px">Collection shoot</div><div class="bar" style="left:582.2452830188679px;width:128.37735849056605px;top:12px;--b:#ebe5f4;--bd:#d4c9e8;--k:#7a62ad;--t:#47376e"></div><div class="bar-out" style="left:716.622641509434px;top:12px;max-width:124.37735849056605px">Campaign photography</div></div></div>
+  </div>
+</div></main></div>
+</body>
+</html>

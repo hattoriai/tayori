@@ -8,6 +8,9 @@ import { connect } from "phoenix_mountable";
 import { Kotoba } from "kotoba";
 import { Koyomi } from "koyomi";
 import { localizeTimes } from "./times";
+import { applyAppearance, TayoriAppearance, TayoriCopy } from "./admin_hooks";
+
+applyAppearance();
 
 const liveSocket = connect({
   Phoenix: { Socket, LongPoll },
@@ -18,7 +21,7 @@ const liveSocket = connect({
     // And their language, for the order and names of the date picker.
     locale: navigator.language,
   },
-  hooks: { Kotoba, Koyomi },
+  hooks: { Kotoba, Koyomi, TayoriAppearance, TayoriCopy },
 });
 
 // The times of the page are written in UTC; each is shown in the admin's

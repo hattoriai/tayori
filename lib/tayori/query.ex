@@ -14,6 +14,58 @@ defmodule Tayori.Query do
     |> for_segments(adapter(config), reader.segments)
   end
 
+  @doc "The entries of a category, or all of them for nil."
+  def in_category(query, _config, blank) when blank in [nil, ""], do: query
+
+  def in_category(query, config, key) when is_binary(key) do
+    case adapter(config) do
+      :postgres ->
+        where(query, [e], fragment("? = ANY(?)", ^key, e.categories))
+
+      :sqlite ->
+        where(
+          query,
+          [e],
+          fragment(
+            "EXISTS (SELECT 1 FROM json_each(?) AS c WHERE c.value = ?)",
+            e.categories,
+            ^key
+          )
+        )
+    end
+  end
+
+  @doc """
+  The entries whose title, summary or body, in any language, has every
+  word of a search. The escape of `%` and `_` is said in the query:
+  SQLite has no escape character by default.
+  """
+  def search(query, blank) when blank in [nil, ""], do: query
+
+  def search(query, words) when is_binary(words) do
+    words
+    |> String.downcase()
+    |> String.split(~r/\s+/, trim: true)
+    |> Enum.take(8)
+    |> Enum.reduce(query, fn word, query ->
+      like = "%" <> String.replace(word, ~r/[\\%_]/, "\\\\\\0") <> "%"
+
+      where(
+        query,
+        [e],
+        e.id in subquery(
+          from(t in Tayori.Translation,
+            where:
+              fragment("lower(?) LIKE ? ESCAPE '\\'", t.title, ^like) or
+                fragment("lower(coalesce(?, '')) LIKE ? ESCAPE '\\'", t.summary, ^like) or
+                fragment("lower(coalesce(?, '')) LIKE ? ESCAPE '\\'", t.text, ^like),
+            select: t.entry_id
+          )
+        )
+      )
+    end)
+  end
+
   @doc "The newest first, and the same order for the same time."
   def newest_first(query), do: order_by(query, [e], desc: e.published_at, desc: e.id)
 

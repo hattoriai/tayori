@@ -13,7 +13,8 @@ gives your app:
 * the news in your LiveViews: a button with the count of what each person
   has not seen, and a panel of the news, live as entries are published;
 * `<tayori-news>` and a JSON API, for a frontend that Phoenix does not
-  render (React, Vue, Svelte, a mobile app);
+  render (React, Vue, Svelte, a mobile app), and for a site on another
+  origin, with a token your server signs for the reader;
 * a public page of the news, a page for each entry, and Atom and JSON
   feeds;
 * segments: an entry for everyone, or for the readers your app says it is
@@ -32,22 +33,25 @@ looks the same in any app. The news in your app is a prebuilt JavaScript
 bundle in the Hex package: your app does not run Node.js for it, you add
 the hook and one style sheet.
 
-![The Tayori admin: an entry in English and Portuguese in Kotoba's editor, its publication and segments, and the notes of what shipped for a draft with AI](https://raw.githubusercontent.com/hattoriai/tayori/main/media/admin.png)
+![The Tayori admin: an entry with screenshots in Kotoba's editor, in English and Portuguese, beside its publication, cover and details](https://raw.githubusercontent.com/hattoriai/tayori/main/media/admin.png)
 
-![The news in a LiveView: the panel of a reader, in their language, with the entries for their plan](https://raw.githubusercontent.com/hattoriai/tayori/main/media/news.png)
+![The news in a LiveView: the panel of a reader, with category filters, a pinned announcement, covers and reactions](https://raw.githubusercontent.com/hattoriai/tayori/main/media/news.png)
+
+![The public page: What's new in Atelier, with a subscription form, category filters, a search and a pinned entry](https://raw.githubusercontent.com/hattoriai/tayori/main/media/changelog.png)
 
 ## What Tayori does
 
 | | |
 | --- | --- |
-| Entries | a title, a summary, a body in Kotoba (headings, lists, links, code, tables, images, videos, files), categories, a slug; drafts, scheduled, published, unpublished |
+| Entries | a title, a summary, a body in Kotoba (headings, lists, links, code, tables, images, videos, files), a cover, categories, a slug; drafts, scheduled, published, unpublished; pinned |
 | Languages | each entry in each of your languages, the first required; each reader gets theirs, else the first |
-| Admin | mounted with `tayori_admin`, behind your pipeline; your resolver says who the admin is and what they may do (all, read only, nothing); a search, filters of status, live as other admins write |
-| Publishing | now, or at a time in the admin's own time zone; each entry announced once, on one node of a cluster, to your notifier and to every open page |
+| Admin | mounted with `tayori_admin`, behind your pipeline; your resolver says who the admin is and what they may do (all, read only, nothing); a list with tabs, a search and each entry's numbers; a preview as the page, the panel or the announcement; categories; live as other admins write |
+| Publishing | now, or at a time in the admin's own time zone; each entry announced once, on one node of a cluster, to every open page, the subscribers, the webhooks and your notifier; as Oban jobs, retried through deploys, when your app has Oban |
+| Extras | yours to turn on: reactions, announcements, analytics, email subscriptions, webhooks and Slack and Discord, the embed |
 | Readers | `Tayori.Reader`, built by your resolver from your own user: an id, segments, a language, the time they joined |
-| In the app | a button with the count of unread entries, a panel with New marks and Show more, Escape and a click outside to close; live over PubSub, and across tabs |
-| Any frontend | a JSON API (`tayori_api`) and `<tayori-news>`, the same button and panel |
-| Public page | `tayori_page`: the news for everyone, a page for each entry, Atom and JSON Feed, in the reader's language |
+| In the app | a button with the count of unread entries, a panel with category filters, cards and each entry whole inside it; announcements as a popup, a toast or a banner; live over PubSub, and across tabs |
+| Any frontend | a JSON API (`tayori_api`) and `<tayori-news>`, the same button, panel and announcement; on another origin with the `:embed` feature: CORS for your sites and a signed reader token |
+| Public page | `tayori_page`: the news for everyone, with filters, a search, pinned entries and email subscriptions; a page for each entry with previous and next; Atom and JSON Feed; shared-link cards, JSON-LD and a sitemap; in the reader's language |
 | AI | any model of ReqLLM with your key, kept encrypted; draft, translate, rewrite, shorter, warmer, fix the spelling; suggestions you accept or reject |
 | Words | eight languages (`Tayori.Messages`), your own in the config |
 | Database | PostgreSQL and SQLite, in a migration of your app (`Tayori.Migrations`) |
@@ -148,7 +152,7 @@ end
 ```
 
 For a frontend that Phoenix does not render, mount `tayori_api` and use
-`<tayori-news src="/api/news">` (see [Any frontend](guides/any_frontend.md)).
+`<tayori-news api="/api/news">` (see [Any frontend](guides/any_frontend.md)).
 
 ## Guides
 
@@ -158,8 +162,9 @@ For a frontend that Phoenix does not render, mount `tayori_api` and use
 * [In the app](guides/in_app.md): the news in your LiveViews.
 * [Any frontend](guides/any_frontend.md): the JSON API and `<tayori-news>`.
 * [The public page](guides/public_page.md): the page, each entry's page, the feeds.
+* [Features](guides/features.md): categories, covers, pinned entries, and the extras you turn on: reactions, announcements, analytics, email subscriptions, webhooks, the embed.
 * [Writing with AI](guides/ai.md): the model, the key, drafts, translations, rewrites.
-* [Notifications](guides/notifications.md): emails and other messages when an entry is published.
+* [Notifications](guides/notifications.md): what a publication sends, with Oban or not.
 * [Testing](guides/testing.md): `Tayori.Test`.
 * [Theming](guides/theming.md): the properties, dark mode, the Sumi theme.
 * [Known limits](guides/limits.md).
@@ -206,4 +211,7 @@ Hex, and tags and pushes `v<version>`.
 ## License
 
 MIT, see `LICENSE`. The admin's script has Phoenix, Phoenix LiveView,
-Kotoba (with Lexical) and Koyomi in it; their licences are in `NOTICE`.
+Kotoba (with Lexical) and Koyomi in it. Tayori's icons are hand-picked from
+[Lucide](https://lucide.dev) (ISC, some from Feather, MIT), and the Sumi
+theme carries the Outfit and Cormorant Garamond typefaces (SIL Open Font
+License). Their licences are in `NOTICE`.

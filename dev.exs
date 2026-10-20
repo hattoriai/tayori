@@ -3,7 +3,8 @@
 # One Phoenix endpoint with a small app ("Atelier", a studio's project
 # tool) and its news: the admin at /admin/news (Tayori's theme) and
 # /sumi/news (the Sumi theme), the news in the app at /, the public page
-# at /changelog. The entries are in SQLite (tmp/dev.sqlite3), the
+# at /changelog, and /elsewhere, a site on another origin with the news
+# (the :embed feature: localhost and 127.0.0.1 are two origins). The entries are in SQLite (tmp/dev.sqlite3), the
 # attachments of the editor in tmp/uploads. The browser tests in e2e/ run
 # against it.
 #
@@ -31,6 +32,8 @@ Logger.configure(level: :info)
 
 Application.put_env(:tayori, TayoriDev.Repo, database: database, pool_size: 5)
 Application.put_env(:kotoba, Kotoba.Storage.Local, root: uploads, url_prefix: "/uploads")
+Application.put_env(:tayori, TayoriDev.Mailer, adapter: Swoosh.Adapters.Local)
+Application.put_env(:swoosh, :local, true)
 
 Application.put_env(:tayori, TayoriDev.Endpoint,
   adapter: Bandit.PhoenixAdapter,
@@ -72,79 +75,12 @@ defmodule TayoriDev.Migration do
   def down, do: Tayori.Migrations.down(to: 0)
 end
 
-defmodule TayoriDev.Seeds do
-  @moduledoc "A few entries of Atelier's news, the first time."
+# Atelier's news: eight entries with screenshots, in dev/seeds.exs.
+Code.require_file("dev/seeds.exs", __DIR__)
 
-  def run do
-    if Tayori.Entries.list() == [] do
-      entry(
-        "Exports in two clicks",
-        ["Feature"],
-        [],
-        -2,
-        """
-        Every project now has an **Export** button. It makes a zip of the
-        project's files and its notes, and emails you a link when it is ready.
-
-        - Files keep their folders.
-        - Notes come as Markdown.
-        """,
-        pt: {"Exportações em dois cliques", "Cada projeto tem agora um botão **Exportar**."}
-      )
-
-      entry(
-        "Shared boards for Pro studios",
-        ["Feature"],
-        ["plan:pro"],
-        -1,
-        "Pro studios can share a board with a client, read only, with a link.",
-        []
-      )
-
-      entry(
-        "Faster search",
-        ["Improved"],
-        [],
-        -26,
-        "Search answers as you type, and forgives a typo.",
-        []
-      )
-
-      entry(
-        "Calendar view",
-        ["Feature"],
-        [],
-        nil,
-        "A draft: the calendar of a project's due dates.",
-        []
-      )
-    end
-  end
-
-  defp entry(title, categories, segments, hours, body, translations) do
-    pt =
-      case translations[:pt] do
-        {title, body} ->
-          [%{locale: "pt-PT", title: title, body: Kotoba.Content.from_markdown(body)}]
-
-        nil ->
-          []
-      end
-
-    {:ok, entry} =
-      Tayori.Entries.create(
-        %{
-          categories: categories,
-          segments: segments,
-          translations: [
-            %{locale: "en", title: title, body: Kotoba.Content.from_markdown(body)} | pt
-          ]
-        },
-        author: %{"id" => 1, "name" => "Hattori Hanzo"}
-      )
-
-    if hours, do: Tayori.Entries.publish(entry, DateTime.add(DateTime.utc_now(), hours * 3600))
-  end
+defmodule TayoriDev.Mailer do
+  @moduledoc "Atelier's mailer: the emails stay in memory, at /dev/mailbox."
+  use Swoosh.Mailer, otp_app: :tayori
 end
 
 defmodule TayoriDev.Resolver do
@@ -174,13 +110,12 @@ defmodule TayoriDev.Resolver do
   def resolve_reader(%Plug.Conn{} = conn), do: reader(conn.assigns[:dev_user])
   def resolve_reader(%{assigns: assigns}), do: reader(assigns[:dev_user])
 
-  defp reader(%{role: role} = user) when role in [:pro, :free, :admin, :viewer] do
-    plan = if role == :free, do: "free", else: "pro"
-
+  defp reader(%{plan: plan, team_role: team_role} = user) do
     %Tayori.Reader{
       id: "user:#{user.id}",
-      segments: ["plan:#{plan}", "role:owner"],
-      locale: user.locale
+      segments: ["plan:#{plan}", "role:#{team_role}"],
+      locale: user.locale,
+      since: ~U[2026-01-01 00:00:00Z]
     }
   end
 
@@ -192,10 +127,46 @@ defmodule TayoriDev.Who do
   import Plug.Conn
 
   @people %{
-    "admin" => %{id: 1, name: "Hattori Hanzo", role: :admin, locale: "en"},
-    "viewer" => %{id: 2, name: "Viewer", role: :viewer, locale: "en"},
-    "pro" => %{id: 3, name: "Ada (Pro)", role: :pro, locale: "en"},
-    "free" => %{id: 4, name: "Grace (Free)", role: :free, locale: "pt-PT"},
+    "admin" => %{
+      id: 1,
+      name: "Hattori Hanzo",
+      role: :admin,
+      plan: "pro",
+      team_role: "owner",
+      locale: "en"
+    },
+    "viewer" => %{
+      id: 2,
+      name: "Viewer",
+      role: :viewer,
+      plan: "pro",
+      team_role: "member",
+      locale: "en"
+    },
+    "pro" => %{
+      id: 3,
+      name: "Ada Okafor",
+      role: :reader,
+      plan: "pro",
+      team_role: "owner",
+      locale: "en"
+    },
+    "member" => %{
+      id: 5,
+      name: "Noah Kim",
+      role: :reader,
+      plan: "pro",
+      team_role: "member",
+      locale: "en"
+    },
+    "free" => %{
+      id: 4,
+      name: "Grace Moreira",
+      role: :reader,
+      plan: "free",
+      team_role: "owner",
+      locale: "pt-PT"
+    },
     "visitor" => nil
   }
 
@@ -219,34 +190,17 @@ defmodule TayoriDev.Who do
 end
 
 defmodule TayoriDev.HomeLive do
-  @moduledoc "Atelier: the app whose news this is."
+  @moduledoc "Atelier: the app whose news this is, in a LiveView."
   use Phoenix.LiveView
 
   def render(assigns) do
     ~H"""
-    <header class="dev-header">
-      <strong>Atelier</strong>
-      <nav>
-        <a href="/plain">Plain page</a>
-        <a href="/changelog">Changelog</a>
-        <Tayori.Components.news_button tayori={@tayori} />
-      </nav>
-    </header>
+    <TayoriDev.Layouts.shell dev_user={@dev_user} here="/">
+      <:button><Tayori.Components.news_button tayori={@tayori} /></:button>
+      <TayoriDev.Layouts.projects />
+    </TayoriDev.Layouts.shell>
     <Tayori.Components.news_panel tayori={@tayori} />
-    <main class="dev-main">
-      <h1>Atelier</h1>
-      <p>A studio's projects. Its news is written at <a href="/admin/news">/admin/news</a>.</p>
-      <p>
-        You are <strong>{(@dev_user && @dev_user.name) || "a visitor"}</strong>. Be
-        <a href="/?as=admin">the admin</a>, <a href="/?as=viewer">a viewer</a>,
-        <a href="/?as=pro">a Pro reader</a>, <a href="/?as=free">a Free reader</a>
-        or <a href="/?as=visitor">a visitor</a>.
-      </p>
-      <p>
-        The envelope above is the news of this LiveView, <code>Tayori.Components</code>. The
-        <a href="/plain">plain page</a> has <code>&lt;tayori-news&gt;</code>, over the JSON API.
-      </p>
-    </main>
+    <Tayori.Components.announcement tayori={@tayori} />
     """
   end
 end
@@ -258,27 +212,15 @@ defmodule TayoriDev.PlainController do
   alias Phoenix.HTML.Safe
 
   def show(conn, _params) do
-    page(conn, """
-    <header class="dev-header">
-      <strong>Atelier</strong>
-      <nav>
-        <a href="/">LiveView page</a>
-        <a href="/changelog">Changelog</a>
-        <tayori-news src="/api/news" page="/changelog"></tayori-news>
-      </nav>
-    </header>
-    <main class="dev-main">
-      <h1>A plain page</h1>
-      <p>This page is not a LiveView: the envelope is &lt;tayori-news&gt;, which reads the JSON API.</p>
-    </main>
-    """)
-  end
+    inner =
+      %{dev_user: conn.assigns[:dev_user], here: "/plain"}
+      |> TayoriDev.Layouts.plain_page()
+      |> Safe.to_iodata()
+      |> IO.iodata_to_binary()
 
-  # The page in the root layout of the app, as a template would be.
-  defp page(conn, body) do
     html(
       conn,
-      %{conn: conn, inner_content: Phoenix.HTML.raw(body)}
+      %{conn: conn, inner_content: Phoenix.HTML.raw(inner)}
       |> TayoriDev.Layouts.root()
       |> Safe.to_iodata()
       |> IO.iodata_to_binary()
@@ -286,27 +228,140 @@ defmodule TayoriDev.PlainController do
   end
 end
 
+defmodule TayoriDev.ElsewhereController do
+  @moduledoc """
+  Atelier's help centre, a site on another origin: the app is on one of
+  localhost and 127.0.0.1, the site on the other. It loads the script and
+  the style sheet from the app's API, and its server gives the element
+  the token of the person of `?as=`, as a site's backend would.
+  """
+  use Phoenix.Controller, formats: [:html]
+  use Phoenix.Component
+
+  alias Phoenix.HTML.Safe
+
+  def show(conn, _params) do
+    app_host = if conn.host == "localhost", do: "127.0.0.1", else: "localhost"
+    reader = TayoriDev.Resolver.resolve_reader(conn)
+
+    assigns = %{
+      api: "http://#{app_host}:#{conn.port}/embed/news",
+      token: reader && Tayori.Embed.token(reader),
+      dev_user: conn.assigns[:dev_user],
+      sumi: conn.query_params["theme"] == "sumi",
+      dark: conn.query_params["dark"] != nil
+    }
+
+    html(conn, assigns |> page() |> Safe.to_iodata() |> IO.iodata_to_binary())
+  end
+
+  defp page(assigns) do
+    ~H"""
+    <!DOCTYPE html>
+    <html lang="en" data-theme={@dark && "dark"}>
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Atelier · Help centre</title>
+        <link rel="stylesheet" href={@api <> if(@sumi, do: "/tayori-sumi.css", else: "/tayori.css")} />
+        <script type="module" src={@api <> "/tayori.js"}>
+        </script>
+        <style>
+          body { margin: 0; background: #f6f4ef; color: #1f1d1a; font: 15px/1.6 Georgia, serif; }
+          [data-theme="dark"] body { background: #17161a; color: #eceae6; }
+          header { display: flex; align-items: center; gap: 1rem; padding: 1rem 2rem; border-bottom: 1px solid #e2ddd3; }
+          header strong { font-size: 1.125rem; }
+          header nav { display: flex; gap: 1.25rem; margin-left: auto; align-items: center; font: 14px system-ui, sans-serif; }
+          header a { color: inherit; }
+          main { max-width: 40rem; padding: 3rem 2rem; }
+          code { font-size: 0.875em; }
+        </style>
+      </head>
+      <body>
+        <div id="banner"></div>
+        <header>
+          <strong>Atelier help centre</strong>
+          <nav>
+            <a href="#">Guides</a>
+            <a href="#">Contact</a>
+            <tayori-news api={@api} reader-token={@token} banner="#banner"></tayori-news>
+          </nav>
+        </header>
+        <main>
+          <h1>A site on another origin</h1>
+          <p>
+            This page is on another origin than the app's API (<code>{@api}</code>). It loads
+            <code>tayori.js</code> and <code>tayori.css</code> from the API, and the element reads
+            the news over CORS, with the token the server signed for {if @dev_user,
+              do: @dev_user.name,
+              else: "no one: you are a visitor"}.
+          </p>
+          <p>
+            Be <a href="?as=pro">a Pro owner</a>, <a href="?as=free">a Free reader (pt-PT)</a>
+            or <a href="?as=visitor">a visitor</a>.
+          </p>
+        </main>
+      </body>
+    </html>
+    """
+  end
+end
+
 defmodule TayoriDev.Layouts do
-  @moduledoc "The root layout of Atelier's own pages."
+  @moduledoc "Atelier's own layout: a studio's project tool, with its news."
   use Phoenix.Component
 
   def root(assigns) do
     ~H"""
     <!DOCTYPE html>
-    <html lang="en">
+    <html lang="en" data-theme={@conn.query_params["dark"] && "dark"}>
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="csrf-token" content={Phoenix.Controller.get_csrf_token()} />
         <title>Atelier</title>
+        <link
+          rel="icon"
+          href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23256d5a'/%3E%3Ctext x='16' y='22' font-family='sans-serif' font-size='17' font-weight='700' fill='white' text-anchor='middle'%3EA%3C/text%3E%3C/svg%3E"
+        />
         <link rel="stylesheet" href="/deps/kotoba/kotoba.css" />
+        <link :if={sumi?(@conn)} rel="stylesheet" href="/deps/kotoba/kotoba-sumi.css" />
         <link rel="stylesheet" href="/assets/tayori.css" />
-        <link :if={@conn.query_params["theme"] == "sumi"} rel="stylesheet" href="/assets/tayori-sumi.css" />
+        <link :if={sumi?(@conn)} rel="stylesheet" href="/assets/tayori-sumi.css" />
         <style>
-          body { margin: 0; font-family: system-ui; }
-          .dev-header { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1.5rem; border-bottom: 1px solid #ddd; }
-          .dev-header nav { display: flex; gap: 1rem; align-items: center; }
-          .dev-main { max-width: 40rem; margin: 3rem auto; line-height: 1.5; padding: 0 1rem; }
+          :root { --atelier-accent: #2e6b5c; --atelier-bg: #faf9f7; --atelier-side: #f3f1ed; --atelier-line: #e7e3dc; --atelier-ink: #1f1d1a; --atelier-muted: #79736a; }
+          [data-theme="dark"] { --atelier-bg: #17161a; --atelier-side: #1e1d21; --atelier-line: #2c2a30; --atelier-ink: #eceae6; --atelier-muted: #9c968e; --atelier-accent: #6fbfa5; }
+          * { box-sizing: border-box; }
+          body { margin: 0; background: var(--atelier-bg); color: var(--atelier-ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+          a { color: inherit; }
+          .app { display: grid; grid-template-columns: 15rem 1fr; min-height: 100vh; }
+          .side { display: flex; flex-direction: column; gap: 1.25rem; padding: 1rem 0.75rem; background: var(--atelier-side); border-right: 1px solid var(--atelier-line); }
+          .studio { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.5rem; font-weight: 600; }
+          .studio span { display: grid; place-items: center; width: 1.5rem; height: 1.5rem; border-radius: 6px; background: var(--atelier-ink); color: var(--atelier-bg); font-size: 0.75rem; }
+          .side nav { display: grid; gap: 1px; }
+          .side nav a, .side nav p { display: flex; align-items: center; gap: 0.5rem; margin: 0; padding: 0.375rem 0.5rem; border-radius: 6px; color: var(--atelier-muted); font-size: 0.875rem; text-decoration: none; }
+          .side nav a:hover, .side nav a[aria-current] { background: color-mix(in oklab, var(--atelier-ink) 6%, transparent); color: var(--atelier-ink); }
+          .side h3 { margin: 0; padding: 0 0.5rem; color: var(--atelier-muted); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+          .dot { width: 0.5rem; height: 0.5rem; border-radius: 99px; }
+          .main { display: flex; flex-direction: column; min-width: 0; }
+          .top { display: flex; align-items: center; gap: 1rem; height: 3.5rem; padding: 0 1.5rem; border-bottom: 1px solid var(--atelier-line); }
+          .top h1 { margin: 0; font-size: 0.9375rem; font-weight: 600; }
+          .top .actions { display: flex; align-items: center; gap: 0.5rem; margin-left: auto; }
+          .avatar { display: grid; place-items: center; width: 1.875rem; height: 1.875rem; border-radius: 99px; background: #b5643c; color: #fff; font-size: 0.6875rem; font-weight: 600; }
+          .content { padding: 2rem 1.5rem; max-width: 64rem; }
+          .content h2 { margin: 0 0 0.25rem; font-size: 1.5rem; letter-spacing: -0.02em; }
+          .content > p { margin: 0 0 1.5rem; color: var(--atelier-muted); }
+          .projects { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 1rem; }
+          .project { padding: 1rem; border: 1px solid var(--atelier-line); border-radius: 10px; background: var(--atelier-bg); }
+          .project strong { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9375rem; }
+          .project p { margin: 0.375rem 0 0.75rem; color: var(--atelier-muted); font-size: 0.8125rem; }
+          .bar { height: 4px; border-radius: 99px; background: var(--atelier-line); overflow: hidden; }
+          .bar span { display: block; height: 100%; background: var(--atelier-accent); }
+          .dev { margin-top: auto; padding: 0.75rem; border: 1px dashed var(--atelier-line); border-radius: 8px; font-size: 0.75rem; color: var(--atelier-muted); }
+          .dev p { margin: 0 0 0.375rem; }
+          .dev a { display: inline-block; margin: 0 0.375rem 0.25rem 0; }
+          .dev a[aria-current] { color: var(--atelier-ink); font-weight: 600; text-decoration: none; }
+          .dev-main { max-width: 40rem; padding: 2rem 1.5rem; }
         </style>
         <script type="importmap">
           {"imports": {
@@ -331,6 +386,103 @@ defmodule TayoriDev.Layouts do
     </html>
     """
   end
+
+  defp sumi?(conn), do: conn.query_params["theme"] == "sumi"
+
+  attr :dev_user, :map, default: nil
+  attr :here, :string, required: true
+  slot :button
+  slot :inner_block, required: true
+
+  def shell(assigns) do
+    ~H"""
+    <div class="app">
+      <aside class="side">
+        <div class="studio"><span>H</span>Hattori Studio</div>
+        <nav>
+          <a href="/" aria-current={@here == "/" && "page"}>Projects</a>
+          <p>Inbox</p>
+          <p>My work</p>
+          <p>Calendar</p>
+          <a href="/plain" aria-current={@here == "/plain" && "page"}>A page without LiveView</a>
+          <a href="/elsewhere">A site on another origin</a>
+          <a href="/changelog">Changelog</a>
+          <a href="/admin/news">Write the news</a>
+        </nav>
+        <h3>Projects</h3>
+        <nav>
+          <p :for={{name, color} <- projects()}><span class="dot" style={"background:#{color}"}></span>{name}</p>
+        </nav>
+        <div class="dev">
+          <p>You are {(@dev_user && @dev_user.name) || "a visitor"}. Be:</p>
+          <a
+            :for={{as, label} <- [{"admin", "Admin"}, {"pro", "Pro owner"}, {"member", "Pro member"}, {"free", "Free (pt-PT)"}, {"visitor", "Visitor"}]}
+            href={"#{@here}?as=#{as}"}
+          >
+            {label}
+          </a>
+          <p>Theme: <a href={@here}>Tayori</a><a href={"#{@here}?theme=sumi"}>Sumi</a><a href={"#{@here}?dark=1"}>Dark</a></p>
+        </div>
+      </aside>
+      <div class="main">
+        <header class="top">
+          <h1>Projects</h1>
+          <div class="actions">
+            {render_slot(@button)}
+            <span class="avatar">{initials(@dev_user)}</span>
+          </div>
+        </header>
+        {render_slot(@inner_block)}
+      </div>
+    </div>
+    """
+  end
+
+  def projects(assigns) do
+    ~H"""
+    <div class="content">
+      <h2>Projects</h2>
+      <p>Five projects this month. The news button, top right, has what is new in Atelier.</p>
+      <div class="projects">
+        <div :for={{{name, color}, done} <- Enum.zip(projects(), [64, 30, 82, 12, 47])} class="project">
+          <strong><span class="dot" style={"background:#{color}"}></span>{name}</strong>
+          <p>{done}% done · due in {div(100 - done, 4)} days</p>
+          <div class="bar"><span style={"width:#{done}%"}></span></div>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  def plain_page(assigns) do
+    ~H"""
+    <.shell dev_user={@dev_user} here={@here}>
+      <:button><tayori-news api="/api/news"></tayori-news></:button>
+      <div class="dev-main">
+        <h2>A page without LiveView</h2>
+        <p>
+          The button at the top is <code>&lt;tayori-news&gt;</code>, a web component that reads
+          the JSON API: for a frontend that Phoenix does not render.
+        </p>
+      </div>
+    </.shell>
+    """
+  end
+
+  defp projects do
+    [
+      {"Harbour Museum rebrand", "#2e6b5c"},
+      {"Kiln & Co. catalogue", "#c47a35"},
+      {"Northfield Library signage", "#4a68a8"},
+      {"Tamsin Ceramics shop", "#b5485d"},
+      {"Orchard Street Bakery", "#7b62a8"}
+    ]
+  end
+
+  defp initials(nil), do: "?"
+
+  defp initials(%{name: name}),
+    do: name |> String.split() |> Enum.map_join(&String.first/1) |> String.slice(0, 2)
 end
 
 defmodule TayoriDev.Router do
@@ -362,9 +514,30 @@ defmodule TayoriDev.Router do
     tayori_api("/news", resolver: TayoriDev.Resolver, page: "/changelog")
   end
 
+  # The JSON API for the sites of the :embed feature: no session, no
+  # CSRF protection; a reader comes with a token.
+  pipeline :embed do
+    plug :accepts, ["json"]
+  end
+
+  scope "/embed" do
+    pipe_through :embed
+
+    tayori_api("/news",
+      resolver: TayoriDev.Resolver,
+      page: "http://localhost:#{System.get_env("PORT", "4099")}/changelog",
+      as: :tayori_embed
+    )
+  end
+
   scope "/admin" do
     pipe_through :browser
-    tayori_admin("/news", resolver: TayoriDev.Resolver, on_mount: [TayoriDev.Who])
+
+    tayori_admin("/news",
+      resolver: TayoriDev.Resolver,
+      on_mount: [TayoriDev.Who],
+      page: "/changelog"
+    )
   end
 
   scope "/sumi" do
@@ -374,6 +547,7 @@ defmodule TayoriDev.Router do
       resolver: TayoriDev.Resolver,
       on_mount: [TayoriDev.Who],
       theme: :sumi,
+      page: "/sumi/changelog",
       as: :tayori_admin_sumi
     )
   end
@@ -387,8 +561,30 @@ defmodule TayoriDev.Router do
     end
 
     get "/plain", TayoriDev.PlainController, :show
-    tayori_page("/changelog", title: "Atelier news", resolver: TayoriDev.Resolver)
-    tayori_page("/sumi/changelog", title: "Atelier news", theme: :sumi, as: :tayori_page_sumi)
+    get "/elsewhere", TayoriDev.ElsewhereController, :show
+
+    tayori_page("/changelog",
+      title: "What's new in Atelier",
+      eyebrow: "Atelier · Changelog",
+      description:
+        "New features, improvements and fixes, every week, from the studio that makes Atelier.",
+      resolver: TayoriDev.Resolver
+    )
+
+    tayori_page("/sumi/changelog",
+      title: "What's new in Atelier",
+      eyebrow: "Atelier · Changelog",
+      description:
+        "New features, improvements and fixes, every week, from the studio that makes Atelier.",
+      resolver: TayoriDev.Resolver,
+      theme: :sumi,
+      as: :tayori_page_sumi
+    )
+  end
+
+  scope "/dev" do
+    pipe_through :browser
+    forward "/mailbox", Plug.Swoosh.MailboxPreview
   end
 end
 
@@ -414,6 +610,7 @@ defmodule TayoriDev.Endpoint do
   plug Plug.Static, at: "/vendor/phoenix_live_view", from: {:phoenix_live_view, "priv/static"}
   plug Plug.Static, at: "/deps/kotoba", from: {:kotoba, "priv/static"}
   plug Kotoba.Storage.Local.Plug, at: "/uploads"
+  plug Plug.Static, at: "/dev-seed", from: Path.expand("dev/seed", __DIR__)
 
   plug Plug.Parsers, parsers: [:urlencoded, :multipart, :json], pass: ["*/*"], json_decoder: JSON
   plug Plug.MethodOverride
@@ -444,8 +641,10 @@ defmodule TayoriDev.CSSCopier do
         mtime = File.stat!(source).mtime
 
         if state[file] != mtime do
+          fonts = File.read!(Path.expand("assets/css/sumi-fonts.css", File.cwd!()))
+          css = source |> File.read!() |> String.replace("/* @tayori-sumi-fonts */", fonts)
           File.mkdir_p!("priv/static")
-          File.cp!(source, Path.join("priv/static", file))
+          File.write!(Path.join("priv/static", file), css)
         end
 
         {file, mtime}
@@ -477,7 +676,12 @@ Task.async(fn ->
          repo: TayoriDev.Repo,
          pubsub: TayoriDev.PubSub,
          secret_key_base: String.duplicate("tayori-development-secret-", 3),
-         locales: ["en", "pt-PT"]},
+         locales: ["en", "pt-PT"],
+         features: [:reactions, :announcements, :analytics, :subscriptions, :webhooks, :embed],
+         embed: [origins: ["http://localhost:#{port}", "http://127.0.0.1:#{port}"]],
+         mailer: TayoriDev.Mailer,
+         email_from: {"Atelier", "news@atelier.test"},
+         page_url: "http://localhost:#{port}/changelog"},
         TayoriDev.Endpoint
       ] ++ if(watch?, do: [TayoriDev.CSSCopier], else: []),
       strategy: :one_for_one

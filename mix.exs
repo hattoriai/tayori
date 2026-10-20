@@ -68,7 +68,7 @@ defmodule Tayori.MixProject do
       {:esbuild, "~> 0.10", only: :dev, runtime: false},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false},
       # The body of an entry, and its editor in the admin.
-      {:kotoba, "~> 0.3"},
+      {:kotoba, "~> 0.5"},
       # The publication date's picker in the admin.
       {:koyomi, "~> 0.2"},
       {:lazy_html, "~> 0.1", only: :test},
@@ -76,7 +76,9 @@ defmodule Tayori.MixProject do
       # has it.
       {:phoenix_ecto, "~> 4.6"},
       # The mounts in the app's router, their assets and the migrations.
-      {:phoenix_mountable, "~> 0.2"},
+      # Main, for the callbacks of a definition not loaded yet
+      # (hattoriai/phoenix_mountable#3); back to Hex when it is released.
+      {:phoenix_mountable, github: "hattoriai/phoenix_mountable", branch: "main"},
       {:igniter, "~> 0.6", optional: true},
       {:phoenix, if(@oldest, do: "~> 1.7.14", else: "~> 1.7.14 or ~> 1.8")},
       {:phoenix_html, "~> 4.1"},
@@ -86,6 +88,13 @@ defmodule Tayori.MixProject do
       # The drafts written with AI, with the key an admin gives: any
       # provider ReqLLM knows. Without it, the admin has no AI.
       {:req_llm, "~> 1.6", optional: true},
+      # Emails to the subscribers (the :subscriptions feature), with the
+      # app's own mailer, and webhooks (the :webhooks feature).
+      {:swoosh, "~> 1.17", optional: true},
+      {:req, "~> 0.5", optional: true},
+      # The emails, webhooks and notifier calls of a publication as jobs,
+      # with retries that survive a deploy, when the app runs Oban.
+      {:oban, "~> 2.19", optional: true},
       {:telemetry, "~> 1.0"},
       # The time zones of the development server's date picker.
       {:tz, "~> 0.28", only: [:dev, :test]}
@@ -138,6 +147,7 @@ defmodule Tayori.MixProject do
         "guides/in_app.md",
         "guides/any_frontend.md",
         "guides/public_page.md",
+        "guides/features.md",
         "guides/ai.md",
         "guides/notifications.md",
         "guides/testing.md",
@@ -153,6 +163,7 @@ defmodule Tayori.MixProject do
           "guides/in_app.md",
           "guides/any_frontend.md",
           "guides/public_page.md",
+          "guides/features.md",
           "guides/ai.md",
           "guides/notifications.md",
           "guides/testing.md",
@@ -177,7 +188,8 @@ defmodule Tayori.MixProject do
           Tayori.Messages,
           Tayori.Locales
         ],
-        Mounting: [Tayori.Router, Tayori.API, Tayori.Page, Tayori.Notifier],
+        Mounting: [Tayori.Router, Tayori.API, Tayori.Embed, Tayori.Page],
+        Publishing: [Tayori.Notifier, Tayori.Jobs, Tayori.Worker],
         Database: [Tayori.Migrations],
         AI: [Tayori.AI],
         Testing: [Tayori.Test]

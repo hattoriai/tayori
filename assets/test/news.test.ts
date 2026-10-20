@@ -1,30 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isNew, unreadText, type ApiEntry } from "../src/news_element";
+import { panelQuery } from "../src/news_element";
 import { timeText } from "../src/times";
 
-const entry = (publishedAt: string): ApiEntry => ({
-  id: "1",
-  slug: "s",
-  title: "T",
-  summary: null,
-  categories: [],
-  publishedAt,
-  locale: "en",
-  html: null,
-  url: null,
-});
-
-test("unreadText picks the form of the count", () => {
-  const messages = { unreadOne: "{n} new update", unreadOther: "{n} new updates" };
-  assert.equal(unreadText(messages, 1), "1 new update");
-  assert.equal(unreadText(messages, 3), "3 new updates");
-});
-
-test("isNew: after newAfter, and never for a visitor", () => {
-  assert.equal(isNew(entry("2026-10-20T10:00:00Z"), "2026-10-20T09:00:00Z"), true);
-  assert.equal(isNew(entry("2026-10-20T08:00:00Z"), "2026-10-20T09:00:00Z"), false);
-  assert.equal(isNew(entry("2026-10-20T10:00:00Z"), null), false);
+test("panelQuery: only what differs from the first view", () => {
+  assert.equal(panelQuery({ category: null, pages: 1, entry: null, since: null }), "");
+  assert.equal(
+    panelQuery({ category: "api", pages: 2, entry: "0193", since: "2026-10-20T09:00:00Z" }),
+    "?category=api&pages=2&entry=0193&since=2026-10-20T09%3A00%3A00Z",
+  );
 });
 
 test("timeText shows a day in the reader's zone and language", () => {

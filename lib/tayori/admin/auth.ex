@@ -8,6 +8,8 @@ defmodule Tayori.Admin.Auth do
   import Phoenix.Component, only: [assign: 2]
   import Phoenix.LiveView
 
+  alias Tayori.Router.Page
+
   def on_mount(:default, _params, session, socket) do
     options = socket.assigns.mount.options
 
@@ -15,6 +17,8 @@ defmodule Tayori.Admin.Auth do
       assign(socket,
         resolver: options.resolver,
         storage: options.storage,
+        page_path: Page.path_from(socket.assigns.mount),
+        theme: options.theme,
         user: session["user"],
         access: session["access"],
         time_zone: time_zone(socket),

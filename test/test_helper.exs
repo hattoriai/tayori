@@ -8,7 +8,10 @@ Application.put_env(:tayori, :ai_adapter, TayoriTest.FakeAI)
 File.mkdir_p!(Path.expand("../tmp", __DIR__))
 
 migrate = fn repo ->
-  Ecto.Migrator.run(repo, [{0, TayoriTest.Migration}], :up, all: true, log: false)
+  Ecto.Migrator.run(repo, [{0, TayoriTest.Migration}, {1, TayoriTest.ObanMigration}], :up,
+    all: true,
+    log: false
+  )
 end
 
 _ = Ecto.Adapters.SQLite3.storage_up(TayoriTest.SQLiteRepo.config())
@@ -16,12 +19,29 @@ _ = Ecto.Adapters.SQLite3.storage_up(TayoriTest.SQLiteRepo.config())
 migrate.(TayoriTest.SQLiteRepo)
 Ecto.Adapters.SQL.Sandbox.mode(TayoriTest.SQLiteRepo, :manual)
 
+# An Oban for each repo, which keeps its jobs for the tests to run.
+{:ok, _pid} =
+  Oban.start_link(
+    name: TayoriTest.SQLiteOban,
+    repo: TayoriTest.SQLiteRepo,
+    engine: Oban.Engines.Lite,
+    testing: :manual
+  )
+
 postgres? =
   case Ecto.Adapters.Postgres.storage_up(TayoriTest.PostgresRepo.config()) do
     result when result in [:ok, {:error, :already_up}] ->
       {:ok, _pid} = TayoriTest.PostgresRepo.start_link()
       migrate.(TayoriTest.PostgresRepo)
       Ecto.Adapters.SQL.Sandbox.mode(TayoriTest.PostgresRepo, :manual)
+
+      {:ok, _pid} =
+        Oban.start_link(
+          name: TayoriTest.PostgresOban,
+          repo: TayoriTest.PostgresRepo,
+          testing: :manual
+        )
+
       true
 
     {:error, reason} ->

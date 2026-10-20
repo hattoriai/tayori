@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>API tokens · Atelier</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#fbfaf8;--panel:#f5f2ee;--surface:#fff;--line:#ece7e0;--line-2:#ddd6cc;--line-3:#f3f0eb;
+  --text:#1f1c18;--text-2:#524d46;--muted:#8b847a;--faint:#b5aea4;
+  --accent:#2e6b5c;--accent-2:#245548;--accent-soft:#e5f0eb;--accent-line:#b9d6cb;
+  --amber:#e2981a;--amber-soft:#fdf1da;--purple:#7353c2;--purple-soft:#efe9fb;
+  --red:#c2493d;--red-soft:#fbe9e6;--green:#3c7d4f;--green-soft:#e6f2e8;--orange:#c06a1f;--orange-soft:#fcefe0;
+  --hover:#f0ece6;
+  --shadow:0 1px 2px rgba(31,28,24,.05),0 2px 8px rgba(31,28,24,.04);
+  --pop:0 0 0 1px rgba(31,28,24,.07),0 16px 40px -8px rgba(31,28,24,.22),0 4px 10px -2px rgba(31,28,24,.08);
+}
+html,body{height:100%}
+body{font-family:Inter,-apple-system,"Segoe UI",system-ui,sans-serif;font-size:13px;line-height:1.45;color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased;font-feature-settings:"cv11","ss03","tnum" 0;letter-spacing:-.006em}
+.i{flex:none;display:block}
+.app{display:grid;grid-template-columns:236px 1fr;height:100vh;overflow:hidden}
+.side{background:var(--panel);border-right:1px solid var(--line);padding:10px 8px;display:flex;flex-direction:column;gap:1px;min-width:0}
+.ws{display:flex;align-items:center;gap:8px;padding:5px 8px 5px 6px;border-radius:7px;font-weight:600;font-size:13.5px;margin-bottom:6px}
+.ws .chev{color:var(--muted)}
+.ws-logo{width:24px;height:24px;border-radius:7px;background:#1f1c18;color:#f5efe6;display:grid;place-items:center;font-size:11px;font-weight:700;letter-spacing:.02em}
+.side .tools{margin-left:auto;display:flex;gap:2px;color:var(--muted)}
+.side .tools span{width:26px;height:26px;border-radius:6px;display:grid;place-items:center}
+.nav a{display:flex;align-items:center;gap:9px;padding:0 8px;border-radius:6px;color:var(--text-2);text-decoration:none;font-weight:500;height:29px;white-space:nowrap;overflow:hidden}
+.nav a.on{background:var(--surface);color:var(--text);box-shadow:0 0 0 1px var(--line),0 1px 2px rgba(31,28,24,.05)}
+.nav .i{color:var(--muted)}
+.nav a.on .i{color:var(--text-2)}
+.nav .count{margin-left:auto;font-size:11px;color:var(--muted);font-weight:500}
+.nav .count.hot{background:var(--accent);color:#fff;border-radius:9px;padding:0 6px;line-height:17px}
+.sec{font-size:11.5px;font-weight:600;color:var(--muted);padding:16px 8px 5px;display:flex;align-items:center;justify-content:space-between}
+.pdot{width:9px;height:9px;border-radius:3px;flex:none;margin:0 3px}
+.side-foot{margin-top:auto;display:flex;flex-direction:column;gap:6px}
+.plan-card{border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:10px 11px;font-size:12px;color:var(--text-2)}
+.plan-card b{color:var(--text);font-weight:600}
+.meter{height:4px;border-radius:2px;background:var(--line);margin-top:8px;overflow:hidden}
+.meter i{display:block;height:100%;background:var(--accent);border-radius:2px}
+.main{display:flex;flex-direction:column;min-width:0;background:var(--surface);position:relative}
+.top{height:48px;flex:none;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 14px 0 18px;gap:10px}
+.crumbs{display:flex;align-items:center;gap:7px;color:var(--muted);font-weight:500;white-space:nowrap}
+.crumbs b{color:var(--text);font-weight:600}
+.crumbs .i{color:var(--faint)}
+.spacer{flex:1}
+.tabs{display:flex;gap:4px;height:40px;flex:none;align-items:stretch;padding:0 12px;border-bottom:1px solid var(--line)}
+.tab{display:flex;align-items:center;gap:7px;padding:0 8px;color:var(--muted);font-weight:500;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab .i{color:var(--faint)}
+.tab.on{color:var(--text);border-color:var(--text)}
+.tab.on .i{color:var(--text-2)}
+.btn{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:7px;border:1px solid var(--line-2);background:var(--surface);font-weight:500;color:var(--text);font-size:12.5px;box-shadow:0 1px 1px rgba(31,28,24,.04);white-space:nowrap;font-family:inherit}
+.btn .i{color:var(--text-2)}
+.btn.primary{background:var(--accent);border-color:var(--accent-2);color:#fff;box-shadow:0 1px 2px rgba(36,85,72,.35),inset 0 1px 0 rgba(255,255,255,.12)}
+.btn.primary .i{color:#fff}
+.btn.ghost{border-color:transparent;box-shadow:none;background:transparent;color:var(--text-2)}
+.btn.icon{width:28px;padding:0;justify-content:center}
+.btn.lg{height:34px;padding:0 14px;font-size:13px}
+.av{width:var(--s);height:var(--s);border-radius:50%;display:inline-grid;place-items:center;color:#fff;font-size:calc(var(--s) * .38);font-weight:600;flex:none;letter-spacing:.01em}
+.stack{display:inline-flex;padding-left:5px}
+.stack .av{box-shadow:0 0 0 2px var(--surface);margin-left:-3px}
+.kbd{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;font:500 10.5px/1 Inter,sans-serif;padding:0 4px;border:1px solid var(--line-2);border-bottom-width:1.5px;border-radius:4px;color:var(--text-2);background:var(--surface)}
+.chip{display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 7px;border-radius:5px;font-size:11px;font-weight:500;background:var(--line-3);color:var(--text-2);white-space:nowrap}
+.chip.green{background:var(--green-soft);color:var(--green)}
+.chip.orange{background:var(--orange-soft);color:var(--orange)}
+.chip.red{background:var(--red-soft);color:var(--red)}
+.chip.purple{background:var(--purple-soft);color:var(--purple)}
+.chip.accent{background:var(--accent-soft);color:var(--accent-2)}
+.chip.line{background:transparent;box-shadow:inset 0 0 0 1px var(--line-2)}
+.sdot{width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
+.seg{display:inline-flex;background:var(--line-3);border:1px solid var(--line);border-radius:8px;padding:2px;gap:2px}
+.seg span{height:22px;padding:0 9px;border-radius:6px;display:flex;align-items:center;font-size:12px;font-weight:500;color:var(--muted)}
+.seg span.on{background:var(--surface);color:var(--text);box-shadow:0 0 0 1px var(--line-2),0 1px 2px rgba(31,28,24,.06)}
+.toolbar{height:48px;flex:none;display:flex;align-items:center;gap:8px;padding:0 14px 0 18px;border-bottom:1px solid var(--line)}
+.toolbar h2{font-size:14px;font-weight:600;letter-spacing:-.01em;margin:0 4px}
+.scrim{position:absolute;inset:0;background:rgba(28,25,21,.38);z-index:50}
+.dialog{position:absolute;z-index:60;background:var(--surface);border-radius:14px;box-shadow:var(--pop)}
+.dialog h3{font-size:15px;font-weight:600;letter-spacing:-.012em}
+.field{display:flex;flex-direction:column;gap:6px}
+.label{font-size:12px;font-weight:500;color:var(--text-2)}
+.input{height:34px;border:1px solid var(--line-2);border-radius:8px;padding:0 11px;display:flex;align-items:center;gap:8px;background:var(--surface);font-size:13px;box-shadow:inset 0 1px 1px rgba(31,28,24,.03)}
+.input.focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(46,107,92,.16)}
+.cb{width:16px;height:16px;border-radius:4.5px;border:1.5px solid var(--line-2);display:grid;place-items:center;flex:none;background:var(--surface)}
+.cb.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.toggle{width:30px;height:18px;border-radius:9px;background:var(--line-2);position:relative;flex:none}
+.toggle::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.toggle.on{background:var(--accent)}
+.toggle.on::after{left:14px}
+.toast{position:absolute;z-index:70;background:#23201c;color:#f3efe9;border-radius:11px;box-shadow:0 12px 32px -6px rgba(0,0,0,.35);display:flex;align-items:center;gap:10px;padding:11px 12px 11px 14px;font-size:12.5px;font-weight:500}
+.toast .muted{color:#a8a197;font-weight:400}
+.toast .act{color:#fff;font-weight:600;padding:4px 9px;border-radius:6px;background:rgba(255,255,255,.1)}
+mark{background:#fbe7a6;color:inherit;border-radius:3px;padding:0 1px;box-shadow:0 0 0 1px #fbe7a6}
+
+  .settings{background:var(--surface)}
+  .sw{max-width:780px;padding:40px 48px;width:100%}
+  .sh{display:flex;align-items:flex-start;gap:20px;justify-content:space-between}
+  .sh h1{font-size:21px;font-weight:650;letter-spacing:-.022em}
+  .sh p{color:var(--muted);margin-top:4px;max-width:520px;line-height:1.55}
+  .vb{display:flex;align-items:center;gap:9px;margin:22px 0 18px;padding:10px 12px;border-radius:9px;background:var(--accent-soft);color:var(--accent-2);font-size:12.5px;box-shadow:inset 0 0 0 1px var(--accent-line)}
+  .vb .lnk{margin-left:auto;font-weight:600;white-space:nowrap}
+  .tbl{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .tr{display:grid;grid-template-columns:1.5fr 1.6fr 1fr 1fr 28px;align-items:center;gap:12px;padding:0 14px;height:46px;border-top:1px solid var(--line);color:var(--text-2)}
+  .tr.th{border-top:none;height:34px;background:var(--bg);font-size:11.5px;font-weight:600;color:var(--muted)}
+  .tr .nm{display:flex;align-items:center;gap:8px;font-weight:550;color:var(--text)}
+  .tr .nm .i{color:var(--muted)}
+  .tr>span:nth-child(2){display:flex;gap:5px}
+  .tr .chip{font-family:"JetBrains Mono",monospace;font-size:10.5px}
+  .tok .dh{display:flex;align-items:flex-start;gap:12px;padding:18px 16px 6px 20px}
+  .dic{width:36px;height:36px;border-radius:10px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;box-shadow:inset 0 0 0 1px var(--accent-line)}
+  .sub{color:var(--muted);font-size:12.5px;margin-top:2px}
+  .db{padding:12px 20px 18px;display:flex;flex-direction:column;gap:16px}
+  .two{display:flex;gap:12px}
+  .caret{display:inline-block;width:1.5px;height:16px;background:var(--accent);margin-left:-6px}
+  .scopes{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .sc{display:flex;gap:10px;padding:10px 12px;align-items:flex-start;border-top:1px solid var(--line)}
+  .sc:nth-child(-n+2){border-top:none}
+  .sc:nth-child(odd){border-right:1px solid var(--line)}
+  .sc .cb{margin-top:1px}
+  .sc.on{background:#f7fbf9}
+  code{font-family:"JetBrains Mono",monospace;font-size:11.5px;font-weight:500;color:var(--text)}
+  .sd{color:var(--muted);font-size:11.5px;margin-top:2px;line-height:1.35}
+  .warn{display:flex;gap:10px;padding:11px 12px;border-radius:10px;background:var(--amber-soft);color:#7a4f08;font-size:12.5px;line-height:1.5;box-shadow:inset 0 0 0 1px #f2d79c}
+  .warn .i{color:#c07f0e;margin-top:1px}
+  .warn b{color:#5f3c04}
+  .preview{display:flex;align-items:center;gap:10px;padding:8px 8px 8px 12px;border:1px dashed var(--line-2);border-radius:9px;background:var(--bg)}
+  .preview code{flex:1;color:var(--faint);letter-spacing:.02em}
+  .df{display:flex;align-items:center;gap:8px;padding:12px 16px 12px 20px;border-top:1px solid var(--line);background:var(--bg);border-radius:0 0 14px 14px}
+  .muted-s{color:var(--muted);font-size:12px}
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="ws" style="color:var(--text-2);font-weight:500"><svg class="i " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg><span>Back to Atelier</span></div>
+    <div class="sec">Account</div>
+    <nav class="nav"><a><svg class="i " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4.5"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Profile</a><a><svg class="i " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>Notifications</a><a><svg class="i " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1.5 14h5M9.5 8h5M17.5 16h5"/></svg>Preferences</a></nav>
+    <div class="sec">Hattori Studio</div>
+    <nav class="nav"><a><svg class="i " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="7" height="9" x="3" y="3" rx="1.5"/><rect width="7" height="5" x="14" y="3" rx="1.5"/><rect width="7" height="9" x="14" y="12" rx="1.5"/><rect width="7" height="5" x="3" y="16" rx="1.5"/></svg>General</a><a><svg class="i " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>Members<span class="count">6</span></a><a><svg class="i " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>Clients<span class="count">9</span></a><a><svg class="i " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="14" x="2" y="5" rx="2"/><path d="M2 10h20"/></svg>Plan and billing</a></nav>
+    <div class="sec">Developers</div>
+    <nav class="nav"><a class="on"><svg class="i " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7.5" cy="15.5" r="5"/><path d="m21 2-9.6 9.6M15.5 7.5l3 3L22 7l-3-3"/></svg>API tokens</a><a><svg class="i " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 16.98h-5.99c-1.1 0-1.95.94-2.48 1.9A4 4 0 0 1 2 17c.01-.7.2-1.4.57-2"/><path d="m6 17 3.13-5.78c.53-.97.1-2.18-.5-3.1a4 4 0 1 1 6.89-4.06"/><path d="m12 6 3.13 5.73C15.66 12.7 16.9 13 18 13a4 4 0 0 1 0 8"/></svg>Webhooks</a><a><svg class="i " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19.4 13.5a2.5 2.5 0 0 0 0-3H18V7a1 1 0 0 0-1-1h-3.5V4.6a2.5 2.5 0 0 0-3 0V6H7a1 1 0 0 0-1 1v3.5H4.6a2.5 2.5 0 0 0 0 3H6V17a1 1 0 0 0 1 1h3.5v1.4a2.5 2.5 0 0 0 3 0V18H17a1 1 0 0 0 1-1v-3.5z"/></svg>Integrations</a></nav>
+  </aside>
+  <main class="main settings">
+    <div class="sw">
+      <div class="sh"><div><h1>API tokens</h1><p>Tokens let scripts and other apps use the Atelier API as you. Each one carries only the scopes you give it.</p></div><span class="btn primary"><svg class="i " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New token</span></div>
+      <div class="vb"><svg class="i " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M12 16v-4.5M12 8h.01"/></svg><span>API version 2 is here: webhooks, cursor pages and scoped tokens. Version 1 answers until 31 March 2027.</span><span class="lnk">Read the changes</span></div>
+      <div class="tbl">
+        <div class="tr th"><span>Name</span><span>Scopes</span><span>Created</span><span>Last used</span><span></span></div>
+        <div class="tr"><span class="nm"><svg class="i " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7.5" cy="15.5" r="5"/><path d="m21 2-9.6 9.6M15.5 7.5l3 3L22 7l-3-3"/></svg>Figma plugin</span><span><span class="chip">projects:read</span><span class="chip">files:read</span></span><span>2 Sep 2026</span><span>12 minutes ago</span><span><svg class="i " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="19" cy="12" r="1.2" fill="currentColor"/></svg></span></div>
+        <div class="tr"><span class="nm"><svg class="i " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7.5" cy="15.5" r="5"/><path d="m21 2-9.6 9.6M15.5 7.5l3 3L22 7l-3-3"/></svg>Invoice export (Zapier)</span><span><span class="chip">projects:read</span><span class="chip">clients:read</span></span><span>14 Jul 2026</span><span>Yesterday</span><span><svg class="i " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="19" cy="12" r="1.2" fill="currentColor"/></svg></span></div>
+        <div class="tr"><span class="nm"><svg class="i " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7.5" cy="15.5" r="5"/><path d="m21 2-9.6 9.6M15.5 7.5l3 3L22 7l-3-3"/></svg>Old site sync <span class="chip orange" style="margin-left:4px">v1</span></span><span><span class="chip">full access</span></span><span>3 Feb 2025</span><span>9 Oct 2026</span><span><svg class="i " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="19" cy="12" r="1.2" fill="currentColor"/></svg></span></div>
+      </div>
+    </div>
+    <div class="scrim"></div>
+    <div class="dialog tok" style="left:50%;top:50px;transform:translateX(-50%);width:520px">
+      <div class="dh"><div class="dic"><svg class="i " width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7.5" cy="15.5" r="5"/><path d="m21 2-9.6 9.6M15.5 7.5l3 3L22 7l-3-3"/></svg></div><div style="flex:1"><h3>New API token</h3><p class="sub">For API version 2. You can revoke it at any time.</p></div><span class="btn icon ghost"><svg class="i " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></span></div>
+      <div class="db">
+        <div class="two">
+          <div class="field" style="flex:1.4"><span class="label">Name</span><div class="input focus">Website sync<span class="caret"></span></div></div>
+          <div class="field" style="flex:1"><span class="label">Expires</span><div class="input" style="justify-content:space-between">In 90 days<svg class="i " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div></div>
+        </div>
+        <div class="field"><span class="label">Scopes <span style="color:var(--muted);font-weight:400">· 2 selected</span></span>
+          <div class="scopes">
+            <div class="sc on"><span class="cb on"><svg class="i " width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span><div><code>projects:read</code><div class="sd">Read projects, boards and cards</div></div></div><div class="sc"><span class="cb"></span><div><code>projects:write</code><div class="sd">Create and change cards and due dates</div></div></div><div class="sc"><span class="cb"></span><div><code>files:read</code><div class="sd">Download files and previews</div></div></div><div class="sc on"><span class="cb on"><svg class="i " width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span><div><code>files:write</code><div class="sd">Upload files to a project</div></div></div><div class="sc"><span class="cb"></span><div><code>webhooks:manage</code><div class="sd">Add and remove webhooks</div></div></div><div class="sc"><span class="cb"></span><div><code>clients:read</code><div class="sd">Read client names and contacts</div></div></div>
+          </div>
+        </div>
+        <div class="warn"><svg class="i " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4M12 17h.01"/></svg><div><b>Copy once.</b> The token is shown once, right after you create it. Keep it in your password manager; we only store its hash.</div></div>
+        <div class="preview"><span class="label" style="margin:0">Token</span><code>atl_v2_••••••••••••••••••••••••••</code><span class="btn" style="opacity:.5"><svg class="i " width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="13" height="13" x="9" y="9" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy</span></div>
+      </div>
+      <div class="df"><span class="muted-s">Requests count toward 1,000 per minute.</span><div style="flex:1"></div><span class="btn">Cancel</span><span class="btn primary">Create token</span></div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

@@ -28,7 +28,9 @@ they read. The count stops at 99.
 A scheduled entry is published at its time (it shows to readers from
 then on); its announcement (to open pages and the notifier) comes within a
 minute on the node that reaches it first, or at once on the node of the
-admin who scheduled it.
+admin who scheduled it. What it sends (emails, webhooks, the notifier)
+is retried by Oban when Tayori has it, and is lost with the node that
+sends it when it has not: see [Notifications](notifications.md).
 
 ## Time zones
 
@@ -38,11 +40,20 @@ so.
 
 ## The JSON API
 
-It reads the reader from your app's session: it answers the pages of
-your app's origin. See [Any frontend](any_frontend.md).
+It reads the reader from your app's session, on your app's origin. On
+another origin (the `:embed` feature), from a token your server signs,
+valid for a day: a reader's segments are those of when it was signed.
+The element asks the count every few minutes; it has no socket. See
+[Any frontend](any_frontend.md).
 
 ## AI
 
 The model's answer is a suggestion; it can be wrong. Tayori asks it never
 to invent a detail, and puts nothing in an entry the admin did not
 accept.
+
+## Search on SQLite
+
+The search ignores case. On SQLite it does so for ASCII letters only:
+"ação" finds "ação" and "Ação" only where the accented letters have the
+same case. PostgreSQL has no such limit.

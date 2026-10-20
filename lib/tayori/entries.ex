@@ -18,6 +18,7 @@ defmodule Tayori.Entries do
 
   import Ecto.Query
 
+  alias Kotoba.Nodes.Attachment
   alias Tayori.{Config, Entry, Translation}
 
   @doc """
@@ -51,6 +52,40 @@ defmodule Tayori.Entries do
     |> config.repo.preload(:translations, prefix: config.prefix)
   end
 
+  @doc "The number of entries of each status, for the admin's tabs."
+  @spec counts() :: %{
+          all: integer(),
+          draft: integer(),
+          scheduled: integer(),
+          published: integer()
+        }
+  def counts do
+    config = Config.get()
+    now = DateTime.utc_now()
+
+    {draft, scheduled, published} =
+      from(e in Entry,
+        select:
+          {sum(fragment("CASE WHEN ? IS NULL THEN 1 ELSE 0 END", e.published_at)),
+           sum(fragment("CASE WHEN ? > ? THEN 1 ELSE 0 END", e.published_at, ^now)),
+           sum(fragment("CASE WHEN ? <= ? THEN 1 ELSE 0 END", e.published_at, ^now))}
+      )
+      |> config.repo.one(prefix: config.prefix)
+
+    [draft, scheduled, published] = Enum.map([draft, scheduled, published], &to_int/1)
+
+    %{
+      all: draft + scheduled + published,
+      draft: draft,
+      scheduled: scheduled,
+      published: published
+    }
+  end
+
+  defp to_int(nil), do: 0
+  defp to_int(%Decimal{} = n), do: Decimal.to_integer(n)
+  defp to_int(n) when is_integer(n), do: n
+
   defp with_status(query, nil, _now), do: query
   defp with_status(query, :draft, _now), do: where(query, [e], is_nil(e.published_at))
   defp with_status(query, :scheduled, now), do: where(query, [e], e.published_at > ^now)
@@ -64,10 +99,10 @@ defmodule Tayori.Entries do
     where(
       query,
       [e],
-      like(fragment("lower(?)", e.slug), ^like) or
+      fragment("lower(?) LIKE ? ESCAPE '\\'", e.slug, ^like) or
         e.id in subquery(
           from(t in Translation,
-            where: like(fragment("lower(?)", t.title), ^like),
+            where: fragment("lower(?) LIKE ? ESCAPE '\\'", t.title, ^like),
             select: t.entry_id
           )
         )
@@ -82,6 +117,17 @@ defmodule Tayori.Entries do
     Entry
     |> config.repo.get!(id, prefix: config.prefix)
     |> config.repo.preload(:translations, prefix: config.prefix)
+  end
+
+  @doc "An entry by its id, with its translations, or nil."
+  @spec get(Ecto.UUID.t()) :: Entry.t() | nil
+  def get(id) do
+    config = Config.get()
+
+    case config.repo.get(Entry, id, prefix: config.prefix) do
+      nil -> nil
+      entry -> config.repo.preload(entry, :translations, prefix: config.prefix)
+    end
   end
 
   @doc "A new entry, with an empty translation in the first language."
@@ -149,6 +195,67 @@ defmodule Tayori.Entries do
   # whole seconds.
   defp usec(nil), do: nil
   defp usec(%DateTime{microsecond: {value, _precision}} = at), do: %{at | microsecond: {value, 6}}
+
+  @doc "Pins an entry: pinned entries come first, the last pinned first."
+  @spec pin(Entry.t()) :: {:ok, Entry.t()} | {:error, Ecto.Changeset.t()}
+  def pin(%Entry{} = entry), do: put(entry, pinned_at: usec(DateTime.utc_now()))
+
+  @doc "Unpins an entry."
+  @spec unpin(Entry.t()) :: {:ok, Entry.t()} | {:error, Ecto.Changeset.t()}
+  def unpin(%Entry{} = entry), do: put(entry, pinned_at: nil)
+
+  @doc """
+  Puts a cover on an entry, from a stored image: a
+  `Kotoba.Nodes.Attachment` (as `Kotoba.Attachments.store/2` or an upload
+  of the admin makes it), with its alternative text. Only an image can be
+  a cover.
+  """
+  @spec put_cover(Entry.t(), Attachment.t(), String.t() | nil) ::
+          {:ok, Entry.t()} | {:error, Ecto.Changeset.t() | :not_an_image}
+  def put_cover(%Entry{} = entry, %Attachment{} = image, alt \\ nil) do
+    if Attachment.image?(image) do
+      put(entry,
+        cover: %{
+          "url" => image.url,
+          "key" => image.key,
+          "width" => image.width,
+          "height" => image.height,
+          "alt" => alt || ""
+        }
+      )
+    else
+      {:error, :not_an_image}
+    end
+  end
+
+  @doc false
+  # The admin's cover: a map it made from an image it stored.
+  def put_cover_map(%Entry{} = entry, nil), do: remove_cover(entry)
+
+  def put_cover_map(%Entry{} = entry, %{"url" => url} = cover) when is_binary(url) do
+    put(entry, cover: Map.take(cover, ["url", "key", "width", "height", "alt"]))
+  end
+
+  @doc "Changes the alternative text of an entry's cover."
+  @spec put_cover_alt(Entry.t(), String.t()) :: {:ok, Entry.t()} | {:error, Ecto.Changeset.t()}
+  def put_cover_alt(%Entry{cover: %{} = cover} = entry, alt) when is_binary(alt),
+    do: put(entry, cover: Map.put(cover, "alt", String.slice(String.trim(alt), 0, 300)))
+
+  @doc """
+  Takes the cover off an entry. The image stays in the storage: delete it
+  with the storage adapter (`Kotoba.Storage`) if nothing else uses it.
+  """
+  @spec remove_cover(Entry.t()) :: {:ok, Entry.t()} | {:error, Ecto.Changeset.t()}
+  def remove_cover(%Entry{} = entry), do: put(entry, cover: nil)
+
+  defp put(entry, changes) do
+    config = Config.get()
+
+    entry
+    |> Ecto.Changeset.change(changes)
+    |> config.repo.update(prefix: config.prefix)
+    |> changed()
+  end
 
   @doc "Deletes an entry and its translations."
   @spec delete(Entry.t()) :: {:ok, Entry.t()} | {:error, Ecto.Changeset.t()}

@@ -42,6 +42,7 @@ defmodule TayoriTest.NewsLive do
     ~H"""
     <Tayori.Components.news_button tayori={@tayori} />
     <Tayori.Components.news_panel tayori={@tayori} />
+    <Tayori.Components.announcement tayori={@tayori} />
     """
   end
 end
@@ -57,7 +58,8 @@ defmodule TayoriTest.Host do
   @moduledoc """
   The app of the tests: the admin mounted with its definition, the API and
   the public page with the macros `import Tayori.Router` gives, as an app
-  writes them, and a LiveView of the app's own with the news.
+  writes them (the page twice: for everyone, and with the app's readers),
+  and a LiveView of the app's own with the news and its announcement.
   """
 
   use PhoenixMountable.TestHost,
@@ -70,8 +72,16 @@ defmodule TayoriTest.Host do
          scope "/" do
            pipe_through :browser
 
-           tayori_api "/api/news", resolver: TayoriTest.Resolver, page: "/changelog"
+           tayori_api "/api/news", resolver: TayoriTest.Resolver
            tayori_page "/changelog", title: "Test news", limit: 2
+
+           # The page with the app's readers, who react and see their entries.
+           tayori_page "/news",
+             as: :readers_page,
+             resolver: TayoriTest.Resolver,
+             limit: 2,
+             description: "What we ship.",
+             image: "https://cdn.test/news.png"
 
            live_session :app,
              on_mount: [
@@ -80,6 +90,22 @@ defmodule TayoriTest.Host do
              ] do
              live "/", TayoriTest.NewsLive
            end
+         end
+
+         # The API for the :embed feature, as the guide mounts it: no
+         # CSRF protection, the readers come with a token.
+         pipeline :embed do
+           plug :accepts, ["json"]
+           plug :fetch_session
+         end
+
+         scope "/embed" do
+           pipe_through :embed
+
+           tayori_api "/news",
+             resolver: TayoriTest.Resolver,
+             page: "https://app.test/changelog",
+             as: :tayori_embed
          end
        end)
 end

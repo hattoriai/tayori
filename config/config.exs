@@ -39,6 +39,10 @@ if config_env() == :dev do
     ]
 end
 
+# Swoosh is optional, for the emails of the :subscriptions feature: the
+# app gives its own mailer, and Tayori needs no HTTP client of Swoosh's.
+config :swoosh, :api_client, false
+
 if config_env() == :test do
   config :logger, level: :warning
   config :phoenix, :json_library, JSON
@@ -61,6 +65,11 @@ if config_env() == :test do
     pool_size: 5
 
   config :tayori, ecto_repos: [TayoriTest.SQLiteRepo, TayoriTest.PostgresRepo]
+
+  config :tayori, TayoriTest.Mailer, adapter: Swoosh.Adapters.Test
+
+  # The webhooks go to the stubs of the tests (Req.Test), never out.
+  config :tayori, :req_options, plug: {Req.Test, Tayori.Webhooks}
 
   # A forgotten version of Tayori.Migrations fails the tests.
   config :phoenix_mountable, pending_migrations: :raise

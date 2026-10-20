@@ -14,3 +14,10 @@ defmodule TayoriTest.Migration do
   def up, do: Tayori.Migrations.up(version: 1)
   def down, do: Tayori.Migrations.down(to: 0)
 end
+
+defmodule TayoriTest.ObanMigration do
+  @moduledoc false
+  use Ecto.Migration
+  def up, do: Oban.Migration.up()
+  def down, do: Oban.Migration.down()
+end

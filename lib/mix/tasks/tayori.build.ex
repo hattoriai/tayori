@@ -21,7 +21,9 @@ defmodule Mix.Tasks.Tayori.Build do
        `:tayori_cjs` profiles (the news in the app) and `:tayori_admin`
        (the admin, with Phoenix, LiveView, Kotoba and Koyomi from `deps/`).
     4. Copies `assets/css/tayori.css`, `assets/css/tayori-sumi.css` and
-       `assets/css/tayori-admin.css` to `priv/static/`.
+       `assets/css/tayori-admin.css` to `priv/static/`, with the Sumi fonts
+       (`assets/css/sumi-fonts.css`) in place of the marker of
+       `tayori-sumi.css`.
 
   After the task, `priv/static` holds exactly these six files, which are
   the files of the Hex package.
@@ -101,7 +103,17 @@ defmodule Mix.Tasks.Tayori.Build do
     end
   end
 
+  # The Sumi fonts go into the Sumi style sheet, where its marker is, so
+  # that the source stays readable.
   defp copy_stylesheet(name) do
-    File.cp!(Path.join([@assets, "css", name]), Path.join(@static, name))
+    fonts = File.read!(Path.join([@assets, "css", "sumi-fonts.css"]))
+
+    css =
+      [@assets, "css", name]
+      |> Path.join()
+      |> File.read!()
+      |> String.replace("/* @tayori-sumi-fonts */", fonts)
+
+    File.write!(Path.join(@static, name), css)
   end
 end
