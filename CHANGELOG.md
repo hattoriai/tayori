@@ -43,7 +43,10 @@ The first release.
   feeds (of all or one category), an SEO title and description of each
   entry, Open Graph, Twitter cards, `hreflang`, JSON-LD and a sitemap,
   and preview links of drafts and scheduled entries, signed, for a week.
-  The admin and the API find it in the same router by themselves.
+  The admin and the API find it in the same router by themselves. In
+  the app's own layout (`:layout`), which gets the page's language,
+  description, canonical address and its tags rendered
+  (`Tayori.Page.head/1`); its title, description and eyebrow by locale.
 - Opt-in features (`features: [...]` of `Tayori.Config`), each with no
   route, page or process when it is off:
   - `:reactions`: emoji reactions, one for each reader and emoji;

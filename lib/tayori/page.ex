@@ -35,8 +35,10 @@ defmodule Tayori.Page do
   links (a description, Open Graph, the cover as its image, the languages
   and a JSON-LD article), unless the app gives its own root layout
   (`layout: {MyAppWeb.Layouts, :root}`), which then gets
-  `@inner_content`, `@conn`, `@page_title` and `@meta` (the tags, as a
-  list of maps), and the app's page loads `tayori.css` itself.
+  `@inner_content`, `@conn`, `@page_title`, `@locale`, `@description`,
+  `@canonical`, `@feed`, `@meta` (the tags, as a list of maps) and `@head`
+  (the same tags rendered, `head/1`), and the app's page loads
+  `tayori.css` itself.
 
   The forms (reactions, subscribe) post with the session's CSRF token: the
   page belongs behind the app's `:browser` pipeline.
@@ -66,6 +68,7 @@ defmodule Tayori.Page do
     conn = fetch_query_params(conn)
     reader = opts.resolver && Resolver.reader(opts.resolver, conn)
     locale = API.locale(conn, reader)
+    opts = localize(opts, locale)
     handle(action, conn, reader, reader || Reader.visitor(locale), locale, opts)
   end
 
@@ -671,12 +674,26 @@ defmodule Tayori.Page do
 
   defp render(conn, opts, locale, title, meta, url, inner) do
     meta = Enum.reject(meta, &(Map.get(&1, :content, true) in [nil, ""]))
+    feed = base_path(conn) <> "/feed.xml"
+    script_nonce = opts.mount.csp_nonces[:script]
 
     html =
       case opts.layout do
         {module, function} ->
           apply(module, function, [
-            %{inner_content: inner, conn: conn, page_title: title, meta: meta, flash: %{}}
+            %{
+              inner_content: inner,
+              conn: conn,
+              page_title: title,
+              locale: locale,
+              description: description(meta),
+              canonical: url,
+              feed: feed,
+              meta: meta,
+              head:
+                head(%{meta: meta, canonical: url, feed: feed, title: title, nonce: script_nonce}),
+              flash: %{}
+            }
           ])
 
         nil ->
@@ -688,9 +705,9 @@ defmodule Tayori.Page do
             canonical: url,
             theme: opts.theme,
             css: css(opts.mount, opts.theme),
-            feed: base_path(conn) <> "/feed.xml",
+            feed: feed,
             nonce: opts.mount.csp_nonces[:style],
-            script_nonce: opts.mount.csp_nonces[:script]
+            script_nonce: script_nonce
           })
       end
 
@@ -709,15 +726,41 @@ defmodule Tayori.Page do
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="color-scheme" content="light dark" />
         <title>{@title}</title>
-        <link rel="canonical" href={@canonical} />
-        <.meta_tag :for={tag <- @meta} tag={tag} nonce={@script_nonce} />
+        <.head meta={@meta} canonical={@canonical} feed={@feed} title={@title} nonce={@script_nonce} />
         <link rel="stylesheet" href={@css} nonce={@nonce} />
-        <link rel="alternate" type="application/atom+xml" title={@title} href={@feed} />
       </head>
       <body class="tayori-page">
         {@inner_content}
       </body>
     </html>
+    """
+  end
+
+  @doc """
+  The tags of a page for the `<head>` of the app's own layout (the
+  `:layout` of `tayori_page`): its canonical address, the description,
+  Open Graph and Twitter cards, the addresses of its languages, an
+  entry's JSON-LD and the link to the Atom feed. Not the `<title>`, which
+  the layout writes from `@page_title`.
+
+  The layout gets them rendered, as `@head`:
+
+      <head>
+        <title>{@page_title}</title>
+        {@head}
+      </head>
+  """
+  attr :meta, :list, required: true, doc: "the tags, as the layout's `@meta` has them"
+  attr :canonical, :string, required: true
+  attr :feed, :string, required: true
+  attr :title, :string, required: true, doc: "the title of the feed's link"
+  attr :nonce, :string, default: nil, doc: "the nonce of the JSON-LD script"
+
+  def head(assigns) do
+    ~H"""
+    <link rel="canonical" href={@canonical} />
+    <.meta_tag :for={tag <- @meta} tag={tag} nonce={@nonce} />
+    <link rel="alternate" type="application/atom+xml" title={@title} href={@feed} />
     """
   end
 
@@ -759,6 +802,36 @@ defmodule Tayori.Page do
   end
 
   # ── Helpers ─────────────────────────────────────────────────────
+
+  @localized [:title, :description, :eyebrow]
+
+  # The words of the mount that may be given by locale, in the page's.
+  defp localize(opts, locale) do
+    Enum.reduce(@localized, opts, fn key, opts ->
+      Map.update(opts, key, nil, &localized(&1, locale))
+    end)
+  end
+
+  @doc false
+  # A string as it is; of a map by locale, the reader's locale's, else
+  # one of its language, else the first of the app's locales that the
+  # map has.
+  @spec localized(String.t() | %{String.t() => String.t()} | nil, String.t()) ::
+          String.t() | nil
+  def localized(text, _locale) when is_binary(text) or is_nil(text), do: text
+
+  def localized(texts, locale) when is_map(texts) do
+    texts[locale] ||
+      Enum.find_value(texts, fn {key, text} -> language(key) == language(locale) && text end) ||
+      Enum.find_value(Config.get().locales, &texts[&1]) ||
+      texts |> Enum.sort() |> Enum.map(&elem(&1, 1)) |> List.first()
+  end
+
+  defp language(locale), do: locale |> String.split(["-", "_"]) |> hd() |> String.downcase()
+
+  defp description(meta) do
+    Enum.find_value(meta, fn tag -> Map.get(tag, :name) == "description" && tag.content end)
+  end
 
   defp json_ld(entry, url, image, description) do
     %{
