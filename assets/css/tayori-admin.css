@@ -1767,6 +1767,263 @@ select.ta-input {
   inset: 0 0 auto;
 }
 
+/* ── The inbox ──────────────────────────────────────────────────── */
+
+.ta-nav-count {
+  min-width: 1.125rem;
+  padding: 0.0625rem 0.375rem;
+  border-radius: 999px;
+  background: var(--tayori-attention);
+  color: var(--tayori-attention-text);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.ta-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.ta-filters select.ta-input {
+  width: auto;
+  min-height: 2.125rem;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  font-size: 0.875rem;
+}
+
+.ta-filters .ta-search {
+  margin-bottom: 0;
+}
+
+.ta-filters .ta-search .ta-input {
+  width: 13rem;
+}
+
+.ta-changes ol {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ta-changes ol > li + li,
+.ta-changes-head + ol > li:first-child {
+  border-top: 1px solid var(--tayori-rule);
+}
+
+.ta-changes-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 3rem;
+  padding: 0.375rem 1rem;
+  background: var(--tayori-surface);
+}
+
+.ta-selection {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+}
+
+.ta-selection strong {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.ta-check-cell {
+  display: grid;
+  place-items: center;
+  width: 1rem;
+}
+
+.ta-check-cell input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--tayori-accent);
+  cursor: pointer;
+}
+
+.ta-change {
+  position: relative;
+  transition: background-color var(--tayori-transition);
+}
+
+.ta-change:hover,
+.ta-change.ta-selected {
+  background: color-mix(in oklab, var(--tayori-surface) 60%, var(--ta-card));
+}
+
+.ta-change.ta-selected::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: var(--tayori-attention);
+}
+
+.ta-change-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.875rem 0.75rem 0.875rem 1rem;
+}
+
+.ta-change-selectable .ta-change-row {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.75rem 1rem;
+}
+
+.ta-change-row .ta-check-cell {
+  align-self: start;
+  height: 1.375rem;
+}
+
+.ta-change .ta-row-actions {
+  opacity: 0.55;
+  transition: opacity var(--tayori-transition);
+}
+
+.ta-change:hover .ta-row-actions,
+.ta-change:focus-within .ta-row-actions {
+  opacity: 1;
+}
+
+.ta-star {
+  --tayori-icon-size: 13px;
+  flex: none;
+  color: var(--tayori-amber);
+  fill: currentColor;
+}
+
+.ta-star-button[aria-pressed="true"] {
+  color: var(--tayori-amber);
+}
+
+.ta-star-button[aria-pressed="true"] .tayori-icon {
+  fill: currentColor;
+}
+
+.ta-source-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  height: 1.375rem;
+  padding: 0 0.5rem;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--tayori-text) 7%, transparent);
+  color: color-mix(in oklab, var(--tayori-text) 75%, var(--tayori-muted));
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.ta-source-pill .tayori-icon {
+  --tayori-icon-size: 12px;
+}
+
+.ta-internal {
+  border-style: dashed;
+}
+
+.ta-version {
+  color: var(--tayori-muted);
+  font: 0.75rem / 1 var(--tayori-mono);
+}
+
+.ta-change-date {
+  color: var(--tayori-muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.ta-change-entry,
+.ta-change-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--tayori-muted);
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.ta-change-entry {
+  color: var(--tayori-text);
+  font-weight: 500;
+}
+
+.ta-change-entry:hover,
+.ta-change-link:hover {
+  color: var(--tayori-text);
+  text-decoration: underline;
+}
+
+.ta-change-entry .tayori-icon,
+.ta-change-link .tayori-icon {
+  --tayori-icon-size: 12px;
+  flex: none;
+}
+
+.ta-change-form {
+  padding: 1rem;
+  background: var(--tayori-surface);
+}
+
+.ta-change-form-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  align-items: end;
+  gap: 0 1rem;
+}
+
+.ta-change-form-row .ta-check {
+  align-items: center;
+  min-height: 2.375rem;
+  margin-bottom: 1rem;
+}
+
+/* The changes an entry was drafted from, beside the editor. */
+.ta-inbox-changes {
+  display: grid;
+  gap: 0.625rem;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  list-style: none;
+}
+
+.ta-inbox-changes li {
+  display: grid;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.ta-inbox-change-title {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.ta-inbox-changes .ta-hint a {
+  margin-left: 0.25rem;
+  overflow-wrap: anywhere;
+}
+
 /* ── Categories ─────────────────────────────────────────────────── */
 
 .ta-categories {
@@ -2008,6 +2265,106 @@ select.ta-input {
   min-width: 14rem;
 }
 
+/* The automation: its parts, their facts, a secret shown once. */
+.ta-subsection {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1.25rem 0 0;
+  border-top: 1px solid var(--tayori-rule);
+}
+
+.ta-subsection + .ta-subsection {
+  margin-top: 1.25rem;
+}
+
+.ta-subsection .ta-hooks,
+.ta-subsection .ta-notice,
+.ta-subsection .ta-field {
+  margin: 0;
+}
+
+.ta-subheading {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.ta-facts {
+  display: grid;
+  margin: 0;
+  border: 1px solid var(--tayori-rule);
+  border-radius: var(--tayori-radius);
+}
+
+.ta-facts > div {
+  display: grid;
+  grid-template-columns: 8rem minmax(0, 1fr);
+  align-items: center;
+  gap: 1rem;
+  min-height: 2.75rem;
+  padding: 0.375rem 0.875rem;
+}
+
+.ta-facts > div + div {
+  border-top: 1px solid var(--tayori-rule);
+}
+
+.ta-facts dt {
+  color: var(--tayori-muted);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.ta-facts dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+  min-width: 0;
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.ta-facts dd code {
+  overflow-wrap: anywhere;
+}
+
+.ta-facts .ta-icon-button {
+  width: 1.875rem;
+  height: 1.875rem;
+}
+
+.ta-shown-once {
+  border-color: color-mix(in oklab, var(--tayori-amber) 45%, var(--tayori-rule));
+  background: color-mix(in oklab, var(--tayori-amber) 8%, var(--tayori-surface));
+}
+
+.ta-shown-once > .tayori-icon {
+  color: var(--tayori-amber);
+}
+
+.ta-shown-once > div {
+  display: grid;
+  gap: 0.625rem;
+  min-width: 0;
+}
+
+.ta-secret {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ta-secret .ta-code {
+  flex: 1;
+  min-width: 0;
+  background: var(--tayori-background);
+  white-space: pre;
+}
+
 /* ── Small screens, touch, motion, contrast ─────────────────────── */
 
 @media (max-width: 1080px) {
@@ -2057,8 +2414,28 @@ select.ta-input {
   }
 
   .ta-search,
-  .ta-search .ta-input {
+  .ta-search .ta-input,
+  .ta-filters,
+  .ta-filters .ta-search .ta-input {
     width: 100%;
+  }
+
+  .ta-nav a .ta-nav-count {
+    display: inline-block;
+  }
+
+  .ta-filters select.ta-input {
+    flex: 1;
+  }
+
+  .ta-change-form-row,
+  .ta-facts > div {
+    grid-template-columns: 1fr;
+  }
+
+  .ta-facts > div {
+    gap: 0.125rem;
+    padding: 0.5rem 0.875rem;
   }
 }
 
@@ -2103,5 +2480,10 @@ select.ta-input {
   .ta-entries,
   .ta-editor-main {
     border: 1px solid CanvasText;
+  }
+
+  .ta-change.ta-selected {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
   }
 }

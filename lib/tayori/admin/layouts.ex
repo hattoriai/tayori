@@ -66,6 +66,7 @@ defmodule Tayori.Admin.Layouts do
   attr :flash, :map, default: %{}
   attr :access, :any, default: :all
   attr :wide, :boolean, default: false
+  attr :inbox, :integer, default: 0, doc: "The inbox's new changes, for the public."
   slot :inner_block, required: true
 
   def page(assigns) do
@@ -80,6 +81,10 @@ defmodule Tayori.Admin.Layouts do
           <nav class="ta-nav" aria-label="Admin">
             <.link navigate={~m"/"} aria-current={@page == :entries && "page"}>
               <.icon name="newspaper" />Entries
+            </.link>
+            <.link navigate={~m"/inbox"} aria-current={@page == :inbox && "page"}>
+              <.icon name="inbox" />Inbox
+              <span :if={@inbox > 0} class="ta-nav-count" title={"#{@inbox} new"}>{@inbox}</span>
             </.link>
             <.link navigate={~m"/categories"} aria-current={@page == :categories && "page"}>
               <.icon name="tags" />Categories

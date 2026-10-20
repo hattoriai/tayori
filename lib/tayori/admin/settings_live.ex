@@ -1,16 +1,19 @@
 defmodule Tayori.Admin.SettingsLive do
   @moduledoc false
   # The settings of the admin: the AI model and its key (encrypted, never
-  # shown again) and what the product is, for the drafts; where the
-  # audiences come from; the extras of the app; the subscribers; the
-  # webhooks, Slack and Discord; and the embed on another domain.
+  # shown again) and what the product is, for the drafts; the automation
+  # (the inbox's sources, the digest, the ingest token and GitHub's
+  # secret, each shown once); where the audiences come from; the extras of
+  # the app; the subscribers; the webhooks, Slack and Discord; and the
+  # embed on another domain.
 
   use Phoenix.LiveView, layout: false
   use PhoenixMountable.Path, mountable: Tayori.Router
 
   import Tayori.Admin.Components
 
-  alias Tayori.{AI, Config, Resolver, Webhooks}
+  alias Tayori.Admin.{Automation, InboxLive}
+  alias Tayori.{AI, Config, Inbox, Resolver, Webhooks}
 
   # Suggestions only: any provider:model that ReqLLM knows will do.
   @models [
@@ -30,8 +33,14 @@ defmodule Tayori.Admin.SettingsLive do
        segment_groups: Resolver.segment_groups(socket.assigns.resolver),
        new_secret: nil,
        tested: %{},
-       embed_api: embed_api(socket),
-       embed_copied: false
+       embed_api: Automation.api_url(socket, :embed),
+       machines_api: Automation.api_url(socket, :machines),
+       embed_copied: false,
+       copied: nil,
+       reading: false,
+       new_token: nil,
+       new_github_secret: nil,
+       sources: Automation.sources(socket.assigns.config)
      )
      |> load()}
   end
@@ -46,6 +55,11 @@ defmodule Tayori.Admin.SettingsLive do
       subscribers: if(Config.feature?(config, :subscriptions), do: Tayori.Subscribers.counts()),
       settings: settings,
       available: AI.available?(),
+      last_read: Automation.last_read(),
+      digest: Automation.digest_status(),
+      pending: Inbox.pending_count(),
+      token?: Automation.token?(),
+      github_secret?: Automation.secret?(),
       form: to_form(%{"model" => settings.model, "about" => settings.about, "key" => ""}, as: :ai)
     )
   end
@@ -110,6 +124,61 @@ defmodule Tayori.Admin.SettingsLive do
   def handle_event("embed_copied", _params, socket),
     do: {:noreply, assign(socket, :embed_copied, true)}
 
+  def handle_event("copied", %{"key" => key}, socket),
+    do: {:noreply, assign(socket, :copied, key)}
+
+  def handle_event("read", _params, %{assigns: %{access: :all}} = socket) do
+    {:noreply, socket |> assign(reading: true) |> start_async(:read, &Automation.read_sources/0)}
+  end
+
+  def handle_event("new_token", _params, %{assigns: %{access: :all}} = socket) do
+    case Automation.new_token() do
+      {:ok, token} ->
+        {:noreply,
+         socket
+         |> put_flash(:info, "The token is made. Copy it now.")
+         |> assign(new_token: token, copied: nil)
+         |> load()}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, secret_error(reason))}
+    end
+  end
+
+  def handle_event("revoke_token", _params, %{assigns: %{access: :all}} = socket) do
+    :ok = Automation.revoke_token()
+
+    {:noreply,
+     socket
+     |> put_flash(:info, "The token is revoked: it adds no change now.")
+     |> assign(new_token: nil)
+     |> load()}
+  end
+
+  def handle_event("new_github_secret", _params, %{assigns: %{access: :all}} = socket) do
+    case Automation.new_secret() do
+      {:ok, secret} ->
+        {:noreply,
+         socket
+         |> put_flash(:info, "The secret is made. Copy it into GitHub now.")
+         |> assign(new_github_secret: secret, copied: nil)
+         |> load()}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, secret_error(reason))}
+    end
+  end
+
+  def handle_event("remove_github_secret", _params, %{assigns: %{access: :all}} = socket) do
+    :ok = Automation.remove_secret()
+
+    {:noreply,
+     socket
+     |> put_flash(:info, "The secret is removed: GitHub's requests are refused.")
+     |> assign(new_github_secret: nil)
+     |> load()}
+  end
+
   def handle_event(_event, _params, socket), do: {:noreply, socket}
 
   @impl true
@@ -119,6 +188,18 @@ defmodule Tayori.Admin.SettingsLive do
   def handle_async({:test_hook, id}, {:exit, reason}, socket),
     do: {:noreply, update(socket, :tested, &Map.put(&1, id, {:error, reason}))}
 
+  def handle_async(:read, {:ok, results}, socket) do
+    {:noreply,
+     socket |> assign(reading: false) |> put_flash(:info, Automation.summary(results)) |> load()}
+  end
+
+  def handle_async(:read, {:exit, reason}, socket) do
+    {:noreply,
+     socket
+     |> assign(reading: false)
+     |> put_flash(:error, "The sources could not be read: #{inspect(reason)}")}
+  end
+
   def handle_async(:check, {:ok, result}, socket), do: {:noreply, assign(socket, check: result)}
 
   def handle_async(:check, {:exit, reason}, socket),
@@ -127,7 +208,7 @@ defmodule Tayori.Admin.SettingsLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <.page page={:settings} flash={@flash} access={@access}>
+    <.page page={:settings} flash={@flash} access={@access} inbox={@inbox_new}>
       <div class="ta-heading">
         <div>
           <h1>Settings</h1>
@@ -138,6 +219,7 @@ defmodule Tayori.Admin.SettingsLive do
       <div class="ta-settings">
         <nav class="ta-settings-nav" aria-label="Settings">
           <a href="#ai"><.icon name="sparkles" />Writing with AI</a>
+          <a href="#automation"><.icon name="zap" />Automation</a>
           <a href="#audiences"><.icon name="users" />Audiences</a>
           <a href="#features"><.icon name="layers" />Features</a>
           <a :if={@subscribers} href="#email"><.icon name="mail" />Email</a>
@@ -246,6 +328,22 @@ defmodule Tayori.Admin.SettingsLive do
               </fieldset>
             </.form>
           </.card>
+
+          <.automation
+            access={@access}
+            config={@config}
+            sources={@sources}
+            last_read={@last_read}
+            reading={@reading}
+            digest={@digest}
+            pending={@pending}
+            api={@machines_api}
+            token?={@token?}
+            new_token={@new_token}
+            github_secret?={@github_secret?}
+            new_github_secret={@new_github_secret}
+            copied={@copied}
+          />
 
           <.card title="Audiences" icon="users" id="audiences">
             <p class="ta-lead">
@@ -470,19 +568,336 @@ defmodule Tayori.Admin.SettingsLive do
     """
   end
 
-  # The address of the JSON API for the sites: the last mount of
-  # tayori_api in the app's router, as the guide mounts the sites' after
-  # the app's own.
-  defp embed_api(socket) do
-    socket.router
-    |> PhoenixMountable.mounts()
-    |> Enum.filter(&(&1.definition == Tayori.Router.API))
-    |> List.last()
-    |> case do
-      nil -> nil
-      mount -> String.trim_trailing(socket.endpoint.url(), "/") <> mount.path
-    end
+  # The inbox's sources, the digest, and what the app's CI and GitHub
+  # send: the ingest token and GitHub's secret, each shown once, when
+  # Tayori has them.
+  defp automation(assigns) do
+    assigns =
+      assign(assigns, :waiting, (assigns.digest && assigns.digest[:pending]) || assigns.pending)
+
+    ~H"""
+    <.card title="Automation" icon="zap" id="automation">
+      <:aside>
+        <.link navigate={~m"/inbox"} class="ta-button ta-small">
+          <.icon name="inbox" />Open the inbox
+        </.link>
+      </:aside>
+      <p class="ta-lead">
+        What ships comes to the inbox: from your changelog and news fragments, your CI and
+        GitHub. A digest makes an entry of what is new, for your people.
+      </p>
+
+      <section class="ta-subsection" aria-labelledby="automation-sources">
+        <h3 id="automation-sources" class="ta-subheading">Sources</h3>
+        <ul :if={@sources != []} class="ta-hooks">
+          <li :for={source <- @sources}>
+            <span class="ta-feature-icon"><.icon name={InboxLive.source_icon(source.name)} /></span>
+            <span>
+              <strong>{source.name}</strong>
+              <span class="ta-hint">
+                <code>{source.module}</code><span :if={source.path}> · {source.path}</span>
+              </span>
+            </span>
+            <span
+              :if={source_read(@last_read, source.name)}
+              class={["ta-hint", source_read(@last_read, source.name)["error"] && "ta-error"]}
+            >
+              {Automation.counted(source_read(@last_read, source.name))}
+            </span>
+          </li>
+        </ul>
+        <div :if={@sources != []} class="ta-actions">
+          <button
+            :if={@access == :all}
+            type="button"
+            class="ta-button ta-small"
+            phx-click="read"
+            disabled={@reading}
+          >
+            <.icon name="refresh-cw" class={@reading && "ta-spin"} />
+            {if @reading, do: "Reading…", else: "Read now"}
+          </button>
+          <span class="ta-hint">
+            {if @config.inbox.ingest_on_start,
+              do: "Read when the app starts, and when you ask.",
+              else: "Read when you ask, and when your code calls Tayori.Inbox.ingest/0."}
+            <span :if={@last_read}>Last read here <.time at={elem(@last_read, 0)} />.</span>
+          </span>
+        </div>
+        <div :if={@sources == []}>
+          <p class="ta-hint">
+            No sources yet. Name them in the <code>:inbox</code> option of Tayori: a
+            Keep a Changelog file, a folder of news fragments, or a module of your own.
+          </p>
+          <pre class="ta-code"><code>{inbox_sample()}</code></pre>
+        </div>
+      </section>
+
+      <section class="ta-subsection" aria-labelledby="automation-digest">
+        <h3 id="automation-digest" class="ta-subheading">Digest</h3>
+        <dl class="ta-facts">
+          <div><dt>When</dt><dd>{Automation.cadence(@config.digest)}</dd></div>
+          <div>
+            <dt>Then</dt>
+            <dd>
+              {if @config.digest.publish == :publish,
+                do: "The entry is published at once.",
+                else: "A draft, for you to read and publish."}
+            </dd>
+          </div>
+          <div :if={@digest}>
+            <dt>Next</dt>
+            <dd>
+              <.time :if={@digest[:next_run_at]} at={@digest.next_run_at} />
+              <span :if={!@digest[:next_run_at]}>When you ask</span>
+            </dd>
+          </div>
+          <div :if={@digest}>
+            <dt>Last</dt>
+            <dd>
+              <.time :if={@digest[:last_run_at]} at={@digest.last_run_at} />
+              <span :if={!@digest[:last_run_at]}>Never</span>
+            </dd>
+          </div>
+          <div>
+            <dt>Waiting</dt>
+            <dd>
+              {waiting(@waiting)}
+              <.link :if={@waiting > 0} navigate={~m"/inbox"}>Draft an entry</.link>
+            </dd>
+          </div>
+        </dl>
+        <p class="ta-hint">
+          The <code>:digest</code> option of Tayori sets them:
+          <code>{"digest: [every: {:weekly, :monday}, at: ~T[09:00:00], publish: :draft]"}</code>.
+        </p>
+      </section>
+
+      <section :if={Automation.ingest?()} class="ta-subsection" aria-labelledby="automation-api">
+        <h3 id="automation-api" class="ta-subheading">
+          From your CI
+          <span class={["ta-badge", @token? && "ta-badge-on"]}>
+            {if @token?, do: "A token is set", else: "No token"}
+          </span>
+        </h3>
+        <p class="ta-hint">
+          A deploy, a release script or another service sends what shipped, with a token.
+        </p>
+        <.shown_once
+          :if={@new_token}
+          id="ingest-token"
+          value={@new_token}
+          copied={@copied == "token"}
+          copy_key="token"
+        >
+          The token, for your CI's secrets. Copy it now: it is not shown again.
+        </.shown_once>
+        <div :if={@access == :all} class="ta-actions">
+          <button :if={!@token?} type="button" class="ta-button ta-small" phx-click="new_token">
+            <.icon name="key-round" />Create a token
+          </button>
+          <button
+            :if={@token?}
+            type="button"
+            class="ta-button ta-small"
+            phx-click="new_token"
+            data-confirm="Replace the token? The one your CI has stops working."
+          >
+            <.icon name="refresh-cw" />Replace
+          </button>
+          <button
+            :if={@token?}
+            type="button"
+            class="ta-button ta-quiet ta-small"
+            phx-click="revoke_token"
+            data-confirm="Revoke the token? Nothing adds changes with it after this."
+          >
+            Revoke
+          </button>
+        </div>
+        <div :if={@api} class="ta-field">
+          <span class="ta-label">The endpoint</span>
+          <pre class="ta-code"><code>POST {@api}/changes</code></pre>
+        </div>
+        <div :if={@api} class="ta-field">
+          <span class="ta-label">With curl</span>
+          <pre class="ta-code" id="ingest-curl"><code>{curl(@api)}</code></pre>
+          <div class="ta-actions">
+            <button
+              type="button"
+              class="ta-button ta-small"
+              id="ingest-curl-copy"
+              phx-hook="TayoriCopy"
+              data-copy-text={curl(@api)}
+              phx-click="copied"
+              phx-value-key="curl"
+            >
+              <.icon name={if @copied == "curl", do: "check", else: "copy"} />
+              {if @copied == "curl", do: "Copied", else: "Copy"}
+            </button>
+          </div>
+        </div>
+        <.no_api :if={!@api} />
+      </section>
+
+      <section :if={Automation.github?()} class="ta-subsection" aria-labelledby="automation-github">
+        <h3 id="automation-github" class="ta-subheading">
+          GitHub
+          <span class={["ta-badge", @github_secret? && "ta-badge-on"]}>
+            {if @github_secret?, do: "A secret is set", else: "No secret"}
+          </span>
+        </h3>
+        <p class="ta-hint">
+          A merged pull request or a published release comes to the inbox. In the
+          repository's Settings → Webhooks, add a webhook with these:
+        </p>
+        <dl :if={@api} class="ta-facts">
+          <div>
+            <dt>Payload URL</dt>
+            <dd>
+              <code>{@api}/hooks/github</code>
+              <button
+                type="button"
+                class="ta-icon-button"
+                id="github-url-copy"
+                phx-hook="TayoriCopy"
+                data-copy-text={"#{@api}/hooks/github"}
+                phx-click="copied"
+                phx-value-key="github-url"
+                aria-label="Copy the payload URL"
+              >
+                <.icon name={if @copied == "github-url", do: "check", else: "copy"} />
+              </button>
+            </dd>
+          </div>
+          <div><dt>Content type</dt><dd><code>application/json</code></dd></div>
+          <div><dt>Secret</dt><dd>The one made here, shown once</dd></div>
+          <div><dt>Events</dt><dd>Pull requests and releases</dd></div>
+        </dl>
+        <.no_api :if={!@api} />
+        <.shown_once
+          :if={@new_github_secret}
+          id="github-secret"
+          value={@new_github_secret}
+          copied={@copied == "github-secret"}
+          copy_key="github-secret"
+        >
+          The webhook's secret, for GitHub. Copy it now: it is not shown again.
+        </.shown_once>
+        <div :if={@access == :all} class="ta-actions">
+          <button
+            :if={!@github_secret?}
+            type="button"
+            class="ta-button ta-small"
+            phx-click="new_github_secret"
+          >
+            <.icon name="key-round" />Create a secret
+          </button>
+          <button
+            :if={@github_secret?}
+            type="button"
+            class="ta-button ta-small"
+            phx-click="new_github_secret"
+            data-confirm="Replace the secret? GitHub's requests are refused until it has the new one."
+          >
+            <.icon name="refresh-cw" />Replace
+          </button>
+          <button
+            :if={@github_secret?}
+            type="button"
+            class="ta-button ta-quiet ta-small"
+            phx-click="remove_github_secret"
+            data-confirm="Remove the secret? GitHub's requests are refused after this."
+          >
+            Remove
+          </button>
+        </div>
+      </section>
+    </.card>
+    """
   end
+
+  defp no_api(assigns) do
+    ~H"""
+    <div class="ta-notice">
+      <.icon name="info" />
+      <p>
+        Mount the JSON API for machines, behind a pipeline with no session and no CSRF
+        protection, as the Automation guide says:
+        <code>tayori_api "/news", resolver: …, as: :tayori_machines</code>.
+      </p>
+    </div>
+    """
+  end
+
+  attr :id, :string, required: true
+  attr :value, :string, required: true
+  attr :copied, :boolean, default: false
+  attr :copy_key, :string, required: true
+  slot :inner_block, required: true
+
+  # A token or a secret, shown once, with its copy button.
+  defp shown_once(assigns) do
+    ~H"""
+    <div class="ta-notice ta-shown-once" id={@id}>
+      <.icon name="key-round" />
+      <div>
+        <p>{render_slot(@inner_block)}</p>
+        <div class="ta-secret">
+          <pre class="ta-code"><code>{@value}</code></pre>
+          <button
+            type="button"
+            class="ta-button ta-small"
+            id={"#{@id}-copy"}
+            phx-hook="TayoriCopy"
+            data-copy-text={@value}
+            phx-click="copied"
+            phx-value-key={@copy_key}
+          >
+            <.icon name={if @copied, do: "check", else: "copy"} />
+            {if @copied, do: "Copied", else: "Copy"}
+          </button>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  # What the admin's "Read now" gave a source, as kept.
+  defp source_read(nil, _name), do: nil
+  defp source_read({_at, sources}, name), do: sources[name]
+
+  defp inbox_sample do
+    """
+    {Tayori,
+     repo: MyApp.Repo,
+     pubsub: MyApp.PubSub,
+     inbox: [
+       sources: [
+         {Tayori.Sources.Changelog, path: {:my_app, "priv/CHANGELOG.md"}},
+         {Tayori.Sources.Fragments, path: {:my_app, "priv/news"}}
+       ]
+     ]}\
+    """
+  end
+
+  defp curl(api) do
+    """
+    curl -X POST #{api}/changes \\
+      -H "authorization: Bearer $TAYORI_INGEST_TOKEN" \\
+      -H "content-type: application/json" \\
+      -d '{"changes": [{"ref": "pr-1234", "title": "Exports in two clicks", "kind": "added"}]}'\
+    """
+  end
+
+  defp waiting(0), do: "Nothing new for the public"
+  defp waiting(1), do: "1 new change for the public"
+  defp waiting(n), do: "#{n} new changes for the public"
+
+  defp secret_error(:no_secrets),
+    do: "Tayori keeps it encrypted: give it a :vault or a :secret_key_base."
+
+  defp secret_error(_reason), do: "It could not be made."
 
   defp snippet(api) do
     """
