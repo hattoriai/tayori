@@ -3,7 +3,8 @@
 # One Phoenix endpoint with a small app ("Atelier", a studio's project
 # tool) and its news: the admin at /admin/news (Tayori's theme) and
 # /sumi/news (the Sumi theme), the news in the app at /, the public page
-# at /changelog. The entries are in SQLite (tmp/dev.sqlite3), the
+# at /changelog, and /elsewhere, a site on another origin with the news
+# (the :embed feature: localhost and 127.0.0.1 are two origins). The entries are in SQLite (tmp/dev.sqlite3), the
 # attachments of the editor in tmp/uploads. The browser tests in e2e/ run
 # against it.
 #
@@ -227,6 +228,85 @@ defmodule TayoriDev.PlainController do
   end
 end
 
+defmodule TayoriDev.ElsewhereController do
+  @moduledoc """
+  Atelier's help centre, a site on another origin: the app is on one of
+  localhost and 127.0.0.1, the site on the other. It loads the script and
+  the style sheet from the app's API, and its server gives the element
+  the token of the person of `?as=`, as a site's backend would.
+  """
+  use Phoenix.Controller, formats: [:html]
+  use Phoenix.Component
+
+  alias Phoenix.HTML.Safe
+
+  def show(conn, _params) do
+    app_host = if conn.host == "localhost", do: "127.0.0.1", else: "localhost"
+    reader = TayoriDev.Resolver.resolve_reader(conn)
+
+    assigns = %{
+      api: "http://#{app_host}:#{conn.port}/embed/news",
+      token: reader && Tayori.Embed.token(reader),
+      dev_user: conn.assigns[:dev_user],
+      sumi: conn.query_params["theme"] == "sumi",
+      dark: conn.query_params["dark"] != nil
+    }
+
+    html(conn, assigns |> page() |> Safe.to_iodata() |> IO.iodata_to_binary())
+  end
+
+  defp page(assigns) do
+    ~H"""
+    <!DOCTYPE html>
+    <html lang="en" data-theme={@dark && "dark"}>
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Atelier · Help centre</title>
+        <link rel="stylesheet" href={@api <> if(@sumi, do: "/tayori-sumi.css", else: "/tayori.css")} />
+        <script type="module" src={@api <> "/tayori.js"}>
+        </script>
+        <style>
+          body { margin: 0; background: #f6f4ef; color: #1f1d1a; font: 15px/1.6 Georgia, serif; }
+          [data-theme="dark"] body { background: #17161a; color: #eceae6; }
+          header { display: flex; align-items: center; gap: 1rem; padding: 1rem 2rem; border-bottom: 1px solid #e2ddd3; }
+          header strong { font-size: 1.125rem; }
+          header nav { display: flex; gap: 1.25rem; margin-left: auto; align-items: center; font: 14px system-ui, sans-serif; }
+          header a { color: inherit; }
+          main { max-width: 40rem; padding: 3rem 2rem; }
+          code { font-size: 0.875em; }
+        </style>
+      </head>
+      <body>
+        <div id="banner"></div>
+        <header>
+          <strong>Atelier help centre</strong>
+          <nav>
+            <a href="#">Guides</a>
+            <a href="#">Contact</a>
+            <tayori-news api={@api} reader-token={@token} banner="#banner"></tayori-news>
+          </nav>
+        </header>
+        <main>
+          <h1>A site on another origin</h1>
+          <p>
+            This page is on another origin than the app's API (<code>{@api}</code>). It loads
+            <code>tayori.js</code> and <code>tayori.css</code> from the API, and the element reads
+            the news over CORS, with the token the server signed for {if @dev_user,
+              do: @dev_user.name,
+              else: "no one: you are a visitor"}.
+          </p>
+          <p>
+            Be <a href="?as=pro">a Pro owner</a>, <a href="?as=free">a Free reader (pt-PT)</a>
+            or <a href="?as=visitor">a visitor</a>.
+          </p>
+        </main>
+      </body>
+    </html>
+    """
+  end
+end
+
 defmodule TayoriDev.Layouts do
   @moduledoc "Atelier's own layout: a studio's project tool, with its news."
   use Phoenix.Component
@@ -325,6 +405,7 @@ defmodule TayoriDev.Layouts do
           <p>My work</p>
           <p>Calendar</p>
           <a href="/plain" aria-current={@here == "/plain" && "page"}>A page without LiveView</a>
+          <a href="/elsewhere">A site on another origin</a>
           <a href="/changelog">Changelog</a>
           <a href="/admin/news">Write the news</a>
         </nav>
@@ -376,7 +457,7 @@ defmodule TayoriDev.Layouts do
   def plain_page(assigns) do
     ~H"""
     <.shell dev_user={@dev_user} here={@here}>
-      <:button><tayori-news src="/api/news" page="/changelog"></tayori-news></:button>
+      <:button><tayori-news api="/api/news" page="/changelog"></tayori-news></:button>
       <div class="dev-main">
         <h2>A page without LiveView</h2>
         <p>
@@ -433,6 +514,22 @@ defmodule TayoriDev.Router do
     tayori_api("/news", resolver: TayoriDev.Resolver, page: "/changelog")
   end
 
+  # The JSON API for the sites of the :embed feature: no session, no
+  # CSRF protection; a reader comes with a token.
+  pipeline :embed do
+    plug :accepts, ["json"]
+  end
+
+  scope "/embed" do
+    pipe_through :embed
+
+    tayori_api("/news",
+      resolver: TayoriDev.Resolver,
+      page: "http://localhost:#{System.get_env("PORT", "4099")}/changelog",
+      as: :tayori_embed
+    )
+  end
+
   scope "/admin" do
     pipe_through :browser
 
@@ -464,6 +561,7 @@ defmodule TayoriDev.Router do
     end
 
     get "/plain", TayoriDev.PlainController, :show
+    get "/elsewhere", TayoriDev.ElsewhereController, :show
 
     tayori_page("/changelog",
       title: "What's new in Atelier",
@@ -580,6 +678,7 @@ Task.async(fn ->
          secret_key_base: String.duplicate("tayori-development-secret-", 3),
          locales: ["en", "pt-PT"],
          features: [:reactions, :announcements, :analytics, :subscriptions, :webhooks, :embed],
+         embed: [origins: ["http://localhost:#{port}", "http://127.0.0.1:#{port}"]],
          mailer: TayoriDev.Mailer,
          email_from: {"Atelier", "news@atelier.test"},
          page_url: "http://localhost:#{port}/changelog"},
