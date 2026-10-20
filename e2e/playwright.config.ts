@@ -46,7 +46,9 @@ export default defineConfig({
   },
   projects: (picked as Browser[]).map((name) => ({ name, use: { ...browsers[name] } })),
   webServer: {
-    command: "mix do tayori.build + dev",
+    // Two runs of mix: the second compiles the router again, with the
+    // bundles the first one built.
+    command: "mix tayori.build && mix dev",
     cwd: "..",
     url: `${baseURL}/admin/news`,
     env: { PORT: String(port), TAYORI_DEV_WATCH: "false", TAYORI_DEV_DATABASE: database, MIX_ENV: "dev" },
