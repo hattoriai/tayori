@@ -58,7 +58,7 @@ What every tool keeps to:
 `Tayori.MCP` compiles only when your app depends on Sake:
 
 ```elixir
-{:sake, "~> 0.4"}
+{:sake, "~> 0.4.2"}
 ```
 
 ### 2. Say who may use it
