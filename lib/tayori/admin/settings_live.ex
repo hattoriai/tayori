@@ -29,7 +29,9 @@ defmodule Tayori.Admin.SettingsLive do
        check: nil,
        segment_groups: Resolver.segment_groups(socket.assigns.resolver),
        new_secret: nil,
-       tested: %{}
+       tested: %{},
+       embed_api: embed_api(socket),
+       embed_copied: false
      )
      |> load()}
   end
@@ -105,6 +107,9 @@ defmodule Tayori.Admin.SettingsLive do
      |> start_async({:test_hook, id}, fn -> Webhooks.test(id) end)}
   end
 
+  def handle_event("embed_copied", _params, socket),
+    do: {:noreply, assign(socket, :embed_copied, true)}
+
   def handle_event(_event, _params, socket), do: {:noreply, socket}
 
   @impl true
@@ -139,7 +144,7 @@ defmodule Tayori.Admin.SettingsLive do
           <a :if={:webhooks in @config.features} href="#integrations">
             <.icon name="webhook" />Integrations
           </a>
-          <a :if={:embed in @config.features} href="#embed"><.icon name="code-xml" />Embed</a>
+          <a href="#embed"><.icon name="code-xml" />Embed</a>
         </nav>
 
         <div class="ta-settings-body">
@@ -394,18 +399,113 @@ defmodule Tayori.Admin.SettingsLive do
             </form>
           </.card>
 
-          <.card :if={:embed in @config.features} title="Embed" icon="code-xml" id="embed">
+          <.card title="Embed" icon="code-xml" id="embed">
+            <:aside>
+              <span class={["ta-badge", :embed in @config.features && "ta-badge-on"]}>
+                {if :embed in @config.features, do: "On", else: "Off"}
+              </span>
+            </:aside>
             <p class="ta-lead">
-              The news on a site on another domain: a script and an element, which read the
-              news over the API with a reader's signed token.
+              The news on a site on another origin than the app's: a help centre, a marketing
+              site. A script and an element read the news over the JSON API, with a token your
+              server signs for the reader.
             </p>
-            <p class="ta-hint">See the Any frontend guide for the snippet and the reader token.</p>
+
+            <div :if={:embed in @config.features}>
+              <div class="ta-field">
+                <span class="ta-label">The sites</span>
+                <span class="ta-segment-values">
+                  <span :for={origin <- @config.embed.origins} class="ta-tag">{origin}</span>
+                </span>
+                <p class="ta-hint">
+                  The API answers their pages, and no others, and never with the app's cookies.
+                  A reader token lasts {duration(@config.embed.max_age)}.
+                </p>
+              </div>
+
+              <div :if={@embed_api} class="ta-field">
+                <span class="ta-label">The snippet</span>
+                <pre class="ta-code" id="embed-snippet"><code>{snippet(@embed_api)}</code></pre>
+                <div class="ta-actions">
+                  <button
+                    type="button"
+                    class="ta-button ta-small"
+                    id="embed-copy"
+                    phx-hook="TayoriCopy"
+                    data-copy-text={snippet(@embed_api)}
+                    phx-click="embed_copied"
+                  >
+                    <.icon name={if @embed_copied, do: "check", else: "copy"} />
+                    {if @embed_copied, do: "Copied", else: "Copy the snippet"}
+                  </button>
+                </div>
+                <p class="ta-hint">
+                  The server that renders the page signs the token of the person it is for,
+                  <code>Tayori.Embed.token(reader)</code>, with the reader your resolver gives.
+                  Without <code>reader-token</code>, the page shows the news for everyone.
+                </p>
+              </div>
+
+              <div :if={!@embed_api} class="ta-notice">
+                <.icon name="info" />
+                <p>
+                  Mount the JSON API for the sites, behind a pipeline with no session:
+                  <code>tayori_api "/news", resolver: {inspect(@resolver)}</code>.
+                </p>
+              </div>
+            </div>
+
+            <div :if={:embed not in @config.features}>
+              <p class="ta-hint">
+                Turn it on with the <code>:embed</code> feature, the origins of the sites, and the
+                app's <code>secret_key_base</code>, which signs the reader tokens:
+              </p>
+              <pre class="ta-code"><code>{"{Tayori,\n repo: MyApp.Repo,\n pubsub: MyApp.PubSub,\n secret_key_base: secret_key_base,\n features: [:embed],\n embed: [origins: [\"https://www.example.com\"]]}"}</code></pre>
+              <p class="ta-hint">Then mount the JSON API for the sites, as the Any frontend guide says.</p>
+            </div>
           </.card>
         </div>
       </div>
     </.page>
     """
   end
+
+  # The address of the JSON API for the sites: the last mount of
+  # tayori_api in the app's router, as the guide mounts the sites' after
+  # the app's own.
+  defp embed_api(socket) do
+    socket.router
+    |> PhoenixMountable.mounts()
+    |> Enum.filter(&(&1.definition == Tayori.Router.API))
+    |> List.last()
+    |> case do
+      nil -> nil
+      mount -> String.trim_trailing(socket.endpoint.url(), "/") <> mount.path
+    end
+  end
+
+  defp snippet(api) do
+    """
+    <link rel="stylesheet" href="#{api}/tayori.css" />
+    <script type="module" src="#{api}/tayori.js"></script>
+
+    <tayori-news api="#{api}" reader-token="<%= Tayori.Embed.token(@reader) %>"></tayori-news>\
+    """
+  end
+
+  defp duration(seconds) when rem(seconds, 86_400) == 0,
+    do: plural(div(seconds, 86_400), "a day", "days")
+
+  defp duration(seconds) when rem(seconds, 3600) == 0,
+    do: plural(div(seconds, 3600), "an hour", "hours")
+
+  defp duration(seconds) when rem(seconds, 60) == 0,
+    do: plural(div(seconds, 60), "a minute", "minutes")
+
+  defp duration(seconds), do: plural(seconds, "a second", "seconds")
+
+  defp plural(1, one, _other), do: one
+  defp plural(n, _one, other), do: "#{n} #{other}"
 
   defp error_text({:error, %{__exception__: true} = error}), do: Exception.message(error)
   defp error_text({:error, reason}) when is_binary(reason), do: reason

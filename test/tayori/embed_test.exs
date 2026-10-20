@@ -299,6 +299,28 @@ defmodule Tayori.EmbedTest do
     end
   end
 
+  describe "the Embed card of the settings" do
+    test "says how to turn it on, then gives the sites and the snippet", ctx do
+      Config.put(config(ctx.repo, []))
+      {:ok, _view, html} = ctx.conn |> as_admin() |> live("/admin/news/settings")
+      assert html =~ "Turn it on with the <code>:embed</code> feature"
+      assert html =~ "embed: [origins: [&quot;https://www.example.com&quot;]]"
+
+      embed(ctx, embed: [origins: [@site], max_age: 7200])
+      {:ok, view, html} = build_conn() |> as_admin() |> live("/admin/news/settings")
+      assert html =~ @site
+      assert html =~ "A reader token lasts 2 hours."
+
+      # The snippet has the address of the last mount of the API.
+      api = "http://localhost/embed/news"
+      snippet = view |> element("#embed-snippet") |> render()
+      assert snippet =~ ~s(&lt;script type=&quot;module&quot; src=&quot;#{api}/tayori.js&quot;)
+      assert snippet =~ ~s(&lt;tayori-news api=&quot;#{api}&quot; reader-token=)
+
+      assert view |> element("#embed-copy") |> render_click() =~ "Copied"
+    end
+  end
+
   describe "the script and the style sheets" do
     test "are served to the sites, with the feature on", ctx do
       embed(ctx)

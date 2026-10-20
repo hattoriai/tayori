@@ -91,10 +91,16 @@ export const TayoriAppearance = {
   },
 };
 
-// Copies the element's data-copy to the clipboard on a click.
+// Copies the element's data-copy (a link, made absolute) or data-copy-text
+// (as it is) to the clipboard on a click.
 export const TayoriCopy = {
   mounted(this: Hook) {
     this.el.addEventListener("click", () => {
+      const raw = this.el.dataset.copyText;
+      if (raw) {
+        navigator.clipboard?.writeText(raw).catch(() => undefined);
+        return;
+      }
       const text = this.el.dataset.copy;
       if (!text) return;
       const url = new URL(text, location.href).toString();
