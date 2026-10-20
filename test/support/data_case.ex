@@ -80,4 +80,20 @@ defmodule TayoriTest.DataCase do
 
   @doc "A time some minutes from now (negative for the past)."
   def minutes(n), do: DateTime.add(DateTime.utc_now(), n * 60, :second)
+
+  @doc "The errors of a changeset, by field, as their messages."
+  def errors_on(changeset) do
+    Ecto.Changeset.traverse_errors(changeset, fn {message, opts} ->
+      Regex.replace(~r"%{(\w+)}", message, fn _, key ->
+        opts |> Keyword.get(String.to_existing_atom(key), key) |> to_string()
+      end)
+    end)
+  end
+
+  @doc "Puts the config of the test with these options changed, and returns it."
+  def put_config(%Tayori.Config{} = config, changes) do
+    config = struct!(config, changes)
+    Tayori.Config.put(config)
+    config
+  end
 end
