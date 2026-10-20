@@ -77,7 +77,6 @@ defmodule Tayori.EntriesTest do
       :persistent_term.put(:tayori_test_notified, self())
       config = %{config | notifier: Notifier}
       Tayori.Config.put(config)
-      start_supervised!({Task.Supervisor, name: Tayori.TaskSupervisor})
       :ok = Tayori.subscribe()
 
       now = entry!("Now", %{published_at: minutes(-1)})

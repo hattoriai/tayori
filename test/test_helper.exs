@@ -1,4 +1,6 @@
 {:ok, _pid} = Phoenix.PubSub.Supervisor.start_link(name: TayoriTest.PubSub)
+{:ok, _pid} = Task.Supervisor.start_link(name: Tayori.TaskSupervisor)
+Application.put_env(:tayori, :ai_adapter, TayoriTest.FakeAI)
 {:ok, _pid} = TayoriTest.Endpoint.start_link()
 
 # The entries in a database: SQLite always, PostgreSQL when it is

@@ -8,7 +8,8 @@ defmodule Tayori.Admin.EntryLive do
 
   import Tayori.Admin.Components
 
-  alias Tayori.{Entries, Entry, Resolver, Translation}
+  alias Tayori.Admin.Writer
+  alias Tayori.{AI, Entries, Entry, Resolver, Translation}
 
   @accept ~w(.png .jpg .jpeg .gif .webp .pdf .mp4 .webm)
   @max_file_size 25_000_000
@@ -30,7 +31,10 @@ defmodule Tayori.Admin.EntryLive do
         language: List.first(locales),
         segment_groups: Resolver.segment_groups(socket.assigns.resolver),
         page_title: if(entry.id, do: "Edit entry", else: "New entry"),
-        now: DateTime.utc_now()
+        now: DateTime.utc_now(),
+        ai: socket.assigns.access == :all and AI.configured?(),
+        ai_open: false,
+        writers: %{}
       )
       |> assign_form(Entries.change(entry))
       |> assign_schedule(entry.published_at)
@@ -158,7 +162,169 @@ defmodule Tayori.Admin.EntryLive do
      |> push_navigate(to: socket.assigns.prefix)}
   end
 
+  # The AI: a draft from notes, a translation from the first language, and
+  # the actions of the editor's Assist menu on a passage.
+
+  def handle_event("ai_toggle", _params, socket) do
+    {:noreply, update(socket, :ai_open, &(!&1))}
+  end
+
+  def handle_event("ai_draft", %{"notes" => notes}, %{assigns: %{ai: true}} = socket) do
+    case String.trim(notes) do
+      "" ->
+        {:noreply, socket}
+
+      notes ->
+        locale = socket.assigns.language
+
+        {:noreply,
+         Writer.start(
+           socket,
+           Kotoba.Live.stream_ref(),
+           editor_id(locale),
+           locale,
+           :draft,
+           {:draft, notes, locale}, label: "Draft")}
+    end
+  end
+
+  def handle_event("ai_translate", _params, %{assigns: %{ai: true}} = socket) do
+    [first | _] = socket.assigns.config.locales
+    to = socket.assigns.language
+
+    case source(socket.assigns.form.source, first) do
+      %{title: title} = source when title not in [nil, ""] and to != first ->
+        {:noreply,
+         Writer.start(
+           socket,
+           Kotoba.Live.stream_ref(),
+           editor_id(to),
+           to,
+           :translate,
+           {:translate, source, first, to}, label: "Translation")}
+
+      _ ->
+        {:noreply,
+         put_flash(socket, :error, "Write the #{Tayori.Locales.name(first)} version first.")}
+    end
+  end
+
+  def handle_event(
+        "kotoba:assist",
+        %{"id" => editor, "ref" => ref, "action" => action, "text" => text},
+        %{assigns: %{ai: true}} = socket
+      ) do
+    with locale when is_binary(locale) <- locale_of(socket, editor),
+         true <- String.trim(text) != "" do
+      {:noreply,
+       Writer.start(socket, ref, editor, locale, :assist, {:assist, action, text, locale},
+         at: :selection,
+         label: action_label(action)
+       )}
+    else
+      _ -> {:noreply, socket}
+    end
+  end
+
+  def handle_event("kotoba:suggestion", %{"ref" => ref, "action" => action}, socket)
+      when action in ["stop", "reject"] do
+    {:noreply, Writer.stop(socket, ref)}
+  end
+
   def handle_event(_event, _params, socket), do: {:noreply, socket}
+
+  @impl true
+  def handle_info({:tayori_ai, ref, message}, socket) do
+    case Writer.handle(socket, ref, message) do
+      {socket, nil} -> {:noreply, socket}
+      {socket, {locale, fields}} -> {:noreply, put_fields(socket, locale, fields)}
+    end
+  end
+
+  def handle_info(_message, socket), do: {:noreply, socket}
+
+  defp locale_of(socket, editor) do
+    Enum.find(socket.assigns.config.locales, &(editor_id(&1) == editor))
+  end
+
+  defp action_label(action) do
+    Enum.find_value(AI.actions(), "AI", fn {id, label} -> if id == action, do: label end)
+  end
+
+  # The first language's version, for a translation: its body as Markdown.
+  defp source(changeset, locale) do
+    case changeset
+         |> Ecto.Changeset.get_assoc(:translations, :struct)
+         |> Enum.find(&(&1.locale == locale)) do
+      nil ->
+        nil
+
+      t ->
+        markdown =
+          with %Kotoba.Content{doc: doc} <- t.body,
+               {:ok, document} <- Kotoba.Document.parse(doc) do
+            Kotoba.Renderer.to_markdown(document)
+          else
+            _ -> ""
+          end
+
+        %{title: t.title, summary: t.summary || "", markdown: markdown}
+    end
+  end
+
+  # The title and summary of a draft or a translation go into the form; a
+  # draft fills only what the admin left empty.
+  defp put_fields(socket, locale, fields) do
+    changeset = socket.assigns.form.source
+    params = form_params(changeset)
+
+    translations =
+      Map.new(params["translations"], fn {index, t} ->
+        if t["locale"] == locale do
+          {index,
+           t
+           |> fill("title", fields.title)
+           |> fill("summary", fields.summary)}
+        else
+          {index, t}
+        end
+      end)
+
+    assign_form(
+      socket,
+      Entries.change(socket.assigns.entry, %{params | "translations" => translations})
+    )
+  end
+
+  defp fill(t, _key, blank) when blank in [nil, ""], do: t
+
+  defp fill(t, key, value) do
+    if (t[key] || "") == "", do: Map.put(t, key, value), else: t
+  end
+
+  # The params of the form as it is now, from its changeset.
+  defp form_params(changeset) do
+    translations =
+      changeset
+      |> Ecto.Changeset.get_assoc(:translations, :struct)
+      |> Enum.with_index()
+      |> Map.new(fn {t, index} ->
+        {Integer.to_string(index),
+         %{
+           "locale" => t.locale,
+           "title" => t.title || "",
+           "summary" => t.summary || "",
+           "body" => if(t.body, do: JSON.encode!(t.body.doc), else: "")
+         }}
+      end)
+
+    %{
+      "slug" => Ecto.Changeset.get_field(changeset, :slug) || "",
+      "categories" => Ecto.Changeset.get_field(changeset, :categories) || [],
+      "segments" => Ecto.Changeset.get_field(changeset, :segments) || [],
+      "translations" => translations
+    }
+  end
 
   # Saves the fields, then the status the admin asked for: the status
   # goes through publish/unpublish, so that an entry is announced when it
@@ -258,8 +424,54 @@ defmodule Tayori.Admin.EntryLive do
           <.link navigate={@prefix} class="ta-back" aria-label="Entries">←</.link>
           {if @entry.id, do: "Edit entry", else: "New entry"}
         </h1>
-        <.status :if={@entry.id} entry={@entry} now={@now} />
+        <div class="ta-toolbar-actions">
+          <.status :if={@entry.id} entry={@entry} now={@now} />
+          <button
+            :if={@ai}
+            type="button"
+            class={["ta-button", @ai_open && "ta-pressed"]}
+            phx-click="ai_toggle"
+            aria-expanded={to_string(@ai_open)}
+            aria-controls="ai-panel"
+          >
+            Write with AI
+          </button>
+        </div>
       </div>
+
+      <section :if={@ai and @ai_open} id="ai-panel" class="ta-panel ta-ai" aria-label="Write with AI">
+        <form id="ai-draft" phx-submit="ai_draft">
+          <div class="ta-field">
+            <label for="ai-notes">What shipped</label>
+            <textarea
+              id="ai-notes"
+              name="notes"
+              rows="4"
+              class="ta-input"
+              placeholder="The changes, as you have them: a list, commit messages, pull request titles."
+            ></textarea>
+          </div>
+          <div class="ta-actions">
+            <button type="submit" class="ta-button ta-primary" disabled={@writers != %{}}>
+              Draft in {Tayori.Locales.name(@language)}
+            </button>
+            <button
+              :if={@language != hd(@config.locales)}
+              type="button"
+              class="ta-button"
+              phx-click="ai_translate"
+              disabled={@writers != %{}}
+            >
+              Translate from {Tayori.Locales.name(hd(@config.locales))}
+            </button>
+            <span :if={@writers != %{}} class="ta-hint" role="status">Writing…</span>
+          </div>
+          <p class="ta-hint">
+            The text comes into the editor as a suggestion: accept it, or reject it.
+            Select a passage for Rewrite, Shorter, Warmer and Fix spelling, in the editor's Assist menu.
+          </p>
+        </form>
+      </section>
 
       <.form
         for={@form}
@@ -320,6 +532,7 @@ defmodule Tayori.Admin.EntryLive do
                   uploads={@uploads[upload_name(@config.locales, t[:locale].value)]}
                   placeholder="What changed, and why it matters to your people"
                   readonly={@read_only}
+                  assist={if @ai, do: AI.actions()}
                 />
               </div>
               <label
