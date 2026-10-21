@@ -7,6 +7,15 @@ and Tayori follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+### Added
+
+- `<tayori-news button="none">`: no button of the element's own, for a
+  page that opens the news from its own control (a menu item, a dot
+  instead of a count) with `open(control)` or `toggle(control)`; the
+  control gets the focus back when the panel closes. The element sends
+  `tayori:unread` with the count whenever it changes, with a button or
+  without.
+
 ### Changed
 
 - The app names the languages of its entries, in `:locales`:

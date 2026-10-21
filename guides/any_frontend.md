@@ -145,6 +145,8 @@ import "tayori"
 * `api` - the path or the address of the JSON API (`src` is its older
   name).
 * `label` - show the word beside the icon.
+* `button` - `none` draws no button: the page has its own control, which
+  opens the panel (below).
 * `poll` - how often to ask the count again, in seconds (300; 0 never).
   It also asks when the page comes back into view.
 * `reader-token` - the reader's token, on another origin (below).
@@ -169,8 +171,39 @@ with the markup of the LiveView components, so `tayori.css` (and
 `kotoba.css`, and `tayori-sumi.css` for Sumi) style it, in light and
 dark, and your CSS can too.
 
-It sends `tayori:open` and `tayori:close` events, which bubble, and
+It sends `tayori:open` and `tayori:close` events, which bubble,
+`tayori:unread` when the count of unread entries changes (its `detail` is
+`{count}`; the element's `unread` is the count now), and
 `tayori:token-expired` (below).
+
+### A button of your own
+
+With `button="none"`, the element draws no button, and your page opens
+the panel with its own control: a link in a menu, a quiet dot instead of
+a number. `open(control)` opens it, `toggle(control)` opens or closes it;
+`control` is your button, which a press does not count as outside the
+panel, and which gets the focus back when it closes. The count comes in
+`tayori:unread`, from `GET /unread` when the element starts, as it polls,
+and 0 when the panel opens, which marks the news seen.
+
+```html
+<button id="news" aria-label="What's new">What's new <span class="dot" hidden></span></button>
+<tayori-news api="/api/news" button="none"></tayori-news>
+
+<script>
+  const news = document.querySelector("tayori-news")
+  const own = document.getElementById("news")
+  own.addEventListener("click", () => news.toggle(own))
+  news.addEventListener("tayori:unread", (event) => {
+    own.querySelector(".dot").hidden = event.detail.count === 0
+  })
+</script>
+```
+
+Add the listener before the element is defined (before the script of the
+news runs), or read `unread` once after it, so that the first count is not
+missed. Say the count in your control's accessible name, as Tayori's
+button does.
 
 ### In React
 
