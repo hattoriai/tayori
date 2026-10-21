@@ -13,7 +13,7 @@ once):
 mix igniter.install tayori
 ```
 
-It adds `{:tayori, "~> 0.2"}` to your deps and makes these changes,
+It adds `{:tayori, "~> 0.3"}` to your deps and makes these changes,
 showing each one as a diff before it writes:
 
 * `lib/my_app_web/router.ex`: the admin at `/admin/news`, in the `/admin`
@@ -39,7 +39,7 @@ Add the dependency:
 ```elixir
 def deps do
   [
-    {:tayori, "~> 0.2"},
+    {:tayori, "~> 0.3"},
     # For writing with AI, with your own key. Optional.
     {:req_llm, "~> 1.6"}
   ]
