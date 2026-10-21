@@ -222,8 +222,12 @@ defmodule TayoriDev.Resolver do
   def resolve_access(%{role: :viewer}), do: :read_only
   def resolve_access(_reader), do: {:forbidden, "/"}
 
+  # The address prefills the campaigns' test letters: hanzo@atelier.test.
   @impl true
-  def author(user), do: %{"id" => user.id, "name" => user.name}
+  def author(user) do
+    first = user.name |> String.split() |> hd() |> String.downcase()
+    %{"id" => user.id, "name" => user.name, "email" => "#{first}@atelier.test"}
+  end
 
   @impl true
   def segments do

@@ -59,6 +59,7 @@ defmodule Tayori.Admin.CampaignLive do
         language: hd(locales),
         conditions: %{"audience" => campaign.audience, "goal" => campaign.goal},
         skip: nil,
+        leaving: nil,
         confirm: nil,
         preview: nil,
         test_address: author["email"] || "",
@@ -205,10 +206,13 @@ defmodule Tayori.Admin.CampaignLive do
 
   # ── The steps ───────────────────────────────────────────────────
 
+  # One step is open at a time. Another opened, a new one, or the open
+  # one closed, with changes not saved: the card asks first (leave/2).
   def handle_event("open_step", %{"id" => id}, socket) do
     case Enum.find(socket.assigns.campaign.steps, &(&1.id == id)) do
       nil -> {:noreply, socket}
-      step -> {:noreply, open_step(socket, step)}
+      _open when socket.assigns.open == id -> {:noreply, socket}
+      step -> {:noreply, leave(socket, {:open, step})}
     end
   end
 
@@ -228,15 +232,19 @@ defmodule Tayori.Admin.CampaignLive do
         letters: [%Letter{locale: Config.default_locale(config)}]
       }
 
-      {:noreply, open_step(socket, step)}
+      {:noreply, leave(socket, {:open, step})}
     else
       {:noreply, socket}
     end
   end
 
-  def handle_event("close_step", _params, socket) do
-    {:noreply, assign(socket, open: nil, step_form: nil)}
-  end
+  def handle_event("close_step", _params, socket), do: {:noreply, leave(socket, :close)}
+
+  # The changes are left, and the card goes where it was asked to.
+  def handle_event("leave_step", _params, %{assigns: %{leaving: to}} = socket) when to != nil,
+    do: {:noreply, go(socket, to)}
+
+  def handle_event("stay", _params, socket), do: {:noreply, assign(socket, :leaving, nil)}
 
   def handle_event("language", %{"locale" => locale}, socket) do
     if locale in socket.assigns.config.locales,
@@ -573,7 +581,7 @@ defmodule Tayori.Admin.CampaignLive do
 
     socket =
       if open not in [nil, "new"] and not Enum.any?(campaign.steps, &(&1.id == open)),
-        do: assign(socket, open: nil, step_form: nil),
+        do: assign(socket, open: nil, step_form: nil, leaving: nil),
         else: socket
 
     socket = assign(socket, campaign: campaign, page_title: campaign.name) |> assign_results()
@@ -591,10 +599,33 @@ defmodule Tayori.Admin.CampaignLive do
       open: step.id || "new",
       step: step,
       skip: step.skip_if,
+      leaving: nil,
       language: hd(socket.assigns.config.locales)
     )
     |> assign_step(step_changeset(step, %{}))
   end
+
+  # To another step, or closed: at once, unless the open step has changes
+  # not saved, which the card then asks about.
+  defp leave(socket, to) do
+    if unsaved?(socket.assigns), do: assign(socket, :leaving, to), else: go(socket, to)
+  end
+
+  defp go(socket, {:open, step}), do: open_step(socket, step)
+  defp go(socket, :close), do: assign(socket, open: nil, step_form: nil, leaving: nil)
+
+  # A new step not added yet, or a step whose form or skip changed since
+  # it opened or was saved.
+  defp unsaved?(%{open: nil}), do: false
+  defp unsaved?(%{access: access}) when access != :all, do: false
+  defp unsaved?(%{open: "new", step_form: form}), do: form.source.action != nil
+
+  defp unsaved?(%{step: step, step_form: form, skip: skip}),
+    do: form.source.changes != %{} or normalized(skip) != normalized(step.skip_if)
+
+  defp normalized(nil), do: nil
+  defp normalized(%{"all" => []}), do: nil
+  defp normalized(condition), do: condition
 
   defp assign_step(socket, changeset),
     do: assign(socket, :step_form, to_form(changeset, as: :step))
@@ -684,25 +715,24 @@ defmodule Tayori.Admin.CampaignLive do
   defp ask(socket, action) do
     campaign = socket.assigns.campaign
 
-    condition =
+    count =
       case action do
-        {:enroll, segment} -> both(campaign.audience, segment_condition(segment))
-        _broadcast -> campaign.audience
+        {:enroll, segment} ->
+          # A segment deleted meanwhile takes no one in.
+          case Campaigns.count_enrollable(campaign, segment_or_everyone(segment)) do
+            {:ok, count} -> count
+            {:error, _reason} -> 0
+          end
+
+        _broadcast ->
+          Audience.count(campaign.audience)
       end
 
-    assign(socket, confirm: %{action: action, count: Audience.count(condition)})
+    assign(socket, confirm: %{action: action, count: count})
   end
-
-  defp segment_condition(""), do: nil
-  defp segment_condition(id), do: %{"segment" => id, "op" => "in"}
 
   defp segment_or_everyone(""), do: nil
   defp segment_or_everyone(id), do: id
-
-  defp both(nil, nil), do: nil
-  defp both(nil, condition), do: condition
-  defp both(audience, nil), do: audience
-  defp both(audience, condition), do: %{"all" => [audience, condition]}
 
   defp start_preview(socket) do
     campaign = socket.assigns.campaign
@@ -974,6 +1004,7 @@ defmodule Tayori.Admin.CampaignLive do
     Map.take(assigns, [
       :step_form,
       :open,
+      :leaving,
       :language,
       :skip,
       :segments,
@@ -1266,6 +1297,7 @@ defmodule Tayori.Admin.CampaignLive do
   attr :campaign, Campaign, required: true
   attr :read_only, :boolean, required: true
   attr :locked, :boolean, required: true
+  attr :leaving, :any, default: nil
 
   defp step_editor(assigns) do
     wait = Form.input_value(assigns.step_form, :wait)
@@ -1378,7 +1410,23 @@ defmodule Tayori.Admin.CampaignLive do
         />
       </div>
 
-      <div :if={not @disabled} class="ta-actions">
+      <div :if={@leaving} class="ta-confirm" role="group" aria-labelledby="leaving-text" id="leaving">
+        <p id="leaving-text">
+          {if @open == "new",
+            do: "This step is not added yet. Leave it?",
+            else: "This step has changes that are not saved. Leave them?"}
+        </p>
+        <div class="ta-actions">
+          <button type="button" class="ta-button ta-primary" phx-click="stay" phx-mounted={JS.focus()}>
+            Keep writing
+          </button>
+          <button type="button" class="ta-button ta-quiet" phx-click="leave_step">
+            {if @open == "new", do: "Leave it", else: "Leave the changes"}
+          </button>
+        </div>
+      </div>
+
+      <div :if={not @disabled and is_nil(@leaving)} class="ta-actions">
         <button type="submit" form="step-form" class="ta-button ta-primary">
           {cond do
             not @sequence -> "Save letter"

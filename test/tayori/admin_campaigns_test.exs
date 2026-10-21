@@ -470,6 +470,66 @@ defmodule Tayori.AdminCampaignsTest do
       assert [_one] = Campaigns.get(campaign.id).steps
     end
 
+    test "a step with changes not saved asks before another opens", %{conn: conn} do
+      {:ok, campaign} = Campaigns.create(%{"name" => "Onboarding", "kind" => "sequence"})
+      {:ok, _} = Campaigns.add_step(campaign, step(0, "Welcome"))
+      {:ok, _} = Campaigns.add_step(campaign, step(1440, "Day one"))
+      {:ok, view, _html} = conn |> as_admin() |> live(@admin <> "/campaigns/#{campaign.id}")
+
+      # Opened, changed nothing: another opens at once.
+      view |> element("button[aria-label='Edit step 1']") |> render_click()
+      view |> form("#step-form") |> render_change(%{})
+      html = view |> element("button[aria-label='Edit step 2']") |> render_click()
+      assert html =~ "Step 2 goes after"
+      refute html =~ "not saved"
+
+      # Changed: the card asks, and keeps the changes.
+      changed = %{"step" => %{"letters" => %{"0" => %{"subject" => "Day one, again"}}}}
+      view |> form("#step-form") |> render_change(changed)
+      html = view |> element("button[aria-label='Edit step 1']") |> render_click()
+      assert html =~ "This step has changes that are not saved."
+      assert html =~ "Step 2 goes after"
+      assert html =~ "Day one, again"
+
+      html = view |> element("#leaving button", "Keep writing") |> render_click()
+      refute html =~ "not saved"
+      assert html =~ "Day one, again"
+
+      # Closing asks too; leaving the changes goes where it was asked.
+      view |> element("button", "Close") |> render_click()
+      html = view |> element("#leaving button", "Leave the changes") |> render_click()
+      refute html =~ "Step 2 goes after"
+      assert [_, %{letters: [%{subject: "Day one"}]}] = Campaigns.get(campaign.id).steps
+
+      # A skip changed is a change.
+      view |> element("button[aria-label='Edit step 1']") |> render_click()
+
+      html =
+        view
+        |> element("#skip-" <> hd(Campaigns.get(campaign.id).steps).id <> " button", "Add a rule")
+        |> render_click()
+
+      [rule] = rules(html, "skip-" <> hd(Campaigns.get(campaign.id).steps).id)
+
+      change_builder(view, "skip-" <> hd(Campaigns.get(campaign.id).steps).id, %{
+        rule => %{"subject" => "attribute:has_story", "checked" => "true"}
+      })
+
+      html = view |> element("button[aria-label='Edit step 2']") |> render_click()
+      assert html =~ "This step has changes that are not saved."
+      html = view |> element("#leaving button", "Leave the changes") |> render_click()
+      assert html =~ "Step 2 goes after"
+
+      # A new step written in, then cancelled: asked, then gone.
+      view |> element("button", "Close") |> render_click()
+      view |> element("button", "Add a step") |> render_click()
+      view |> form("#step-form") |> render_change(%{"step" => %{"wait_days" => "3"}})
+      html = view |> element("button", "Cancel") |> render_click()
+      assert html =~ "This step is not added yet. Leave it?"
+      html = view |> element("#leaving button", "Leave it") |> render_click()
+      refute html =~ "Step 3 goes after"
+    end
+
     test "starts, pauses, resumes and is archived; refusals in words", %{conn: conn} do
       {:ok, campaign} = Campaigns.create(%{"name" => "Onboarding", "kind" => "sequence"})
       {:ok, view, _html} = conn |> as_admin() |> live(@admin <> "/campaigns/#{campaign.id}")

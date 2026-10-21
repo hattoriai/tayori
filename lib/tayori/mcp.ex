@@ -32,8 +32,8 @@ if Code.ensure_loaded?(Sake.Server) do
         campaigns, and preview letters.
       * `tayori:campaigns:write` - save segments, write campaigns, their
         steps and letters, send test letters, pause campaigns.
-      * `tayori:campaigns:send` - start a sequence and send a broadcast:
-        email the app's people.
+      * `tayori:campaigns:send` - start a sequence, take people into it and
+        send a broadcast: email the app's people.
 
     The tools of a module that is off (the `:modules` of `Tayori.Config`)
     are not listed. The app's subject module gives the scopes to its roles
@@ -46,8 +46,9 @@ if Code.ensure_loaded?(Sake.Server) do
          mcp: [resolver: MyAppWeb.TayoriResolver]}
 
     Nothing is published but by `publish_entry`, nobody is emailed but by
-    `start_campaign`, `send_broadcast` and `send_test_letter`, and nothing
-    is deleted but a campaign's step (`remove_step`). See the
+    `start_campaign`, `enroll_people`, `send_broadcast` and
+    `send_test_letter`, and nothing is deleted but a campaign's step
+    (`remove_step`). See the
     [MCP](mcp.md) guide.
     """
 
@@ -97,14 +98,16 @@ if Code.ensure_loaded?(Sake.Server) do
       6. Start a sequence (start_campaign) or send a broadcast (send_broadcast) only when
          the person asks you to, and say first how many people it reaches (get_campaign
          gives the audience's count). These email real people and cannot be taken back.
-         pause_campaign stops a sequence, or a scheduled broadcast.
+         A sequence started by hand takes people in with enroll_people, by their ids or
+         by a condition or a segment (say first how many enter). pause_campaign stops a
+         sequence, or a scheduled broadcast.
       """
 
     scope "tayori:read", "Read the news and the inbox"
     scope "tayori:write", "Write, draft and publish the news"
     scope "tayori:campaigns:read", "Read the audience and the campaigns"
     scope "tayori:campaigns:write", "Write segments, campaigns and their letters"
-    scope "tayori:campaigns:send", "Start campaigns and send broadcasts to the app's people"
+    scope "tayori:campaigns:send", "Start campaigns, take people in and send broadcasts"
 
     tools [
       Tayori.MCP.Tools.ListEntries,
@@ -134,6 +137,7 @@ if Code.ensure_loaded?(Sake.Server) do
       Tayori.MCP.Tools.Campaigns.SendTestLetter,
       Tayori.MCP.Tools.Campaigns.PauseCampaign,
       Tayori.MCP.Tools.Campaigns.StartCampaign,
+      Tayori.MCP.Tools.Campaigns.EnrollPeople,
       Tayori.MCP.Tools.Campaigns.SendBroadcast
     ]
 

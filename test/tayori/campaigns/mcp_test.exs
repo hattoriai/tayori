@@ -17,7 +17,7 @@ if Code.ensure_loaded?(Sake.Server) do
     @read_tools ~w(list_audience preview_segment list_campaigns get_campaign preview_letter)
     @write_tools ~w(save_segment create_campaign update_campaign add_step update_step
                     remove_step send_test_letter pause_campaign)
-    @send_tools ~w(start_campaign send_broadcast)
+    @send_tools ~w(start_campaign enroll_people send_broadcast)
     @campaign_tools @read_tools ++ @write_tools ++ @send_tools
 
     @pro %{"attribute" => "plan", "op" => "in", "value" => ["pro"]}
@@ -532,6 +532,123 @@ if Code.ensure_loaded?(Sake.Server) do
 
         assert tool_error("start_campaign", %{"id" => broadcast.id}) =~
                  "send it with send_broadcast"
+      end
+
+      test "takes people into a sequence by their ids, once each" do
+        ada = person!(plan: "pro")
+        grace = person!(name: "Grace Hopper", plan: "free")
+
+        draft =
+          sequence!(%{"name" => "Pro tips", "audience" => @pro}, [step(0, "Hello")])
+
+        {:ok, paused} = Campaigns.pause(draft)
+
+        assert tool_error("enroll_people", %{
+                 "campaign_id" => paused.id,
+                 "person_ids" => [person_id(ada)]
+               }) =~ "The sequence is paused"
+
+        {:ok, campaign} = Campaigns.resume(Campaigns.get(paused.id))
+
+        result =
+          call!("enroll_people", %{
+            "campaign_id" => campaign.id,
+            "person_ids" => [person_id(ada), person_id(grace), "person:0", person_id(ada)]
+          })
+
+        assert result["entered"] == 1
+        assert result["campaign"]["id"] == campaign.id
+
+        assert [
+                 %{"person_id" => grace_id, "reason" => "Not in the sequence's audience."},
+                 %{"person_id" => "person:0", "reason" => "No one in the app has this id."}
+               ] = result["not_entered"]
+
+        assert grace_id == person_id(grace)
+        assert %{state: "active"} = enrollment(campaign, ada)
+
+        assert %{"entered" => 0, "not_entered" => [%{"reason" => reason}]} =
+                 call!("enroll_people", %{
+                   "campaign_id" => campaign.id,
+                   "person_ids" => [person_id(ada)]
+                 })
+
+        assert reason =~ "enters once"
+
+        assert tool_error("enroll_people", %{"campaign_id" => campaign.id}) =~
+                 "person_ids, a condition or a segment_id"
+
+        assert tool_error("enroll_people", %{
+                 "campaign_id" => campaign.id,
+                 "person_ids" => [person_id(ada)],
+                 "segment_id" => "x"
+               }) =~ "one of them"
+
+        assert tool_error("enroll_people", %{
+                 "campaign_id" => campaign.id,
+                 "person_ids" => Enum.map(1..501, &"person:#{&1}")
+               }) =~ "500 at most"
+
+        broadcast = broadcast!("News")
+
+        assert tool_error("enroll_people", %{
+                 "campaign_id" => broadcast.id,
+                 "person_ids" => [person_id(ada)]
+               }) =~ "This is a broadcast"
+      end
+
+      test "takes in a condition or a segment only at the count expected" do
+        ada = person!(plan: "pro")
+        grace = person!(name: "Grace Hopper", plan: "pro")
+        person!(name: "Linus Torvalds", plan: "free")
+        {:ok, segment} = Segments.create(%{"name" => "Pro", "condition" => @pro})
+
+        # Grace is in the sequence before: of those on Pro, only Ada may enter.
+        campaign = sequence!(%{"name" => "Tips"}, [step(0, "Hello")])
+        {:ok, _} = Campaigns.enroll(campaign, person_id(grace))
+
+        assert tool_error("enroll_people", %{"campaign_id" => campaign.id, "condition" => @pro}) =~
+                 "Give expected_people: 1 person would enter now"
+
+        error =
+          tool_error("enroll_people", %{
+            "campaign_id" => campaign.id,
+            "condition" => @pro,
+            "expected_people" => 2
+          })
+
+        assert error =~ "1 person would enter now, not 2: no one entered"
+        assert enrollment(campaign, ada) == nil
+
+        assert %{"entered" => 1, "not_entered" => []} =
+                 call!("enroll_people", %{
+                   "campaign_id" => campaign.id,
+                   "condition" => @pro,
+                   "expected_people" => 1
+                 })
+
+        assert %{state: "active"} = enrollment(campaign, ada)
+
+        # A segment: those in it, less those in the sequence, that is no one now.
+        assert %{"entered" => 0} =
+                 call!("enroll_people", %{
+                   "campaign_id" => campaign.id,
+                   "segment_id" => segment.id,
+                   "expected_people" => 0
+                 })
+
+        assert tool_error("enroll_people", %{
+                 "campaign_id" => campaign.id,
+                 "segment_id" => segment.id,
+                 "condition" => @pro,
+                 "expected_people" => 0
+               }) =~ "not both"
+
+        assert tool_error("enroll_people", %{
+                 "campaign_id" => campaign.id,
+                 "condition" => %{"attribute" => "nope", "op" => "true"},
+                 "expected_people" => 0
+               }) =~ "nope"
       end
 
       test "sends a broadcast only to the count expected, now" do

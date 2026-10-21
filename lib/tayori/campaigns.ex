@@ -64,6 +64,7 @@ defmodule Tayori.Campaigns do
     Delivery,
     Enrollment,
     Letter,
+    Runner,
     Segment,
     Segments,
     Step,
@@ -547,7 +548,7 @@ defmodule Tayori.Campaigns do
          {:audience, true} <- {:audience, Audience.match?(person_id, campaign.audience, now)},
          first = first_at(config, campaign, now),
          {:ok, enrollment} <-
-           config.repo.transaction(fn ->
+           Runner.transaction(config, fn ->
              insert_enrollment(config, campaign, person_id, now, first)
            end) do
       changed(config, campaign.id)
@@ -620,6 +621,45 @@ defmodule Tayori.Campaigns do
     end
   end
 
+  @doc """
+  How many people would enter a sequence now by `enroll_segment/3`, with
+  the same condition or segment: those who match it and the sequence's
+  audience, less those in the sequence before. For saying how many before
+  taking them in.
+  """
+  @spec count_enrollable(
+          Campaign.t(),
+          Conditions.t() | Segment.t() | String.t(),
+          DateTime.t()
+        ) :: {:ok, non_neg_integer()} | {:error, term()}
+  def count_enrollable(%Campaign{} = campaign, condition, now \\ DateTime.utc_now()) do
+    config = Config.get()
+
+    with {:ok, condition} <- who(condition) do
+      counter = :counters.new(1, [])
+
+      Audience.each_batch(
+        both(campaign.audience, condition),
+        500,
+        fn recipients ->
+          ids = Enum.map(recipients, & &1.id)
+
+          before =
+            from(e in Enrollment,
+              where: e.campaign_id == ^campaign.id and e.person in ^ids,
+              select: count()
+            )
+            |> config.repo.one(prefix: config.prefix)
+
+          :counters.add(counter, 1, length(ids) - before)
+        end,
+        now
+      )
+
+      {:ok, :counters.get(counter, 1)}
+    end
+  end
+
   defp enroll_batch(config, campaign, recipients, now, first) do
     stamp = usec(now)
 
@@ -639,7 +679,7 @@ defmodule Tayori.Campaigns do
       end)
 
     {:ok, ids} =
-      config.repo.transaction(fn ->
+      Runner.transaction(config, fn ->
         config.repo.insert_all(Enrollment, rows,
           on_conflict: :nothing,
           conflict_target: [:campaign_id, :person],
@@ -1015,7 +1055,7 @@ defmodule Tayori.Campaigns do
   # A write of a campaign, with its jobs (Oban), in one transaction; then
   # the pages hear of it, and without Oban the scheduler looks again.
   defp write(config, campaign_id \\ nil, fun) do
-    config.repo.transaction(fn ->
+    Runner.transaction(config, fn ->
       case fun.() do
         {:ok, result} -> result
         {:error, error} -> config.repo.rollback(error)

@@ -51,6 +51,7 @@ With the `:campaigns` module on (`modules: [:changelog, :campaigns]`):
 | `send_test_letter` | `tayori:campaigns:write` | A step's letter to one address (`to`, else the writer's), "[Test] " before its subject, with a person's merge tags |
 | `pause_campaign` | `tayori:campaigns:write` | Pauses an active sequence, or takes a scheduled broadcast back to a draft |
 | `start_campaign` | `tayori:campaigns:send` | Starts a sequence, a draft, or resumes a paused one |
+| `enroll_people` | `tayori:campaigns:send` | Takes people into an active sequence: `person_ids` (500 at most), or everyone a `condition` or a `segment_id` matches, with `expected_people` the number who would enter now; answers how many `entered`, and why the others did not |
 | `send_broadcast` | `tayori:campaigns:send` | Sends a broadcast now, or `at` a time; `expected_recipients` must be the audience's count now |
 
 The tools of a module that is off are not listed. A condition is a JSON
@@ -77,13 +78,16 @@ What every tool keeps to:
   changes a status. The server's instructions tell the model to publish
   only when you ask it to; `publish_entry` is marked destructive, so your
   client asks you before it runs.
-* **Nobody emailed but by `start_campaign` and `send_broadcast`.** And
-  a test by `send_test_letter`, to the address given only. The
-  instructions tell the model to start or send only when you ask, and to
-  say first how many people it reaches; both tools are marked
-  destructive and open-world. `send_broadcast` takes
-  `expected_recipients`, the count the model told you: when the audience
-  has another count now, nothing is sent, and the error gives the count.
+* **Nobody emailed but by `start_campaign`, `enroll_people` and
+  `send_broadcast`.** And a test by `send_test_letter`, to the address
+  given only. The instructions tell the model to start, take people in
+  or send only when you ask, and to say first how many people it
+  reaches; the three tools are marked destructive and open-world.
+  `send_broadcast` takes `expected_recipients`, the count the model told
+  you: when the audience has another count now, nothing is sent, and the
+  error gives the count. `enroll_people` with a condition or a segment
+  takes `expected_people` the same way: those who match it and the
+  sequence's audience, less those in the sequence before.
 * **Nothing deleted.** There is no tool that deletes an entry, a change,
   a category, a segment or a campaign. A change put aside comes back in
   the admin. `remove_step` removes a step of a sequence; the letters it
@@ -184,8 +188,8 @@ rest: the subject module, the `Sake` child, the OAuth routes.
 * `tayori:campaigns:read` - "Read the audience and the campaigns".
 * `tayori:campaigns:write` - "Write segments, campaigns and their
   letters" (and send a test letter).
-* `tayori:campaigns:send` - "Start campaigns and send broadcasts to the
-  app's people".
+* `tayori:campaigns:send` - "Start campaigns, take people in and send
+  broadcasts".
 
 Keep `tayori:campaigns:send` apart: a role may write the letters and
 leave the sending to another. Your subject module's `scopes_for/2` maps your roles to them, with the
@@ -267,6 +271,17 @@ Claude says it reaches 182 people, and calls `send_broadcast` with
 `expected_recipients: 182` and `at: "2026-10-22T10:00:00Z"`. Had
 someone joined in the meantime, nothing would have been sent, and
 Claude would have told you the new count.
+
+> **You:** And put the Pro people of last month into the onboarding
+> sequence too.
+
+They signed up before the onboarding sequence started, so they never
+entered it.
+Claude tries the condition (`preview_segment`), then asks
+`enroll_people` without the number: the error says 40 would enter (the
+others are in it already). It tells you so, and, when you agree, calls
+`enroll_people` again with `expected_people: 40`. Each gets the first
+letter at its time from now.
 
 ## Screenshots from a browser agent
 

@@ -2665,9 +2665,28 @@ select.ta-input {
 }
 
 /* Fields side by side start at the top, with a hint or without. */
-.ta-grid-2 > .ta-field,
 .ta-preview-controls > .ta-field {
   align-content: start;
+}
+
+/* Two fields side by side share their rows (label, input, hint, error),
+   so that the inputs line up whatever their labels and hints: a label of
+   two lines, or a hint on one side only, moves both, or neither. The
+   gaps are margins, so that the rows a field leaves empty take no room. */
+.ta-grid-2 > .ta-field {
+  grid-row: span 4;
+  grid-template-rows: subgrid;
+  row-gap: 0;
+  align-content: start;
+}
+
+.ta-grid-2 > .ta-field > label {
+  align-self: end;
+  margin-bottom: 0.375rem;
+}
+
+.ta-grid-2 > .ta-field > .ta-input ~ * {
+  margin-top: 0.375rem;
 }
 
 .ta-letter-steps .ta-card {

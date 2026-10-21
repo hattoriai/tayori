@@ -225,10 +225,15 @@ defmodule Tayori.CampaignsTest do
 
       {:ok, segment} = Segments.create(%{"name" => "Pro", "condition" => @pro})
 
+      # How many would enter is how many do.
+      assert {:ok, 2} = Campaigns.count_enrollable(campaign, segment, @t0)
       assert {:ok, 2} = Campaigns.enroll_segment(campaign, segment, @t0)
+      assert {:ok, 0} = Campaigns.count_enrollable(campaign, segment.id, @t0)
       assert {:ok, 0} = Campaigns.enroll_segment(campaign, segment.id, @t0)
       # The team plan is not in the audience.
+      assert {:ok, 1} = Campaigns.count_enrollable(campaign, nil, @t0)
       assert {:ok, 1} = Campaigns.enroll_segment(campaign, nil, @t0)
+      assert {:error, :not_found} = Campaigns.count_enrollable(campaign, Ecto.UUID.generate())
       assert Campaigns.results(campaign).entered == 3
 
       assert {:error, :not_found} = Campaigns.enroll_segment(campaign, Ecto.UUID.generate(), @t0)
