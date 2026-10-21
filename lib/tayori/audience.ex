@@ -97,10 +97,14 @@ defmodule Tayori.Audience do
   @callback events() :: [{String.t(), String.t()}]
 
   @doc """
-  The order the people are walked in, for batches. Without this function,
-  by the `id` of the `:person` binding.
+  The key the people are walked by, in batches: a `dynamic` on the
+  `:person` binding whose value is unique to each person and sortable,
+  such as `dynamic([person: u], u.id)`. Each batch starts after the last
+  key of the one before, so that a person added or removed during a walk
+  moves no one else. Without this function, the `id` of the `:person`
+  binding.
   """
-  @callback order(Ecto.Query.t()) :: Ecto.Query.t()
+  @callback key() :: Ecto.Query.dynamic_expr()
 
   @doc """
   The id of the person as SQL, the same string `c:recipient/1` gives:
@@ -109,7 +113,7 @@ defmodule Tayori.Audience do
   """
   @callback person_id() :: Ecto.Query.dynamic_expr()
 
-  @optional_callbacks attributes: 0, can_email?: 2, events: 0, order: 1, person_id: 0
+  @optional_callbacks attributes: 0, can_email?: 2, events: 0, key: 0, person_id: 0
 
   @doc """
   An attribute: a key (an atom or a string), its label, its type (see
@@ -194,26 +198,59 @@ defmodule Tayori.Audience do
 
   @doc """
   Walks every person who matches a condition, in batches of `size`
-  recipients: `fun` gets each batch, in the order of `c:order/1`.
+  recipients: `fun` gets each batch, in the order of `c:key/0`. Each
+  batch is read after the last key of the one before (keyset
+  pagination): a person added or removed during the walk moves no one
+  else, and every batch costs the same.
   """
   @spec each_batch(Conditions.t(), pos_integer(), ([Recipient.t()] -> term()), DateTime.t()) ::
           :ok
   def each_batch(condition, size, fun, now \\ DateTime.utc_now())
       when is_integer(size) and size > 0 and is_function(fun, 1) do
     {config, audience} = audience!()
+    key = key(audience)
     query = audience |> matching(condition, now) |> ordered(audience)
-    walk(config, audience, query, size, 0, fun)
+    walk(config, audience, query, key, size, :start, fun)
   end
 
-  defp walk(config, audience, query, size, offset, fun) do
-    rows = query |> limit(^size) |> offset(^offset) |> config.repo.all()
+  defp walk(config, audience, query, key, size, last, fun) do
+    {last, rows} = query |> after_key(key, last) |> limit(^size) |> page(config, query, key)
 
     if rows != [], do: fun.(Enum.map(rows, &audience.recipient/1))
 
     if length(rows) == size,
-      do: walk(config, audience, query, size, offset + size, fun),
+      do: walk(config, audience, query, key, size, last, fun),
       else: :ok
   end
+
+  defp after_key(query, _key, :start), do: query
+  defp after_key(query, key, last), do: where(query, ^dynamic(^key > ^last))
+
+  # A page's rows, as the query gives them, and the last key. The key is
+  # read with the row; a query that selects something of its own (not its
+  # first binding) has its page's keys read first, then their rows.
+  defp page(%Ecto.Query{select: nil} = page, config, _query, key) do
+    rows = page |> select(^%{key: key, row: dynamic([p], p)}) |> config.repo.all()
+    {last_key(rows, & &1.key), Enum.map(rows, & &1.row)}
+  end
+
+  defp page(page, config, query, key) do
+    keys =
+      page
+      |> exclude(:select)
+      |> exclude(:preload)
+      |> select(^%{key: key})
+      |> config.repo.all()
+      |> Enum.map(& &1.key)
+
+    rows =
+      if keys == [], do: [], else: query |> where(^dynamic(^key in ^keys)) |> config.repo.all()
+
+    {last_key(keys, & &1), rows}
+  end
+
+  defp last_key([], _fun), do: nil
+  defp last_key(rows, fun), do: rows |> List.last() |> fun.()
 
   @doc "A person by their id, as a recipient, or nil."
   @spec get(String.t()) :: Recipient.t() | nil
@@ -243,9 +280,13 @@ defmodule Tayori.Audience do
   end
 
   defp ordered(query, audience) do
-    if exports?(audience, :order, 1),
-      do: audience.order(query),
-      else: order_by(query, [person: p], asc: p.id)
+    query |> exclude(:order_by) |> order_by(^[asc: key(audience)])
+  end
+
+  @doc false
+  # The key the people are walked by (c:key/0).
+  def key(audience) do
+    if exports?(audience, :key, 0), do: audience.key(), else: dynamic([person: p], p.id)
   end
 
   defp audience! do

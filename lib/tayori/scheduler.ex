@@ -25,6 +25,10 @@ defmodule Tayori.Scheduler do
   # whose time came, sends the broadcasts whose time came
   # (Tayori.Campaigns.Runner.run_due/3), and deletes the old events once
   # a day; Tayori.Campaigns wakes it after a write.
+  #
+  # A wake is cheap, as it comes after every write: a message to the
+  # scheduler, found by a global name (a local lookup), and the ticks
+  # that came while it ran are one run.
 
   use GenServer
 
@@ -36,6 +40,7 @@ defmodule Tayori.Scheduler do
   require Logger
 
   @interval :timer.minutes(1)
+  @wake {__MODULE__, :wake}
 
   def start_link(%Config{} = config) do
     GenServer.start_link(__MODULE__, config, name: __MODULE__)
@@ -43,9 +48,9 @@ defmodule Tayori.Scheduler do
 
   @doc "Looks for entries to announce now, on whichever node the scheduler runs."
   def wake do
-    case PhoenixMountable.Singleton.whereis(__MODULE__) do
+    case :global.whereis_name(@wake) do
       pid when is_pid(pid) -> send(pid, :tick)
-      nil -> :ok
+      :undefined -> :ok
     end
 
     :ok
@@ -91,6 +96,7 @@ defmodule Tayori.Scheduler do
 
   @impl GenServer
   def init(config) do
+    :global.re_register_name(@wake, self(), &:global.random_notify_name/3)
     send(self(), :tick)
 
     # A deploy's new code may bring new changes (Tayori.Inbox).
@@ -105,6 +111,7 @@ defmodule Tayori.Scheduler do
   @impl GenServer
   def handle_info(:tick, %{config: config} = state) do
     if state.timer, do: Process.cancel_timer(state.timer)
+    drain_ticks()
 
     try do
       announce_due(config)
@@ -134,6 +141,15 @@ defmodule Tayori.Scheduler do
 
   # Anything else (a message of a task it started) is nothing to it.
   def handle_info(_message, state), do: {:noreply, state}
+
+  # The wakes that came meanwhile: this run is theirs.
+  defp drain_ticks do
+    receive do
+      :tick -> drain_ticks()
+    after
+      0 -> :ok
+    end
+  end
 
   defp claim(config, id, now) do
     {count, _} =

@@ -11,7 +11,8 @@ defmodule Tayori.Admin.CampaignLive do
   # says how many people it reaches), and its results. The preview shows
   # a saved letter as a person of the audience gets it, and sends a test.
   #
-  # It follows the changes of the other admins, and the letters as they go.
+  # It follows the changes of the other admins, and the letters as they go:
+  # the messages of a second are one reload.
 
   use Phoenix.LiveView, layout: false
   use PhoenixMountable.Path, mountable: Tayori.Router
@@ -29,6 +30,9 @@ defmodule Tayori.Admin.CampaignLive do
   @accept ~w(.png .jpg .jpeg .gif .webp)
   @max_file_size 25_000_000
   @kinds ["sequence", "broadcast"]
+  # The changes heard within this time are one reload.
+  @reload_after 1_000
+  @has_people "People are in this sequence: change the times of its steps instead."
 
   @impl true
   def mount(params, _session, socket) do
@@ -64,7 +68,8 @@ defmodule Tayori.Admin.CampaignLive do
         preview: nil,
         test_address: author["email"] || "",
         enroll_segment: "",
-        changed_elsewhere: false
+        changed_elsewhere: false,
+        reload_pending: false
       )
       |> assign_settings(Campaigns.change(campaign))
       |> assign_segments()
@@ -330,7 +335,8 @@ defmodule Tayori.Admin.CampaignLive do
       {:noreply, reload(socket)}
     else
       {:error, reason} ->
-        {:noreply, put_flash(socket, :error, error_text(reason, socket.assigns.campaign))}
+        {:noreply,
+         socket |> put_flash(:error, error_text(reason, socket.assigns.campaign)) |> reload()}
 
       nil ->
         {:noreply, socket}
@@ -376,7 +382,7 @@ defmodule Tayori.Admin.CampaignLive do
          |> assign_results()}
 
       {:error, reason} ->
-        {:noreply, put_flash(socket, :error, error_text(reason, campaign))}
+        {:noreply, refused(socket, reason)}
     end
   end
 
@@ -394,7 +400,7 @@ defmodule Tayori.Admin.CampaignLive do
          |> push_navigate(to: ~m"/campaigns?#{[kind: socket.assigns.campaign.kind]}")}
 
       {:error, reason} ->
-        {:noreply, put_flash(socket, :error, error_text(reason, socket.assigns.campaign))}
+        {:noreply, refused(socket, reason)}
     end
   end
 
@@ -471,8 +477,7 @@ defmodule Tayori.Admin.CampaignLive do
          |> assign_results()}
 
       {:error, reason} ->
-        {:noreply,
-         socket |> assign(confirm: nil) |> put_flash(:error, error_text(reason, campaign))}
+        {:noreply, socket |> assign(confirm: nil) |> refused(reason)}
     end
   end
 
@@ -485,7 +490,7 @@ defmodule Tayori.Admin.CampaignLive do
          |> assign(campaign: campaign, schedule: to_form(%{"at" => nil}, as: :schedule))}
 
       {:error, reason} ->
-        {:noreply, put_flash(socket, :error, error_text(reason, socket.assigns.campaign))}
+        {:noreply, refused(socket, reason)}
     end
   end
 
@@ -561,10 +566,15 @@ defmodule Tayori.Admin.CampaignLive do
   def handle_info(
         {Tayori, :campaign_changed, id},
         %{assigns: %{campaign: %Campaign{id: id}}} = socket
-      ) do
-    case Campaigns.get(id) do
+      ),
+      do: {:noreply, CampaignsLive.reload_soon(socket, {__MODULE__, :reload}, @reload_after)}
+
+  def handle_info({__MODULE__, :reload}, socket) do
+    socket = assign(socket, reload_pending: false)
+
+    case Campaigns.get(socket.assigns.campaign.id) do
       nil -> {:noreply, assign(socket, changed_elsewhere: :deleted)}
-      _campaign -> {:noreply, reload(socket)}
+      campaign -> {:noreply, reload(socket, campaign)}
     end
   end
 
@@ -575,8 +585,8 @@ defmodule Tayori.Admin.CampaignLive do
 
   # The campaign as it is now, the forms as they are: a step deleted
   # elsewhere closes.
-  defp reload(socket) do
-    campaign = Campaigns.get(socket.assigns.campaign.id)
+  defp reload(socket, campaign \\ nil) do
+    campaign = campaign || Campaigns.get(socket.assigns.campaign.id)
     open = socket.assigns.open
 
     socket =
@@ -592,6 +602,18 @@ defmodule Tayori.Admin.CampaignLive do
   end
 
   # ── Helpers ─────────────────────────────────────────────────────
+
+  # A refusal in words, with the campaign as it is now: another admin, or
+  # the sender, may have changed it since the page last read it.
+  defp refused(socket, reason) do
+    socket =
+      case Campaigns.get(socket.assigns.campaign.id) do
+        nil -> socket
+        campaign -> reload(socket, campaign)
+      end
+
+    put_flash(socket, :error, error_text(reason, socket.assigns.campaign))
+  end
 
   defp open_step(socket, %Step{} = step) do
     socket
@@ -839,6 +861,22 @@ defmodule Tayori.Admin.CampaignLive do
     do: "Only a draft or an archived campaign is deleted. Archive it first."
 
   def error_text(:not_active, _campaign), do: "Only an active sequence takes people in."
+
+  def error_text(:stale, _campaign),
+    do: "Another admin changed this campaign meanwhile: here it is as it is now."
+
+  def error_text(:has_people, _campaign), do: @has_people
+
+  def error_text(:incomplete_letter, %Campaign{kind: kind}) do
+    locale = Tayori.Locales.name(Config.default_locale(Config.get()))
+
+    if kind == "broadcast",
+      do: "A scheduled broadcast keeps its letter in #{locale} with a subject and a body.",
+      else:
+        "This sequence sends each step it reaches: the letter in #{locale} needs a subject " <>
+          "and a body."
+  end
+
   def error_text(:not_found, _campaign), do: "That segment no longer exists."
 
   def error_text({:status, status}, _campaign),
@@ -854,7 +892,9 @@ defmodule Tayori.Admin.CampaignLive do
       assign(assigns,
         read_only: assigns.access != :all,
         locked: locked?(assigns.campaign),
-        sequence: assigns.campaign.kind == "sequence"
+        sequence: assigns.campaign.kind == "sequence",
+        movable: movable?(assigns.results),
+        has_people: @has_people
       )
 
     ~H"""
@@ -923,6 +963,13 @@ defmodule Tayori.Admin.CampaignLive do
                   Each letter goes at its time after the person entered, unless its skip matches them then.
                 </p>
               </div>
+              <p
+                :if={not @movable and not @read_only and not @locked and length(@campaign.steps) > 1}
+                class="ta-hint"
+                id="steps-fixed"
+              >
+                <.icon name="info" />{@has_people}
+              </p>
               <ol :if={@campaign.steps != [] or @open == "new"} class="ta-letter-steps">
                 <li :for={{step, n} <- Enum.with_index(@campaign.steps, 1)} id={"step-#{step.id}"}>
                   <.step_editor
@@ -937,6 +984,7 @@ defmodule Tayori.Admin.CampaignLive do
                     last={n == length(@campaign.steps)}
                     results={step_results(@results, step)}
                     read_only={@read_only or @locked}
+                    movable={@movable}
                     config={@config}
                   />
                 </li>
@@ -1015,6 +1063,10 @@ defmodule Tayori.Admin.CampaignLive do
       :locked
     ])
   end
+
+  # A sequence's steps move until someone enters it (Campaigns.move_step/2).
+  defp movable?(%{entered: entered}), do: entered == 0
+  defp movable?(_results), do: true
 
   defp step_results(nil, _step), do: nil
   defp step_results(%{steps: steps}, step), do: Enum.find(steps, &(&1.step_id == step.id))
@@ -1197,6 +1249,7 @@ defmodule Tayori.Admin.CampaignLive do
   attr :last, :boolean, required: true
   attr :results, :map, default: nil
   attr :read_only, :boolean, required: true
+  attr :movable, :boolean, default: true
   attr :config, :any, required: true
 
   defp step_summary(assigns) do
@@ -1237,7 +1290,7 @@ defmodule Tayori.Admin.CampaignLive do
         </div>
         <div class="ta-row-actions">
           <button
-            :if={not @read_only}
+            :if={not @read_only and @movable}
             type="button"
             class="ta-icon-button"
             phx-click="move_step"
@@ -1249,7 +1302,7 @@ defmodule Tayori.Admin.CampaignLive do
             <.icon name="chevron-up" />
           </button>
           <button
-            :if={not @read_only}
+            :if={not @read_only and @movable}
             type="button"
             class="ta-icon-button"
             phx-click="move_step"

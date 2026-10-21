@@ -9,6 +9,36 @@ defmodule Tayori.AdminCampaignsTest do
   @admin "/admin/news"
 
   # The ids of the builder's rules and groups, in the order of the page.
+  # A page shows a change heard within a second or so: its reloads are
+  # one for the changes of a second.
+  defp soon(view, text, tries \\ 40) do
+    cond do
+      render(view) =~ text -> true
+      tries == 0 -> false
+      true -> Process.sleep(50) && soon(view, text, tries - 1)
+    end
+  end
+
+  # The calls of functions in pages' processes, as they handle what
+  # `fun` sends them: by pid and function.
+  defp count_calls(pids, mfas, fun) do
+    for mfa <- mfas, do: :erlang.trace_pattern(mfa, true, [:local])
+    for pid <- pids, do: :erlang.trace(pid, true, [:call, {:tracer, self()}])
+    fun.()
+    for pid <- pids, do: :erlang.trace(pid, false, [:call])
+    for mfa <- mfas, do: :erlang.trace_pattern(mfa, false, [:local])
+    traces(%{})
+  end
+
+  defp traces(counts) do
+    receive do
+      {:trace, pid, :call, {m, f, args}} ->
+        traces(Map.update(counts, {pid, {m, f, length(args)}}, 1, &(&1 + 1)))
+    after
+      0 -> counts
+    end
+  end
+
   defp rules(html, builder),
     do:
       Regex.scan(~r/id="#{builder}-(c\d+)-subject"/, html, capture: :all_but_first)
@@ -326,7 +356,7 @@ defmodule Tayori.AdminCampaignsTest do
     test "follow the changes of other admins", %{conn: conn} do
       {:ok, view, _html} = conn |> as_admin() |> live(@admin <> "/campaigns")
       {:ok, _} = Campaigns.create(%{"name" => "Made elsewhere", "kind" => "sequence"})
-      assert render(view) =~ "Made elsewhere"
+      assert soon(view, "Made elsewhere")
     end
   end
 
@@ -468,6 +498,54 @@ defmodule Tayori.AdminCampaignsTest do
       html = view |> element("button[aria-label='Delete step 2']") |> render_click()
       assert html =~ "The step is deleted."
       assert [_one] = Campaigns.get(campaign.id).steps
+    end
+
+    test "with people in it, its steps keep their order, and a new step its letter",
+         %{conn: conn} do
+      campaign = sequence!([step(0, "Welcome"), step(1440, "Day one")])
+      {:ok, view, html} = conn |> as_admin() |> live(@admin <> "/campaigns/#{campaign.id}")
+      assert html =~ "Move step 2 up"
+      refute html =~ "People are in this sequence"
+
+      {:ok, _} = Campaigns.enroll(campaign, person_id(person!(name: "Ada")))
+      {:ok, view, html} = conn |> as_admin() |> live(@admin <> "/campaigns/#{campaign.id}")
+      refute html =~ "Move step 2 up"
+      assert html =~ "People are in this sequence: change the times of its steps instead."
+
+      # Asked all the same (a page from before): refused, in words.
+      [_welcome, day_one] = campaign.steps
+      html = render_click(view, "move_step", %{"id" => day_one.id, "to" => "up"})
+      assert html =~ "People are in this sequence: change the times of its steps instead."
+
+      # A new step of a running sequence is saved with its letter whole.
+      view |> element("button", "Add a step") |> render_click()
+
+      html =
+        view
+        |> form("#step-form")
+        |> render_submit(%{
+          "step" => %{
+            "wait_days" => "3",
+            "letters" => %{"0" => %{"locale" => "en", "subject" => "Day three"}}
+          }
+        })
+
+      assert html =~ "the letter in English needs a subject and a body"
+      assert length(Campaigns.get(campaign.id).steps) == 2
+    end
+
+    test "a change another admin made meanwhile is not undone", %{conn: conn} do
+      campaign = sequence!([step(0, "Welcome")])
+      {:ok, view, _html} = conn |> as_admin() |> live(@admin <> "/campaigns/#{campaign.id}")
+
+      # Paused and archived elsewhere, before this page heard of it.
+      {:ok, paused} = Campaigns.pause(campaign)
+      {:ok, _} = Campaigns.archive(paused)
+
+      html = view |> element("button", "Pause") |> render_click()
+      assert html =~ "Another admin changed this campaign meanwhile"
+      assert Campaigns.get(campaign.id).status == "archived"
+      assert html =~ "Archived"
     end
 
     test "a step with changes not saved asks before another opens", %{conn: conn} do
@@ -656,9 +734,31 @@ defmodule Tayori.AdminCampaignsTest do
       campaign = sequence!([step(0, "Welcome")])
       {:ok, view, _html} = conn |> as_admin() |> live(@admin <> "/campaigns/#{campaign.id}")
       {:ok, _} = Campaigns.add_step(campaign, step(1440, "Added elsewhere"))
-      assert render(view) =~ "Added elsewhere"
+      assert soon(view, "Added elsewhere")
       {:ok, _} = Campaigns.pause(campaign)
-      assert render(view) =~ "Resume"
+      assert soon(view, "Resume")
+    end
+
+    test "hears many changes as one reload", %{conn: conn} do
+      campaign = sequence!([step(0, "Welcome")])
+      {:ok, view, _html} = conn |> as_admin() |> live(@admin <> "/campaigns/#{campaign.id}")
+      {:ok, list, _html} = conn |> as_admin() |> live(@admin <> "/campaigns")
+
+      counts =
+        count_calls([view.pid, list.pid], [{Campaigns, :results, 1}, {Campaigns, :list, 1}], fn ->
+          for _ <- 1..5,
+              page <- [view, list],
+              do: send(page.pid, {Tayori, :campaign_changed, campaign.id})
+
+          render(view)
+          render(list)
+          Process.sleep(1_200)
+          render(view)
+          render(list)
+        end)
+
+      assert counts[{view.pid, {Campaigns, :results, 1}}] == 1
+      assert counts[{list.pid, {Campaigns, :list, 1}}] == 1
     end
 
     test "an unknown campaign is a 404", %{conn: conn} do

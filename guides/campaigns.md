@@ -117,16 +117,23 @@ plug Plug.Parsers,
 
 With Oban (the `:oban` option), each person in a sequence has one job,
 at the time of their next step, moved when it moves; a broadcast has a
-job at its time; each letter is a job, tried five times before it is
-"failed". At boot, Tayori gives Oban the jobs that may be missing, on
-every node (they are unique). Start Tayori after Oban.
+job at its time, tried again from where it stopped when it fails; each
+letter is a job, tried five times before it is "failed". A sweep, one
+job in the cluster at boot and then every hour, gives a job to what lost
+its own: a person more than 5 minutes past their time, a broadcast more
+than 5 minutes past its time or sending with no batch in 5 minutes, a
+letter queued for more than 15 minutes (but those of a paused
+sequence). A letter is claimed before it goes, so that one with two jobs
+goes once. Start Tayori after Oban.
 
 Without Oban, the scheduler looks each minute, and when a write makes
 something due sooner, at what is due: the people whose time came, 200
-at a time, and the broadcasts. The letters go from a task, one after the
-other, tried once; one that fails is "failed", and logged. A node
-stopped while it sends loses what it had not sent: no one gets a letter
-twice, but some may not get it. Run Oban when the letters matter.
+at a time, the broadcasts, and a broadcast a stopped node or an error
+left half sent (no one gets it twice). The letters go from a task, one
+after the other, tried once; one that fails is "failed", and logged. A
+node stopped while it sends loses the letters it had not sent: no one
+gets a letter twice, but some may not get it. Run Oban when the letters
+matter.
 
 ## The audience
 
@@ -240,8 +247,12 @@ The callbacks:
 * `can_email?/2` - whether a person may get a letter of a purpose,
   `:product` or `:marketing`. Without it, everyone may.
 * `events/0` - the events the admin offers.
-* `order/1` - the order people are read in, for batches; by the
-  binding's `id` without it.
+* `key/0` - what people are read by, for batches: a `dynamic` on
+  `:person` that is unique to each person and sortable, such as
+  `dynamic([person: u], u.id)`; the binding's `id` without it. Each
+  batch starts after the last key of the one before, so that people
+  who join or leave while a broadcast goes move no one else. Your
+  `query/0` may select a row of its own: `recipient/1` gets that row.
 
 An attribute's type is `:string`, `:integer`, `:boolean`, `:datetime`
 (UTC), `:date`, or `{:enum, [{value, label}]}`. Its expression is a
@@ -390,13 +401,31 @@ Editing a running sequence: the steps are read live. A step changed,
 added or removed counts for everyone still before it. A step added at
 or before where a person is goes to those who come after, not to them.
 A step removed while its letter waits to go is not sent ("skipped",
-`step_removed`); a step with no letter is left out (`no_letter`).
+`step_removed`). Once a sequence is started, each of its steps keeps its
+letter in your first language whole: a step is added with it, in the
+same call, and an edit that would leave it without a subject or a body
+is refused (`{:error, :incomplete_letter}`). A step with no letter all
+the same (made by hand) is left out (`no_letter`).
+
+The steps go in the order of their waits. Before anyone enters, a step
+moves up or down (`move_step/2`), trading times with its neighbour; once
+someone has, a person is where the last step they had put them, and a
+step moved before it would never reach them: moving is refused
+(`{:error, :has_people}`), and the admin hides the arrows. Change the
+times of the steps instead.
 
 Its life: a draft, then **started** (it needs a step, and each step a
 subject and a body in your first language), **paused** (no one enters,
-and no letter goes; the people wait), **resumed** (each goes on: at once
-for those whose time came while it was paused, else at their time), and **archived** (no one enters,
-and those in it leave, "stopped"; it does not start again).
+and no letter goes, not even those queued before the pause; the people
+wait), **resumed** (each goes on: at once for those whose time came
+while it was paused, else at their time, and the letters queued go), and
+**archived** (no one enters, those in it leave, "stopped", and their
+letters not sent yet are skipped, `stopped`; it does not start again).
+
+Each change of status is from the status the campaign had when it was
+read: when another admin, or the sender, changed it meanwhile, nothing
+changes and the call is `{:error, :stale}` (the admin says so and shows
+the campaign as it is).
 
 A person enters a sequence once, ever: signing up twice, or being taken
 in by hand again, changes nothing.
@@ -678,6 +707,7 @@ by itself beside them.
 * No click or open tracking, no quiet hours, no time zones per person,
   no cap of letters across campaigns: the gap is per sequence.
 * The runner reads 200 people at a time, a broadcast 500.
+* A step does not move once someone has entered its sequence.
 
 See [Known limits](limits.md) for the rest, SQLite included.
 

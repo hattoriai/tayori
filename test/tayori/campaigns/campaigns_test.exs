@@ -284,6 +284,136 @@ defmodule Tayori.CampaignsTest do
                Campaigns.schedule_broadcast(sequence!([step(0, "Hi")]), @t0)
     end
 
+    # Each change of status is from the status read: another admin's, or
+    # the sender's, meanwhile is not undone.
+    test "a status changed meanwhile is not written over: stale", %{repo: repo} do
+      draft = broadcast!("Spring")
+      {:ok, scheduled} = Campaigns.schedule_broadcast(draft, later(@t0, 1))
+
+      # The sender claimed it.
+      repo.update_all(Campaign, set: [status: "sending"])
+      assert {:error, :stale} = Campaigns.schedule_broadcast(scheduled, later(@t0, 2))
+      assert {:error, :stale} = Campaigns.send_broadcast_now(scheduled, @t0)
+      assert {:error, :sending} = Campaigns.cancel_broadcast(scheduled)
+      assert {:error, :stale} = Campaigns.archive(scheduled)
+      assert %{status: "sending", send_at: send_at} = Campaigns.get(draft.id)
+      assert send_at == later(@t0, 1)
+
+      # A draft started twice, from the same page.
+      {:ok, campaign} = Campaigns.create(%{"name" => "A", "kind" => "sequence"})
+      {:ok, _} = Campaigns.add_step(campaign, step(0, "Hi"))
+      assert {:ok, active} = Campaigns.start(campaign, @t0)
+      assert {:error, :stale} = Campaigns.start(campaign, later(@t0, 1))
+      assert Campaigns.get(campaign.id).started_at == @t0
+
+      # Paused and resumed by another admin: this page's pause is stale.
+      assert {:ok, paused} = Campaigns.pause(active)
+      assert {:ok, _} = Campaigns.resume(paused)
+      assert {:error, :stale} = Campaigns.resume(paused)
+      assert {:ok, _} = Campaigns.pause(Campaigns.get(campaign.id))
+      assert {:error, :stale} = Campaigns.pause(active)
+
+      # A draft deleted after another started it is not deleted.
+      {:ok, other} = Campaigns.create(%{"name" => "B", "kind" => "sequence"})
+      {:ok, _} = Campaigns.add_step(other, step(0, "Hi"))
+      {:ok, _} = Campaigns.start(other)
+      assert {:error, :stale} = Campaigns.delete(other)
+      assert Campaigns.get(other.id)
+      assert {:error, :stale} = Campaigns.archive(other)
+    end
+
+    test "the steps' times are unique in the database too", %{repo: repo} do
+      {:ok, campaign} = Campaigns.create(%{"name" => "A", "kind" => "sequence"})
+      {:ok, _} = Campaigns.add_step(campaign, step(60, "Hi"))
+
+      config = Tayori.Config.get()
+
+      # As two admins adding a step at once would: past the app's check.
+      assert {:error, changeset} =
+               %Step{campaign_id: campaign.id, position: 1}
+               |> Step.changeset(%{"wait" => 60}, [], config.locales)
+               |> repo.insert()
+
+      assert errors_on(changeset) == %{wait: ["another step goes at this time"]}
+
+      assert_raise Ecto.ConstraintError, fn ->
+        repo.insert!(%Step{campaign_id: campaign.id, position: 2, wait: 60})
+      end
+    end
+
+    test "a step is not moved once anyone entered the sequence" do
+      ada = person!(name: "Ada")
+      {:ok, campaign} = Campaigns.create(%{"name" => "A", "kind" => "sequence"})
+
+      for {wait, subject} <- [{0, "A"}, {60, "B"}],
+          do: Campaigns.add_step(campaign, step(wait, subject))
+
+      {:ok, campaign} = Campaigns.start(campaign)
+
+      # No one yet: it moves.
+      [_a, b] = Campaigns.get(campaign.id).steps
+      assert {:ok, _} = Campaigns.move_step(b, :up)
+
+      {:ok, _} = Campaigns.enroll(campaign, person_id(ada), @t0)
+      [b, a] = Campaigns.get(campaign.id).steps
+      assert {:error, :has_people} = Campaigns.move_step(a, :up)
+      assert {:error, :has_people} = Campaigns.move_step(b, :down)
+      assert Enum.map(Campaigns.get(campaign.id).steps, &hd(&1.letters).subject) == ["B", "A"]
+    end
+
+    # A running sequence sends each step it reaches: its letter in the
+    # first language stays whole.
+    test "a running sequence's steps keep a whole first letter" do
+      {:ok, draft} = Campaigns.create(%{"name" => "A", "kind" => "sequence"})
+
+      # A draft takes a step with no letter yet.
+      assert {:ok, _} = Campaigns.add_step(draft, %{"wait" => 60, "letters" => []})
+      assert {:ok, _} = Campaigns.add_step(draft, step(0, "Welcome"))
+      [first, empty] = Campaigns.get(draft.id).steps
+      {:ok, _} = Campaigns.remove_step(empty)
+      {:ok, campaign} = Campaigns.start(draft)
+
+      assert {:error, :incomplete_letter} =
+               Campaigns.add_step(campaign, %{"wait" => 120, "letters" => []})
+
+      assert {:error, :incomplete_letter} =
+               Campaigns.add_step(campaign, step(120, "No body", body: ""))
+
+      pt = %{
+        "locale" => "pt-PT",
+        "subject" => "Olá",
+        "body" => Kotoba.Content.from_markdown("Olá.")
+      }
+
+      assert {:error, :incomplete_letter} =
+               Campaigns.add_step(campaign, %{"wait" => 120, "letters" => [pt]})
+
+      assert [_] = Campaigns.get(campaign.id).steps
+      assert {:ok, added} = Campaigns.add_step(campaign, step(120, "Later"))
+
+      assert {:error, :incomplete_letter} =
+               Campaigns.update_step(added, %{"letters" => [pt]})
+
+      assert {:error, :incomplete_letter} =
+               Campaigns.put_letter(first, "en", %{"body" => Kotoba.Content.from_markdown("")})
+
+      assert {:error, :incomplete_letter} = Campaigns.delete_letter(first, "en")
+      assert {:ok, _} = Campaigns.put_letter(first, "pt-PT", Map.delete(pt, "locale"))
+      assert :ok = Campaigns.delete_letter(first, "pt-PT")
+      assert {:ok, _} = Campaigns.put_letter(first, "en", %{"subject" => "Hello"})
+
+      assert [%{subject: "Hello", text: "About Welcome."}] = Campaigns.get_step(first.id).letters
+      assert [%{subject: "Later"}] = Campaigns.get_step(added.id).letters
+
+      # Paused, it is no draft either; a scheduled broadcast the same.
+      {:ok, paused} = Campaigns.pause(campaign)
+      assert {:error, :incomplete_letter} = Campaigns.add_step(paused, %{"wait" => 240})
+
+      {:ok, scheduled} = Campaigns.schedule_broadcast(broadcast!("Spring"), later(@t0, 1))
+      [letter_step] = scheduled.steps
+      assert {:error, :incomplete_letter} = Campaigns.delete_letter(letter_step, "en")
+    end
+
     test "suppressions: by address, lowercased, for a purpose or all" do
       refute Campaigns.suppressed?("ada@app.test", "product")
       refute Campaigns.suppressed?(nil, "product")

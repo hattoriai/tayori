@@ -5,6 +5,24 @@ defmodule Tayori.AudienceTest do
 
   alias Tayori.{Audience, Recipient}
 
+  defmodule Selected do
+    @moduledoc "An audience whose query selects a map, walked by name."
+    @behaviour Tayori.Audience
+    import Ecto.Query
+
+    def query do
+      from(p in TayoriTest.Person,
+        as: :person,
+        where: is_nil(p.closed_at),
+        select: %{id: p.id, name: p.name}
+      )
+    end
+
+    def where_ids(query, _ids), do: query
+    def recipient(row), do: %Recipient{id: "person:#{row.id}", name: row.name}
+    def key, do: dynamic([person: p], p.name)
+  end
+
   defp people(_ctx) do
     people =
       for {name, plan} <- [{"Ada A", "pro"}, {"Bob B", "free"}, {"Cleo C", "pro"}],
@@ -60,6 +78,7 @@ defmodule Tayori.AudienceTest do
     assert Audience.events(Bare) == []
     assert Audience.person_id(Bare) == nil
     assert Audience.can_email?(Bare, %Recipient{id: "x"}, :marketing)
+    assert inspect(Audience.key(Bare)) == inspect(dynamic([person: p], p.id))
 
     audience = TayoriTest.Audience
     assert length(Audience.attributes(audience)) > 5
@@ -122,6 +141,52 @@ defmodule Tayori.AudienceTest do
       refute_received {:batch, _}
     end
 
+    # Each batch starts after the last key of the one before: who leaves
+    # or comes during the walk moves no one else.
+    test "each_batch/4 skips no one when people come and go meanwhile", %{people: [ada | _]} do
+      repo = Tayori.Config.get().repo
+      eve = person!(%{name: "Eve E"})
+      test = self()
+
+      Audience.each_batch(nil, 2, fn batch ->
+        send(test, {:batch, Enum.map(batch, & &1.name)})
+
+        if Enum.any?(batch, &(&1.name == "Ada A")) do
+          repo.delete!(ada)
+          person!(%{name: "Fay F"})
+        end
+      end)
+
+      assert_received {:batch, ["Ada A", "Bob B"]}
+      assert_received {:batch, ["Cleo C", "Eve E"]}
+      assert_received {:batch, ["Fay F"]}
+      refute_received {:batch, _}
+      assert eve
+    end
+
+    # A base query that selects a row of its own: its rows, by their keys.
+    test "each_batch/4 with a query that selects, and a key of the app's" do
+      config = Tayori.Config.get()
+
+      put_config(config,
+        campaigns: Keyword.put(campaigns_config()[:campaigns], :audience, Selected)
+      )
+
+      test = self()
+
+      assert :ok =
+               Audience.each_batch(
+                 nil,
+                 2,
+                 &send(test, {:batch, Enum.map(&1, fn r -> r.name end)})
+               )
+
+      assert_received {:batch, ["Ada A", "Bob B"]}
+      assert_received {:batch, ["Cleo C"]}
+      refute_received {:batch, _}
+      assert [%Recipient{name: "Ada A"}] = Audience.sample(nil, 1)
+    end
+
     test "get/1: a recipient, or nil", %{people: [ada | _]} do
       assert %Recipient{
                id: id,
@@ -152,7 +217,7 @@ defmodule Tayori.AudienceTest do
 
       ids =
         audience.query()
-        |> audience.order()
+        |> order_by(^[asc: Audience.key(audience)])
         |> select(^%{id: person_id})
         |> Tayori.Config.get().repo.all()
         |> Enum.map(& &1.id)

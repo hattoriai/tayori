@@ -369,6 +369,23 @@ if Code.ensure_loaded?(Sake.Server) do
     end
 
     def error(:sending), do: "The broadcast is being sent: it can no longer change."
+
+    def error(:stale),
+      do:
+        "The campaign changed since it was read (another admin, or the sender): " <>
+          "read it again with get_campaign, then try again if it still makes sense."
+
+    def error(:has_people),
+      do: "People are in this sequence: change the times of its steps instead."
+
+    def error(:incomplete_letter) do
+      locale = Config.default_locale(Config.get())
+
+      "The campaign is under way: each step keeps its letter in #{locale} with a subject " <>
+        "and a body. Give them in the same call (add_step takes the letter with the step), " <>
+        "or leave the #{locale} letter whole."
+    end
+
     def error(:not_draft), do: "Only a draft or an archived campaign can be deleted."
 
     def error({:status, status}), do: "The campaign is #{status}: it cannot do that now."

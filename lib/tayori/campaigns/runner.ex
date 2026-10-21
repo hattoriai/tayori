@@ -13,7 +13,13 @@ defmodule Tayori.Campaigns.Runner do
   # An enrollment is advanced by one node at a time: the claim sets its
   # next_at to nil where it is still the value read, in the transaction
   # of the advance, so that a second claim finds nothing. A crash rolls
-  # the claim back with the rest, and the enrollment is due again.
+  # the claim back with the rest, and the enrollment is due again. A
+  # letter is claimed the same way (claimed_at) before it is sent, so
+  # that a delivery given two jobs goes once.
+  #
+  # The pages hear of a campaign once for each run that changed it (an
+  # enrollment's job, a run of run_due/3, a batch of a broadcast), not
+  # once for each person.
 
   import Ecto.Query
 
@@ -26,6 +32,9 @@ defmodule Tayori.Campaigns.Runner do
 
   @batch 200
   @broadcast_batch 500
+  @id_batch 1000
+  # How long a letter's job keeps it, sending it, from the others.
+  @claim_seconds 600
 
   # ── Entry ───────────────────────────────────────────────────────
 
@@ -55,11 +64,18 @@ defmodule Tayori.Campaigns.Runner do
   @spec advance(Config.t(), Ecto.UUID.t(), DateTime.t(), keyword()) :: :ok
   def advance(%Config{} = config, id, %DateTime{} = now, opts \\ []) do
     if Config.module?(config, :campaigns) do
-      {:ok, jobs} = transaction(config, fn -> advance_due(config, id, now) end)
-      Jobs.campaign_committed(config, jobs, Keyword.put(opts, :now, now))
+      config |> advance_one(id, now, opts) |> List.wrap() |> changed()
     end
 
     :ok
+  end
+
+  # Advances one enrollment: the id of its campaign when the person's
+  # state changed (they left it, or finished), else nil.
+  defp advance_one(config, id, now, opts) do
+    {:ok, {jobs, changed}} = transaction(config, fn -> advance_due(config, id, now) end)
+    Jobs.campaign_committed(config, jobs, Keyword.put(opts, :now, now))
+    changed
   end
 
   defp advance_due(config, id, now) do
@@ -68,13 +84,13 @@ defmodule Tayori.Campaigns.Runner do
         if DateTime.after?(next_at, now) do
           # Moved later since its job was made: a job at the new time.
           Jobs.campaign_written(config, [{:enrollment, id, next_at}])
-          []
+          {[], nil}
         else
           claimed(config, enrollment, now)
         end
 
       _gone_ended_or_held ->
-        []
+        {[], nil}
     end
   end
 
@@ -89,12 +105,13 @@ defmodule Tayori.Campaigns.Runner do
       save(config, campaign, enrollment, Map.put(changes, :updated_at, usec(now)), jobs)
     else
       # Another node has it.
-      []
+      {[], nil}
     end
   end
 
-  # The enrollment as judged, and its jobs. No row when the campaign, and
-  # its people with it, was deleted meanwhile: there is nothing to do.
+  # The enrollment as judged, and its jobs, with the campaign's id when the
+  # person's state changed. No row when the campaign, and its people with
+  # it, was deleted meanwhile: there is nothing to do.
   defp save(config, campaign, enrollment, changes, jobs) do
     {count, _} =
       config.repo.update_all(
@@ -107,10 +124,9 @@ defmodule Tayori.Campaigns.Runner do
       next = for {:next_at, %DateTime{} = at} <- changes, do: {:enrollment, enrollment.id, at}
       jobs = next ++ jobs
       Jobs.campaign_written(config, jobs)
-      if changes[:state], do: Tayori.broadcast({Tayori, :campaign_changed, campaign.id})
-      jobs
+      {jobs, if(changes[:state], do: campaign.id)}
     else
-      []
+      {[], nil}
     end
   end
 
@@ -275,7 +291,7 @@ defmodule Tayori.Campaigns.Runner do
             campaign_id: campaign.id,
             step_id: step.id,
             person: recipient.id,
-            email: recipient.email,
+            email: address(recipient.email),
             locale: recipient.locale,
             status: status,
             reason: reason,
@@ -296,10 +312,12 @@ defmodule Tayori.Campaigns.Runner do
   @doc false
   # Sends a broadcast whose time came: claimed once (scheduled to
   # sending), then each person of its audience, in batches, gets a
-  # delivery and a letter, once. Options: `:resume` - a broadcast being
-  # sent is walked again (an Oban job tried again after a crash: the
-  # deliveries are unique, so no one gets two); `:batch_size` (500);
-  # `:inline`.
+  # delivery and a letter, once; each batch marks its progress
+  # (updated_at), which the sweep reads (Tayori.Jobs). Options: `:resume`
+  # - a broadcast being sent is walked again (an Oban job tried again
+  # after a crash, a broadcast the sweep found stopped, a run of run_due/3
+  # after a crash: the deliveries are unique, so no one gets two);
+  # `:batch_size` (500); `:inline`.
   @spec send_broadcast(Config.t(), Ecto.UUID.t(), DateTime.t(), keyword()) :: :ok
   def send_broadcast(%Config{} = config, id, %DateTime{} = now, opts \\ []) do
     if Config.module?(config, :campaigns) do
@@ -337,9 +355,11 @@ defmodule Tayori.Campaigns.Runner do
   defp claim_broadcast(config, campaign) do
     {count, _} =
       from(c in Campaign, where: c.id == ^campaign.id and c.status == "scheduled")
-      |> config.repo.update_all([set: [status: "sending"]], prefix: config.prefix)
+      |> config.repo.update_all([set: [status: "sending", updated_at: stamp()]],
+        prefix: config.prefix
+      )
 
-    if count == 1, do: Tayori.broadcast({Tayori, :campaign_changed, campaign.id})
+    if count == 1, do: changed([campaign.id])
     count == 1
   end
 
@@ -349,7 +369,10 @@ defmodule Tayori.Campaigns.Runner do
         Audience.each_batch(
           campaign.audience,
           Keyword.get(opts, :batch_size, @broadcast_batch),
-          &send_batch(&1, config, campaign, step, now, opts),
+          fn recipients ->
+            send_batch(recipients, config, campaign, step, now, opts)
+            progressed(config, campaign)
+          end,
           now
         )
 
@@ -357,13 +380,22 @@ defmodule Tayori.Campaigns.Runner do
         :ok
     end
 
-    from(c in Campaign, where: c.id == ^campaign.id)
+    from(c in Campaign, where: c.id == ^campaign.id and c.status == "sending")
     |> config.repo.update_all([set: [status: "sent", sent_at: usec(now), updated_at: usec(now)]],
       prefix: config.prefix
     )
 
-    Tayori.broadcast({Tayori, :campaign_changed, campaign.id})
+    changed([campaign.id])
     :ok
+  end
+
+  # A batch of a broadcast went: its time, for the sweep, and a word to
+  # the pages.
+  defp progressed(config, campaign) do
+    from(c in Campaign, where: c.id == ^campaign.id and c.status == "sending")
+    |> config.repo.update_all([set: [updated_at: stamp()]], prefix: config.prefix)
+
+    changed([campaign.id])
   end
 
   # The people of a batch who may be written to: a delivery each, and a
@@ -395,7 +427,7 @@ defmodule Tayori.Campaigns.Runner do
           campaign_id: campaign.id,
           step_id: step.id,
           person: recipient.id,
-          email: recipient.email,
+          email: address(recipient.email),
           locale: recipient.locale,
           status: "queued",
           inserted_at: stamp,
@@ -430,26 +462,52 @@ defmodule Tayori.Campaigns.Runner do
   @doc false
   # Sends a delivery's letter, once: the person is read again, and the
   # address checked again (unsubscribed since, or the app says not to:
-  # skipped). An error is tried again, unless this is the last attempt:
-  # the delivery is then "failed".
+  # skipped). A paused sequence's letter stays queued, sent by resume/2; an
+  # archived campaign's is skipped, "stopped". The letter is claimed
+  # first: a delivery given two jobs goes once. An error is tried again,
+  # unless this is the last attempt: the delivery is then "failed".
   @spec deliver_letter(Config.t(), Ecto.UUID.t(), DateTime.t(), boolean()) ::
           :ok | {:error, term()}
   def deliver_letter(%Config{} = config, id, %DateTime{} = now, last_attempt?) do
     with true <- Config.module?(config, :campaigns),
          %Delivery{status: "queued"} = delivery <-
-           config.repo.get(Delivery, id, prefix: config.prefix) do
-      send_letter(config, delivery, now, last_attempt?)
+           config.repo.get(Delivery, id, prefix: config.prefix),
+         # Deleted since, with its deliveries: nothing to send.
+         %Campaign{} = campaign <-
+           config.repo.get(Campaign, delivery.campaign_id, prefix: config.prefix),
+         :ok <- going(config, campaign, delivery, now),
+         true <- claim_letter(config, delivery, now) do
+      send_letter(config, campaign, delivery, now, last_attempt?)
     else
       _ -> :ok
     end
   end
 
-  defp send_letter(config, delivery, now, last_attempt?) do
-    case config.repo.get(Campaign, delivery.campaign_id, prefix: config.prefix) do
-      # Deleted since, with its deliveries: nothing to send.
-      nil -> :ok
-      campaign -> send_letter(config, campaign, delivery, now, last_attempt?)
-    end
+  defp going(_config, %Campaign{status: "paused"}, _delivery, _now), do: :paused
+
+  defp going(config, %Campaign{status: "archived"}, delivery, now) do
+    finish(config, delivery, "skipped", "stopped", now)
+    :stopped
+  end
+
+  defp going(_config, _campaign, _delivery, _now), do: :ok
+
+  # The letter, taken by this job, where no other took it in the last ten
+  # minutes. A failure gives it back, for the next attempt.
+  defp claim_letter(config, delivery, now) do
+    free = usec(DateTime.add(now, -@claim_seconds))
+
+    {count, _} =
+      from(d in Delivery,
+        where:
+          d.id == ^delivery.id and d.status == "queued" and
+            (is_nil(d.claimed_at) or d.claimed_at < ^free)
+      )
+      |> config.repo.update_all([set: [claimed_at: usec(now), updated_at: usec(now)]],
+        prefix: config.prefix
+      )
+
+    count == 1
   end
 
   defp send_letter(config, campaign, delivery, now, last_attempt?) do
@@ -499,19 +557,23 @@ defmodule Tayori.Campaigns.Runner do
         set(config, delivery,
           status: "sent",
           sent_at: usec(now),
-          email: recipient.email,
+          email: address(recipient.email),
           provider_id: provider_id(meta),
+          claimed_at: nil,
           updated_at: usec(now)
         )
 
       {:error, reason} ->
-        if last_attempt?, do: finish(config, delivery, "failed", reason(reason), now)
+        if last_attempt?,
+          do: finish(config, delivery, "failed", reason(reason), now),
+          else: set(config, delivery, claimed_at: nil, updated_at: usec(now))
+
         {:error, reason}
     end
   end
 
   defp finish(config, delivery, status, reason, now) do
-    set(config, delivery, status: status, reason: reason, updated_at: usec(now))
+    set(config, delivery, status: status, reason: reason, claimed_at: nil, updated_at: usec(now))
   end
 
   defp set(config, delivery, changes) do
@@ -532,27 +594,42 @@ defmodule Tayori.Campaigns.Runner do
 
   @doc false
   # What is due at a time, from the scheduler (or the tests): the
-  # enrollments whose next_at came, in batches of 200, and the
-  # broadcasts whose send_at came. Options: those of advance/4 and
+  # enrollments whose next_at came, in batches of 200, the broadcasts
+  # whose send_at came, and those being sent, walked again: a node that
+  # stopped, or a walk that raised, left them half way (their deliveries
+  # are unique: no one gets two). Each campaign whose people changed is
+  # told once, at the end. Options: those of advance/4 and
   # send_broadcast/4.
   @spec run_due(Config.t(), DateTime.t(), keyword()) :: :ok
   def run_due(%Config{} = config, %DateTime{} = now, opts \\ []) do
     if Config.module?(config, :campaigns) do
-      run_enrollments(config, now, opts, MapSet.new())
+      config |> run_enrollments(now, opts, MapSet.new(), MapSet.new()) |> changed()
 
       from(c in Campaign,
-        where: c.kind == "broadcast" and c.status == "scheduled" and c.send_at <= ^now,
-        order_by: c.send_at,
+        where:
+          c.kind == "broadcast" and
+            ((c.status == "scheduled" and c.send_at <= ^now) or c.status == "sending"),
+        order_by: [asc: c.send_at, asc: c.id],
         select: c.id
       )
       |> config.repo.all(prefix: config.prefix)
-      |> Enum.each(&send_broadcast(config, &1, now, opts))
+      |> Enum.each(&broadcast_logged(config, &1, now, opts))
     end
 
     :ok
   end
 
-  defp run_enrollments(config, now, opts, seen) do
+  defp broadcast_logged(config, id, now, opts) do
+    send_broadcast(config, id, now, Keyword.put(opts, :resume, true))
+  rescue
+    error ->
+      Logger.error(
+        "Tayori could not send the broadcast #{id}, and tries again: " <> Exception.message(error)
+      )
+  end
+
+  # The ids of the campaigns whose people changed.
+  defp run_enrollments(config, now, opts, seen, changed) do
     ids =
       from(e in Enrollment,
         where: e.state == "active" and not is_nil(e.next_at) and e.next_at <= ^now,
@@ -563,20 +640,56 @@ defmodule Tayori.Campaigns.Runner do
       |> config.repo.all(prefix: config.prefix)
 
     new = Enum.reject(ids, &MapSet.member?(seen, &1))
-    Enum.each(new, &advance_logged(config, &1, now, opts))
+
+    changed =
+      new
+      |> Enum.map(&advance_logged(config, &1, now, opts))
+      |> Enum.reject(&is_nil/1)
+      |> MapSet.new()
+      |> MapSet.union(changed)
 
     # A full batch has more after it; one whose every id was seen is held
     # elsewhere, or failed: the next run tries again.
     if length(ids) == @batch and new != [],
-      do: run_enrollments(config, now, opts, MapSet.union(seen, MapSet.new(ids))),
-      else: :ok
+      do: run_enrollments(config, now, opts, MapSet.union(seen, MapSet.new(ids)), changed),
+      else: changed
   end
 
   defp advance_logged(config, id, now, opts) do
-    advance(config, id, now, opts)
+    if Config.module?(config, :campaigns), do: advance_one(config, id, now, opts)
   rescue
     error ->
       Logger.error("Tayori could not advance #{id} in its campaign: " <> Exception.message(error))
+      nil
+  end
+
+  @doc false
+  # The deliveries of a campaign still queued, for resume/2.
+  @spec queued(Ecto.UUID.t()) :: Ecto.Query.t()
+  def queued(campaign_id) do
+    from(d in Delivery, where: d.campaign_id == ^campaign_id and d.status == "queued")
+  end
+
+  @doc false
+  # Walks the ids of a query's rows, 1000 at a time, each batch after the
+  # last id of the one before: `fun` gets each batch.
+  @spec each_id(Ecto.Query.t(), Config.t(), ([Ecto.UUID.t()] -> term())) :: :ok
+  def each_id(query, %Config{} = config, fun), do: each_id(query, config, fun, nil)
+
+  defp each_id(query, config, fun, last) do
+    ids =
+      query
+      |> then(fn query -> if last, do: where(query, [r], r.id > ^last), else: query end)
+      |> order_by([r], asc: r.id)
+      |> limit(@id_batch)
+      |> select([r], r.id)
+      |> config.repo.all(prefix: config.prefix)
+
+    if ids != [], do: fun.(ids)
+
+    if length(ids) == @id_batch,
+      do: each_id(query, config, fun, List.last(ids)),
+      else: :ok
   end
 
   @doc false
@@ -631,6 +744,16 @@ defmodule Tayori.Campaigns.Runner do
       do: repo.transaction(fun, mode: :immediate),
       else: repo.transaction(fun)
   end
+
+  # The campaigns whose people or letters changed, each told once.
+  defp changed(ids),
+    do: ids |> Enum.uniq() |> Enum.each(&Tayori.broadcast({Tayori, :campaign_changed, &1}))
+
+  # An address as the deliveries keep it: lowercased, as the suppressions.
+  defp address(nil), do: nil
+  defp address(email), do: Campaigns.normalize(email)
+
+  defp stamp, do: usec(DateTime.utc_now())
 
   defp purpose(%Campaign{purpose: "marketing"}), do: :marketing
   defp purpose(%Campaign{}), do: :product

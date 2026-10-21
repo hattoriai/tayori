@@ -68,9 +68,21 @@ same case. PostgreSQL has no such limit.
   is left out; a step added at or before where a person is does not go
   to them. A sequence has no branches and no waits for an event.
 * **Batches.** The runner reads the people whose time came 200 at a
-  time, a broadcast its audience 500 at a time, and takes a segment into
-  a sequence 500 at a time; a broadcast to many people takes a while
-  to go. Without Oban the letters go one after the other from a task.
+  time, a broadcast its audience 500 at a time (each batch after the
+  last key of the one before, `key/0`), and takes a segment into a
+  sequence 500 at a time; a broadcast to many people takes a while to
+  go. Resuming a sequence takes its people up in one update, then gives
+  Oban their jobs 1000 at a time. Without Oban the letters go one after
+  the other from a task.
+* **Lost jobs.** With Oban, the sweep finds what lost its job once an
+  hour (and at each boot): a letter whose job was lost may wait up to
+  an hour and a quarter. A letter sent and not marked (a crash between
+  the mailer and the database) is not sent again for ten minutes, then
+  may be: a letter goes at least once, and twice only then.
+* **Steps keep their order** once a person has entered the sequence:
+  change their times instead.
+* **The admin** reads a campaign again at most once a second while its
+  letters go.
 * **Events** are kept 400 days (`keep_events_days`), and a condition
   reads them with the audience's `person_id/0`, in one query.
 * **No tracking.** No opens and no clicks; a provider's webhook tells of

@@ -130,13 +130,15 @@ defmodule Tayori.ModulesTest do
       config = put_config(config, oban: TayoriTest.SQLiteOban, digest: [every: :weekly])
       assert :ok = Tayori.Jobs.boot(config)
 
-      # The campaigns' own work only: the events' daily cleanup.
-      assert [%{args: %{"job" => "campaigns_cleanup"}}] =
-               Oban.Testing.all_enqueued(
-                 repo: repo,
-                 engine: Oban.Engines.Lite,
-                 worker: Tayori.Worker
-               )
+      # The campaigns' own work only: their sweep and the events' daily
+      # cleanup.
+      assert Oban.Testing.all_enqueued(
+               repo: repo,
+               engine: Oban.Engines.Lite,
+               worker: Tayori.Worker
+             )
+             |> Enum.map(& &1.args["job"])
+             |> Enum.sort() == ["campaigns_cleanup", "campaigns_sweep"]
     end
 
     test "the changelog's MCP tools are not listed", %{config: config} do

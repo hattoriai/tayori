@@ -6,8 +6,12 @@ defmodule Tayori.Campaigns.Delivery do
     * `:status` - `"queued"`, `"sent"`, `"skipped"` (with its `:reason`,
       such as `"skip_if"` or `"no_email"`), `"failed"`, `"bounced"` or
       `"complained"`.
+    * `:email` - the address it went to, lowercased.
     * `:provider_id` - the id the mailer gave the email, which the
       provider's webhooks name.
+    * `:claimed_at` - when a letter's job took it to send it: no other
+      job takes it for ten minutes, so that a letter given two jobs goes
+      once.
   """
 
   use Ecto.Schema
@@ -26,7 +30,8 @@ defmodule Tayori.Campaigns.Delivery do
           status: String.t(),
           reason: String.t() | nil,
           provider_id: String.t() | nil,
-          sent_at: DateTime.t() | nil
+          sent_at: DateTime.t() | nil,
+          claimed_at: DateTime.t() | nil
         }
 
   @primary_key {:id, :binary_id, autogenerate: true}
@@ -41,6 +46,7 @@ defmodule Tayori.Campaigns.Delivery do
     field :reason, :string
     field :provider_id, :string
     field :sent_at, :utc_datetime_usec
+    field :claimed_at, :utc_datetime_usec
     timestamps(type: :utc_datetime_usec)
   end
 

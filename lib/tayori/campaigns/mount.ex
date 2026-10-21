@@ -276,7 +276,10 @@ defmodule Tayori.Campaigns.Mount do
     end)
   end
 
+  # The deliveries keep the address lowercased, as the token does.
   defp last_locale(config, email) do
+    email = Campaigns.normalize(email)
+
     from(d in Delivery,
       where: d.email == ^email and not is_nil(d.locale),
       order_by: [desc: d.inserted_at],

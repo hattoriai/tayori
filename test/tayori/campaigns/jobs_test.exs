@@ -5,7 +5,7 @@ defmodule Tayori.Campaigns.JobsTest do
   import Swoosh.TestAssertions
 
   alias Tayori.Campaigns
-  alias Tayori.Campaigns.{Delivery, Event, Runner}
+  alias Tayori.Campaigns.{Campaign, Delivery, Enrollment, Event, Runner}
 
   defmodule DownMailer do
     @moduledoc "A mailer that cannot send."
@@ -27,6 +27,30 @@ defmodule Tayori.Campaigns.JobsTest do
     do: Tayori.Worker.perform(%{job | attempt: attempt, max_attempts: job.max_attempts})
 
   defp close?(a, b), do: abs(DateTime.diff(a, b)) <= 1
+
+  # People of a paused sequence, looked at while it was paused: no next
+  # time.
+  defp waiting(repo, campaign, n) do
+    stamp = DateTime.utc_now()
+
+    for chunk <- Enum.chunk_every(1..n, 1000) do
+      rows =
+        for i <- chunk do
+          %{
+            id: Ecto.UUID.generate(),
+            campaign_id: campaign.id,
+            person: "person:#{i}",
+            state: "active",
+            entered_at: stamp,
+            cursor: -1,
+            inserted_at: stamp,
+            updated_at: stamp
+          }
+        end
+
+      repo.insert_all(Enrollment, rows)
+    end
+  end
 
   for_each_repo do
     setup :campaigns
@@ -133,33 +157,148 @@ defmodule Tayori.Campaigns.JobsTest do
       assert [%Delivery{status: "failed", reason: ":down"}] = deliveries(campaign)
     end
 
-    test "with Oban, boot gives Oban the campaigns' work that may have no job",
+    test "with Oban, boot gives one sweep, which gives a job to what lost its own",
          %{config: config, repo: repo} do
-      # Written before Tayori ran with Oban: no job.
+      now = DateTime.utc_now()
       ada = person!(name: "Ada")
-      campaign = sequence!([step(60, "Welcome")])
-      {:ok, enrollment} = Campaigns.enroll(campaign, person_id(ada))
-      broadcast = broadcast!("Spring")
-      {:ok, _} = Campaigns.schedule_broadcast(broadcast, DateTime.add(DateTime.utc_now(), 600))
-      sending = broadcast!("Half sent")
+      bob = person!(name: "Bob")
+      sequence = sequence!([step(60, "Welcome")])
 
-      repo.update_all(where(Tayori.Campaigns.Campaign, [c], c.id == ^sending.id),
-        set: [status: "sending"]
+      # Written before Tayori ran with Oban: no job. Ada's time is to come,
+      # Bob's passed an hour ago.
+      {:ok, _} = Campaigns.enroll(sequence, person_id(ada), now)
+      {:ok, late} = Campaigns.enroll(sequence, person_id(bob), DateTime.add(now, -2, :hour))
+
+      {:ok, soon} = Campaigns.schedule_broadcast(broadcast!("Soon"), DateTime.add(now, 600))
+      {:ok, missed} = Campaigns.schedule_broadcast(broadcast!("Missed"), DateTime.add(now, -600))
+      stopped = broadcast!("Stopped")
+      going = broadcast!("Going")
+      at = fn minutes -> DateTime.add(now, minutes * 60) end
+
+      repo.update_all(where(Campaign, [c], c.id == ^stopped.id),
+        set: [status: "sending", updated_at: at.(-10)]
       )
 
-      assert jobs(repo) == []
+      repo.update_all(where(Campaign, [c], c.id == ^going.id),
+        set: [status: "sending", updated_at: at.(-1)]
+      )
 
+      [welcome] = sequence.steps
+      paused = sequence!(%{"name" => "Paused"}, [step(0, "Hi")])
+      {:ok, _} = Campaigns.pause(paused)
+
+      letter = fn campaign, step, person, minutes ->
+        repo.insert!(%Delivery{
+          campaign_id: campaign.id,
+          step_id: step.id,
+          person: person,
+          status: "queued",
+          updated_at: at.(minutes)
+        })
+      end
+
+      lost = letter.(sequence, welcome, "person:1", -20)
+      letter.(sequence, welcome, "person:2", -1)
+      letter.(paused, hd(paused.steps), "person:3", -20)
+
+      assert jobs(repo) == []
       config = put_config(config, oban: oban_of(repo))
       assert :ok = Tayori.Jobs.boot(config)
       assert :ok = Tayori.Jobs.boot(config)
 
+      # One sweep and one cleanup for the cluster, and nothing else.
+      assert [sweep] = jobs(repo, "campaigns_sweep")
+      assert [_] = jobs(repo, "campaigns_cleanup")
+      assert length(jobs(repo)) == 2
+
+      repo.update_all(where(Oban.Job, [j], j.id == ^sweep.id), set: [state: "executing"])
+      assert :ok = perform(sweep)
+
       assert [%{args: %{"id" => id}}] = jobs(repo, "enrollment")
-      assert id == enrollment.id
+      assert id == late.id
 
       assert jobs(repo, "broadcast") |> Enum.map(& &1.args["id"]) |> Enum.sort() ==
-               Enum.sort([broadcast.id, sending.id])
+               Enum.sort([missed.id, stopped.id])
 
-      assert [_] = jobs(repo, "campaigns_cleanup")
+      assert [%{args: %{"delivery_id" => delivery_id}}] = jobs(repo, "letter")
+      assert delivery_id == lost.id
+      assert soon.id not in Enum.map(jobs(repo, "broadcast"), & &1.args["id"])
+
+      # The next sweep, in an hour.
+      assert [next] = jobs(repo, "campaigns_sweep") |> Enum.filter(&(&1.state == "scheduled"))
+      assert close?(next.scheduled_at, DateTime.add(now, 3600))
+    end
+
+    test "with Oban, a broadcast job that raises half way is tried again, and gives no one two",
+         %{config: config, repo: repo} do
+      put_config(config, oban: oban_of(repo))
+      for name <- ["Ada", "Bob", "Boom", "Cleo"], do: person!(name: name)
+
+      put_config(Tayori.Config.get(),
+        campaigns: Keyword.put(campaigns_config()[:campaigns], :audience, TayoriTest.BoomAudience)
+      )
+
+      {:ok, _} = Campaigns.send_broadcast_now(broadcast!("Spring"))
+      [job] = jobs(repo, "broadcast")
+
+      Process.put(:boom, true)
+      assert_raise RuntimeError, fn -> Tayori.Jobs.perform(Tayori.Config.get(), job.args, %{}) end
+      assert %{status: "sending"} = Campaigns.get(job.args["id"])
+
+      Process.delete(:boom)
+      assert :ok = perform(job, 2)
+      assert %{status: "sent"} = Campaigns.get(job.args["id"])
+      assert length(jobs(repo, "letter")) == 4
+      assert repo.aggregate(Delivery, :count) == 4
+    end
+
+    test "with Oban, a paused sequence's letters wait, and resume gives them their jobs",
+         %{config: config, repo: repo} do
+      put_config(config, oban: oban_of(repo))
+      ada = person!(name: "Ada")
+      campaign = sequence!([step(0, "Welcome"), step(1440, "Day two")])
+      {:ok, _} = Campaigns.enroll(campaign, person_id(ada), DateTime.add(DateTime.utc_now(), -60))
+
+      [enrollment_job] = jobs(repo, "enrollment")
+      :ok = perform(enrollment_job)
+      [letter] = jobs(repo, "letter")
+
+      {:ok, paused} = Campaigns.pause(campaign)
+      assert :ok = perform(letter)
+      refute_email_sent()
+      assert [%Delivery{status: "queued"}] = deliveries(campaign)
+      repo.update_all(Oban.Job, set: [state: "completed"])
+
+      {:ok, _} = Campaigns.resume(paused)
+      assert [again] = jobs(repo, "letter")
+      assert again.args == letter.args
+      assert :ok = perform(again)
+      assert_email_sent(subject: "Welcome")
+    end
+
+    # One update for those waiting, then their jobs a batch at a time.
+    test "with Oban, resume gives a job to each person waiting, in batches",
+         %{config: config, repo: repo} do
+      put_config(config, oban: oban_of(repo))
+      campaign = sequence!([step(0, "Welcome")])
+      {:ok, paused} = Campaigns.pause(campaign)
+      waiting(repo, campaign, 1001)
+
+      {:ok, _} = Campaigns.resume(paused)
+      assert length(jobs(repo, "enrollment")) == 1001
+      assert repo.aggregate(where(Enrollment, [e], is_nil(e.next_at)), :count) == 0
+    end
+
+    # More than SQLite takes as parameters of one query.
+    test "without Oban, resume takes up any number of people waiting", %{repo: repo} do
+      campaign = sequence!([step(0, "Welcome")])
+      {:ok, paused} = Campaigns.pause(campaign)
+      waiting(repo, campaign, 33_000)
+
+      {:ok, _} = Campaigns.resume(paused)
+      assert repo.aggregate(where(Enrollment, [e], is_nil(e.next_at)), :count) == 0
+      # Its letters' task, done.
+      assert eventually(fn -> Task.Supervisor.children(Tayori.TaskSupervisor) == [] end)
     end
 
     test "with Oban, the events' cleanup is a job each day", %{config: config, repo: repo} do
@@ -200,6 +339,24 @@ defmodule Tayori.Campaigns.JobsTest do
       start_supervised!({Tayori.Scheduler, config})
       assert eventually(fn -> match?(%{status: "sent"}, repo.one(Delivery)) end)
       assert %{state: "completed", reason: "finished"} = enrollment(campaign, ada)
+    end
+
+    # A wake after each write: those that come while it runs are one run.
+    test "without Oban, many wakes of the scheduler are one run", %{config: config} do
+      pid = start_supervised!({Tayori.Scheduler, config})
+      :sys.get_state(pid)
+
+      :erlang.trace_pattern({Runner, :run_due, 3}, true, [:local])
+      :erlang.trace(pid, true, [:call, {:tracer, self()}])
+      on_exit(fn -> :erlang.trace_pattern({Runner, :run_due, 3}, false, [:local]) end)
+
+      :sys.suspend(pid)
+      for _ <- 1..50, do: Tayori.Scheduler.wake()
+      :sys.resume(pid)
+      :sys.get_state(pid)
+
+      assert_received {:trace, ^pid, :call, {Runner, :run_due, _}}
+      refute_received {:trace, ^pid, :call, {Runner, :run_due, _}}
     end
 
     test "without Oban, the events' cleanup is once a day", %{config: config, repo: repo} do

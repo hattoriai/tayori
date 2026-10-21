@@ -49,7 +49,15 @@ defmodule Tayori.Campaigns do
   no.
 
   Each change is told on the PubSub as `{Tayori, :campaign_changed, id}`
-  (see `Tayori.subscribe/0`).
+  (see `Tayori.subscribe/0`): once for each write here, and once for each
+  run of the runner that moved its people on, or for each batch of a
+  broadcast, not once for each person.
+
+  A step does not move once someone has entered its sequence
+  (`move_step/2`), and a campaign under way keeps each step's letter in
+  the first language whole (`add_step/2`). A change of status is from the
+  status read: `{:error, :stale}` when another admin changed it
+  meanwhile (`start/2`).
 
   The functions that depend on the time take `now`, the current time by
   default.
@@ -202,8 +210,10 @@ defmodule Tayori.Campaigns do
 
   @doc """
   Archives a campaign: a sequence takes no one in and its people leave it
-  (reason `"stopped"`); a scheduled broadcast is not sent. A broadcast
-  being sent is `{:error, :sending}`.
+  (reason `"stopped"`), and its letters not sent yet are skipped; a
+  scheduled broadcast is not sent. A broadcast being sent is `{:error,
+  :sending}`; a campaign whose status changed since it was read,
+  `{:error, :stale}`.
   """
   @spec archive(Campaign.t(), DateTime.t()) :: {:ok, Campaign.t()} | {:error, term()}
   def archive(%Campaign{} = campaign, now \\ DateTime.utc_now()) do
@@ -217,10 +227,14 @@ defmodule Tayori.Campaigns do
         {:error, :sending}
 
       true ->
-        write(config, fn ->
-          stop_enrollments(config, campaign, now)
-          put_status(config, campaign, status: "archived")
-        end)
+        write(config, fn -> archive_now(config, campaign, now) end)
+    end
+  end
+
+  defp archive_now(config, campaign, now) do
+    with {:ok, archived} <- put_status(config, campaign, status: "archived") do
+      stop_enrollments(config, campaign, now)
+      {:ok, archived}
     end
   end
 
@@ -244,12 +258,20 @@ defmodule Tayori.Campaigns do
 
   @doc """
   Deletes a campaign with its steps, letters, people and deliveries. Only
-  a draft or an archived campaign: `{:error, :not_draft}` else.
+  a draft or an archived campaign: `{:error, :not_draft}` else, and
+  `{:error, :stale}` when its status changed since it was read.
   """
   @spec delete(Campaign.t()) :: {:ok, Campaign.t()} | {:error, term()}
   def delete(%Campaign{status: status} = campaign) when status in ["draft", "archived"] do
     config = Config.get()
-    write(config, fn -> config.repo.delete(campaign, prefix: config.prefix) end)
+
+    write(config, campaign.id, fn ->
+      {count, _} =
+        from(c in Campaign, where: c.id == ^campaign.id and c.status == ^status)
+        |> config.repo.delete_all(prefix: config.prefix)
+
+      if count == 1, do: {:ok, campaign}, else: {:error, :stale}
+    end)
   end
 
   def delete(%Campaign{}), do: {:error, :not_draft}
@@ -262,9 +284,14 @@ defmodule Tayori.Campaigns do
   `%{"locale", "subject", "preheader", "body", "cta_label", "cta_url"}`
   (`Tayori.Campaigns.Letter`). Two steps of a sequence cannot have the
   same wait. A broadcast has its one step already: `{:error, :one_step}`.
+
+  A sequence that is no longer a draft sends each step it reaches: its new
+  step comes with its letter in the first language, a subject and a body,
+  in the same call, else `{:error, :incomplete_letter}`.
   """
   @spec add_step(Campaign.t(), map()) ::
-          {:ok, Step.t()} | {:error, Ecto.Changeset.t() | :locked | :one_step}
+          {:ok, Step.t()}
+          | {:error, Ecto.Changeset.t() | :locked | :one_step | :incomplete_letter}
   def add_step(%Campaign{} = campaign, attrs) do
     config = Config.get()
     attrs = stringify(attrs)
@@ -283,21 +310,29 @@ defmodule Tayori.Campaigns do
 
         attrs = Map.put_new(attrs, "position", (position || -1) + 1)
 
-        write(config, campaign.id, fn ->
-          %Step{campaign_id: campaign.id, letters: []}
-          |> step_changeset(attrs, campaign)
-          |> config.repo.insert(prefix: config.prefix)
-        end)
+        write(config, campaign.id, fn -> insert_step(config, campaign, attrs) end)
+    end
+  end
+
+  defp insert_step(config, campaign, attrs) do
+    with {:ok, step} <-
+           %Step{campaign_id: campaign.id, letters: []}
+           |> step_changeset(attrs, campaign)
+           |> config.repo.insert(prefix: config.prefix),
+         :ok <- keep_letter(config, campaign, step.id) do
+      {:ok, step}
     end
   end
 
   @doc """
   Updates a step: its wait, its skip, its position, and its letters when
   `"letters"` is given (all of them: a letter not in the list is
-  deleted; see `put_letter/3` for one language).
+  deleted; see `put_letter/3` for one language). A sequence that is no
+  longer a draft, or a scheduled broadcast, keeps its letter in the first
+  language whole: `{:error, :incomplete_letter}` else.
   """
   @spec update_step(Step.t(), map()) ::
-          {:ok, Step.t()} | {:error, Ecto.Changeset.t() | :locked}
+          {:ok, Step.t()} | {:error, Ecto.Changeset.t() | :locked | :incomplete_letter}
   def update_step(%Step{} = step, attrs) do
     config = Config.get()
     campaign = config.repo.get!(Campaign, step.campaign_id, prefix: config.prefix)
@@ -309,12 +344,18 @@ defmodule Tayori.Campaigns do
     if locked?(campaign) do
       {:error, :locked}
     else
-      write(config, campaign.id, fn ->
-        step
-        |> config.repo.preload(:letters, prefix: config.prefix)
-        |> step_changeset(attrs, campaign)
-        |> config.repo.update(prefix: config.prefix)
-      end)
+      write(config, campaign.id, fn -> save_step(config, campaign, step, attrs) end)
+    end
+  end
+
+  defp save_step(config, campaign, step, attrs) do
+    with {:ok, step} <-
+           step
+           |> config.repo.preload(:letters, prefix: config.prefix)
+           |> step_changeset(attrs, campaign)
+           |> config.repo.update(prefix: config.prefix),
+         :ok <- keep_letter(config, campaign, step.id) do
+      {:ok, step}
     end
   end
 
@@ -327,7 +368,8 @@ defmodule Tayori.Campaigns do
   end
 
   # A sequence goes from step to step by their waits: two at the same
-  # time would be one.
+  # time would be one. The unique index says it too (Step.changeset/4),
+  # for two admins who add a step at the same time at once.
   defp distinct_wait(%{valid?: true} = changeset, config, %Campaign{kind: "sequence"} = campaign) do
     wait = Ecto.Changeset.get_field(changeset, :wait)
     id = changeset.data.id
@@ -338,7 +380,7 @@ defmodule Tayori.Campaigns do
       |> config.repo.exists?(prefix: config.prefix)
 
     if taken,
-      do: Ecto.Changeset.add_error(changeset, :wait, "another step goes at this time"),
+      do: Ecto.Changeset.add_error(changeset, :wait, Step.wait_taken()),
       else: changeset
   end
 
@@ -346,10 +388,12 @@ defmodule Tayori.Campaigns do
 
   @doc """
   Writes a step's letter in a language, the one it has or a new one:
-  `%{"subject", "preheader", "body", "cta_label", "cta_url"}`.
+  `%{"subject", "preheader", "body", "cta_label", "cta_url"}`. The letter
+  in the first language of a sequence that is no longer a draft, or of a
+  scheduled broadcast, stays whole: `{:error, :incomplete_letter}` else.
   """
   @spec put_letter(Step.t(), String.t(), map()) ::
-          {:ok, Letter.t()} | {:error, Ecto.Changeset.t() | :locked}
+          {:ok, Letter.t()} | {:error, Ecto.Changeset.t() | :locked | :incomplete_letter}
   def put_letter(%Step{} = step, locale, attrs) when is_binary(locale) do
     config = Config.get()
     campaign = config.repo.get!(Campaign, step.campaign_id, prefix: config.prefix)
@@ -361,33 +405,43 @@ defmodule Tayori.Campaigns do
     if locked?(campaign) do
       {:error, :locked}
     else
-      write(config, campaign.id, fn ->
-        letter
-        |> Letter.changeset(Map.put(stringify(attrs), "locale", locale), config.locales)
-        |> config.repo.insert_or_update(prefix: config.prefix)
-      end)
+      attrs = Map.put(stringify(attrs), "locale", locale)
+      write(config, campaign.id, fn -> save_letter(config, campaign, letter, attrs) end)
     end
   end
 
-  @doc "Deletes a step's letter in a language."
-  @spec delete_letter(Step.t(), String.t()) :: :ok | {:error, :locked}
+  defp save_letter(config, campaign, letter, attrs) do
+    with {:ok, saved} <-
+           letter
+           |> Letter.changeset(attrs, config.locales)
+           |> config.repo.insert_or_update(prefix: config.prefix),
+         :ok <- keep_letter(config, campaign, saved.step_id) do
+      {:ok, saved}
+    end
+  end
+
+  @doc """
+  Deletes a step's letter in a language. Not the first language's, of a
+  sequence that is no longer a draft or a scheduled broadcast: `{:error,
+  :incomplete_letter}`.
+  """
+  @spec delete_letter(Step.t(), String.t()) :: :ok | {:error, :locked | :incomplete_letter}
   def delete_letter(%Step{} = step, locale) when is_binary(locale) do
     config = Config.get()
     campaign = config.repo.get!(Campaign, step.campaign_id, prefix: config.prefix)
 
-    if locked?(campaign) do
-      {:error, :locked}
-    else
-      {:ok, _} =
-        write(config, campaign.id, fn ->
-          from(l in Letter, where: l.step_id == ^step.id and l.locale == ^locale)
-          |> config.repo.delete_all(prefix: config.prefix)
-
-          {:ok, step}
-        end)
-
+    with :ok <- unlocked(campaign),
+         {:ok, _step} <-
+           write(config, campaign.id, fn -> drop_letter(config, campaign, step, locale) end) do
       :ok
     end
+  end
+
+  defp drop_letter(config, campaign, step, locale) do
+    from(l in Letter, where: l.step_id == ^step.id and l.locale == ^locale)
+    |> config.repo.delete_all(prefix: config.prefix)
+
+    with :ok <- keep_letter(config, campaign, step.id), do: {:ok, step}
   end
 
   @doc """
@@ -417,8 +471,13 @@ defmodule Tayori.Campaigns do
   before or after it, and their times too, so that the times stay where
   they were and the letters change order. At the top or the bottom
   already, it stays.
+
+  Only in a sequence no one has entered: a person is where they are by the
+  time of the last step they had, and a letter moved before it would never
+  reach them, `{:error, :has_people}`. Change the times of the steps
+  instead.
   """
-  @spec move_step(Step.t(), :up | :down) :: {:ok, Step.t()} | {:error, :locked}
+  @spec move_step(Step.t(), :up | :down) :: {:ok, Step.t()} | {:error, :locked | :has_people}
   def move_step(%Step{} = step, direction) when direction in [:up, :down] do
     config = Config.get()
     campaign = config.repo.get!(Campaign, step.campaign_id, prefix: config.prefix)
@@ -444,14 +503,26 @@ defmodule Tayori.Campaigns do
         me = Enum.at(steps, index)
         other = Enum.at(steps, other_index)
 
-        write(config, campaign.id, fn ->
-          # The waits are distinct: one goes out of the way first.
-          swap(config, me, other)
-        end)
+        write(config, campaign.id, fn -> swap(config, campaign, me, other) end)
     end
   end
 
-  defp swap(config, me, other) do
+  @doc false
+  # Whether anyone has entered a sequence, as they are or were.
+  def has_people?(config, %Campaign{id: id}) do
+    from(e in Enrollment, where: e.campaign_id == ^id)
+    |> config.repo.exists?(prefix: config.prefix)
+  end
+
+  # Not once someone entered. The waits are distinct: one goes out of the
+  # way first.
+  defp swap(config, campaign, me, other) do
+    if has_people?(config, campaign),
+      do: {:error, :has_people},
+      else: swap_waits(config, me, other)
+  end
+
+  defp swap_waits(config, me, other) do
     now = usec(DateTime.utc_now())
 
     set = fn step, wait, position ->
@@ -474,6 +545,12 @@ defmodule Tayori.Campaigns do
   step at least, and each step a letter in the first language with a
   subject and a body: else `{:error, :no_steps}` or
   `{:error, {:incomplete, step_ids}}`.
+
+  This, `pause/1`, `resume/2`, `archive/2`, `delete/1` and the
+  broadcasts' `schedule_broadcast/2`, `send_broadcast_now/2` and
+  `cancel_broadcast/1` change the status from the one the campaign given
+  has: when another admin, or the sender, changed it since it was read,
+  nothing changes and they return `{:error, :stale}`.
   """
   @spec start(Campaign.t(), DateTime.t()) :: {:ok, Campaign.t()} | {:error, term()}
   def start(%Campaign{} = campaign, now \\ DateTime.utc_now()) do
@@ -490,7 +567,7 @@ defmodule Tayori.Campaigns do
 
   @doc """
   Pauses an active sequence: no one enters, and no letter goes, until it
-  is resumed.
+  is resumed. The letters queued already wait too.
   """
   @spec pause(Campaign.t()) :: {:ok, Campaign.t()} | {:error, term()}
   def pause(%Campaign{} = campaign) do
@@ -503,31 +580,53 @@ defmodule Tayori.Campaigns do
 
   @doc """
   Resumes a paused sequence: its people go on where they were, at once
-  for those whose time came while it was paused.
+  for those whose time came while it was paused, and the letters queued
+  before the pause go.
   """
   @spec resume(Campaign.t(), DateTime.t()) :: {:ok, Campaign.t()} | {:error, term()}
   def resume(%Campaign{} = campaign, now \\ DateTime.utc_now()) do
     config = Config.get()
 
-    with :ok <- expect(campaign, "sequence", ["paused"]) do
-      write(config, fn ->
-        # Those looked at while it was paused wait for nothing: now.
-        waiting =
-          from(e in Enrollment,
-            where: e.campaign_id == ^campaign.id and e.state == "active" and is_nil(e.next_at),
-            select: e.id
-          )
-          |> config.repo.all(prefix: config.prefix)
-
-        from(e in Enrollment, where: e.id in ^waiting)
-        |> config.repo.update_all([set: [next_at: usec(now), updated_at: usec(now)]],
-          prefix: config.prefix
-        )
-
-        Jobs.campaign_written(config, Enum.map(waiting, &{:enrollment, &1, now}))
-        put_status(config, campaign, status: "active")
-      end)
+    with :ok <- expect(campaign, "sequence", ["paused"]),
+         {:ok, resumed} <- write(config, fn -> resume_people(config, campaign, now) end) do
+      # Without Oban, the scheduler takes the people up; the letters go
+      # from a task.
+      if config.oban == nil, do: Jobs.send_queued(config, campaign.id)
+      {:ok, resumed}
     end
+  end
+
+  # Those looked at while it was paused wait for nothing: now, in one
+  # update. Then, with Oban, their jobs and those of the letters queued,
+  # a batch at a time.
+  defp resume_people(config, campaign, now) do
+    at = usec(now)
+
+    with {:ok, resumed} <- put_status(config, campaign, status: "active") do
+      from(e in Enrollment,
+        where: e.campaign_id == ^campaign.id and e.state == "active" and is_nil(e.next_at)
+      )
+      |> config.repo.update_all([set: [next_at: at, updated_at: at]], prefix: config.prefix)
+
+      if config.oban, do: requeue(config, campaign, at, now)
+      {:ok, resumed}
+    end
+  end
+
+  # With Oban: the jobs of the people resumed (whose next_at is the
+  # resume's), and of the letters queued, 1000 ids at a time.
+  defp requeue(config, campaign, at, now) do
+    from(e in Enrollment,
+      where: e.campaign_id == ^campaign.id and e.state == "active" and e.next_at == ^at
+    )
+    |> Runner.each_id(config, fn ids ->
+      Jobs.campaign_requeued(config, Enum.map(ids, &{:enrollment, &1, now}))
+    end)
+
+    Runner.queued(campaign.id)
+    |> Runner.each_id(config, fn ids ->
+      Jobs.campaign_requeued(config, Enum.map(ids, &{:letter, &1}))
+    end)
   end
 
   @doc """
@@ -742,10 +841,14 @@ defmodule Tayori.Campaigns do
 
     with :ok <- expect(campaign, "broadcast", ["draft", "scheduled"]),
          :ok <- ready(config, campaign) do
-      write(config, fn ->
-        Jobs.campaign_written(config, [{:broadcast, campaign.id, at}])
-        put_status(config, campaign, status: "scheduled", send_at: usec(at))
-      end)
+      write(config, fn -> schedule(config, campaign, at) end)
+    end
+  end
+
+  defp schedule(config, campaign, at) do
+    with {:ok, scheduled} <- put_status(config, campaign, status: "scheduled", send_at: usec(at)) do
+      Jobs.campaign_written(config, [{:broadcast, campaign.id, at}])
+      {:ok, scheduled}
     end
   end
 
@@ -766,14 +869,16 @@ defmodule Tayori.Campaigns do
 
   # Claimed by the sender in the meantime: it goes.
   defp unschedule(config, campaign) do
-    {count, _} =
-      from(c in Campaign, where: c.id == ^campaign.id and c.status == "scheduled")
-      |> config.repo.update_all([set: [status: "draft", send_at: nil]], prefix: config.prefix)
+    case put_status(config, campaign, status: "draft", send_at: nil) do
+      {:ok, draft} ->
+        {:ok, draft}
 
-    if count == 1,
-      do:
-        {:ok, with_steps(config, config.repo.get!(Campaign, campaign.id, prefix: config.prefix))},
-      else: {:error, :sending}
+      {:error, :stale} ->
+        case config.repo.get(Campaign, campaign.id, prefix: config.prefix) do
+          %Campaign{status: status} when status in ["sending", "sent"] -> {:error, :sending}
+          _other -> {:error, :stale}
+        end
+    end
   end
 
   # ── Suppressions ────────────────────────────────────────────────
@@ -1042,12 +1147,43 @@ defmodule Tayori.Campaigns do
 
   defp locked?(%Campaign{}), do: false
 
+  defp unlocked(campaign), do: if(locked?(campaign), do: {:error, :locked}, else: :ok)
+
+  # A change of status, from the status the campaign had when it was
+  # read, in one conditional update: {:error, :stale} when another admin,
+  # or the sender, changed it since.
   defp put_status(config, campaign, changes) do
-    campaign
-    |> Ecto.Changeset.change(changes)
-    |> config.repo.update(prefix: config.prefix)
-    |> preloaded(config)
+    {count, _} =
+      from(c in Campaign, where: c.id == ^campaign.id and c.status == ^campaign.status)
+      |> config.repo.update_all(
+        [set: Keyword.put_new(changes, :updated_at, usec(DateTime.utc_now()))],
+        prefix: config.prefix
+      )
+
+    if count == 1,
+      do:
+        {:ok, with_steps(config, config.repo.get!(Campaign, campaign.id, prefix: config.prefix))},
+      else: {:error, :stale}
   end
+
+  # A campaign under way (a sequence no longer a draft, or a broadcast
+  # scheduled) sends what its steps have: each keeps its letter in the
+  # first language whole, with a subject and a body.
+  defp keep_letter(config, campaign, step_id) do
+    if under_way?(campaign) do
+      locale = Config.default_locale(config)
+
+      letter =
+        config.repo.get_by(Letter, [step_id: step_id, locale: locale], prefix: config.prefix)
+
+      if complete?(letter), do: :ok, else: {:error, :incomplete_letter}
+    else
+      :ok
+    end
+  end
+
+  defp under_way?(%Campaign{kind: "sequence", status: status}), do: status != "draft"
+  defp under_way?(%Campaign{kind: "broadcast", status: status}), do: status == "scheduled"
 
   defp preloaded({:ok, campaign}, config), do: {:ok, with_steps(config, campaign)}
   defp preloaded(error, _config), do: error

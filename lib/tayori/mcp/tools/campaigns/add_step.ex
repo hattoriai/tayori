@@ -10,7 +10,9 @@ if Code.ensure_loaded?(Sake.Server) do
           "matches them when its time comes. Two steps cannot go at the same time. Write " <>
           "its letter here or later with update_step, in one language (the app's first by " <>
           "default), in Markdown; merge tags such as {{first_name|there}} or {{email}} " <>
-          "take the person's values. A broadcast has its one step already.",
+          "take the person's values. A sequence that is no longer a draft needs the letter " <>
+          "here, in the app's first language, with a subject and a body. A broadcast has " <>
+          "its one step already.",
       scope: "tayori:campaigns:write",
       annotations: [read_only: false, destructive: false, idempotent: false, open_world: false]
 

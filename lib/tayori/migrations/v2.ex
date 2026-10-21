@@ -58,6 +58,9 @@ defmodule Tayori.Migrations.V2 do
     end
 
     create index(:tayori_campaign_steps, [:campaign_id, :position], prefix: ctx.prefix)
+    # A sequence goes from step to step by their waits: two at one time
+    # would be one.
+    create unique_index(:tayori_campaign_steps, [:campaign_id, :wait], prefix: ctx.prefix)
 
     create table(:tayori_letters, primary_key: false, prefix: ctx.prefix) do
       add :id, :binary_id, primary_key: true
@@ -133,12 +136,17 @@ defmodule Tayori.Migrations.V2 do
       add :reason, :string, size: 64
       add :provider_id, :string, size: 255
       add :sent_at, :utc_datetime_usec
+      # When a letter's job took it to send: another job does not take it
+      # meanwhile.
+      add :claimed_at, :utc_datetime_usec
       timestamps(type: :utc_datetime_usec)
     end
 
     create unique_index(:tayori_deliveries, [:campaign_id, :step_id, :person], prefix: ctx.prefix)
     create index(:tayori_deliveries, [:email], prefix: ctx.prefix)
     create index(:tayori_deliveries, [:provider_id], prefix: ctx.prefix)
+    # The letters queued long ago, which lost their job.
+    create index(:tayori_deliveries, [:status, :updated_at], prefix: ctx.prefix)
 
     create table(:tayori_events, primary_key: false, prefix: ctx.prefix) do
       add :id, :binary_id, primary_key: true

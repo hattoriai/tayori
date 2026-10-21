@@ -3,7 +3,8 @@ defmodule Tayori.Admin.CampaignsLive do
   # The campaigns: the sequences and the broadcasts, as tabs, the newest
   # first, each with its purpose, status and numbers (two queries for the
   # list, Campaigns.counts/1); the archived ones on request. It follows the
-  # changes of the other admins, and the letters as they go.
+  # changes of the other admins, and the letters as they go: the messages
+  # of a second are one reload.
 
   use Phoenix.LiveView, layout: false
   use PhoenixMountable.Path, mountable: Tayori.Router
@@ -15,11 +16,13 @@ defmodule Tayori.Admin.CampaignsLive do
   alias Tayori.Campaigns.Campaign
 
   @kinds %{"sequence" => "sequence", "broadcast" => "broadcast"}
+  # The changes heard within this time are one reload.
+  @reload_after 1_000
 
   @impl true
   def mount(_params, _session, socket) do
     if connected?(socket), do: Tayori.subscribe()
-    {:ok, assign(socket, page_title: "Campaigns")}
+    {:ok, assign(socket, page_title: "Campaigns", reload_pending: false)}
   end
 
   @impl true
@@ -54,9 +57,23 @@ defmodule Tayori.Admin.CampaignsLive do
   @impl true
   def handle_info({Tayori, event, _id}, socket)
       when event in [:campaign_changed, :segment_changed],
-      do: {:noreply, load(socket)}
+      do: {:noreply, reload_soon(socket, {__MODULE__, :reload}, @reload_after)}
+
+  def handle_info({__MODULE__, :reload}, socket),
+    do: {:noreply, socket |> assign(reload_pending: false) |> load()}
 
   def handle_info(_message, socket), do: {:noreply, socket}
+
+  @doc false
+  # One reload, in a while, for the changes heard until then: a page
+  # that hears of a running campaign does not read it again for each
+  # letter. `:reload_pending` says one is coming.
+  def reload_soon(%{assigns: %{reload_pending: true}} = socket, _message, _after), do: socket
+
+  def reload_soon(socket, message, after_ms) do
+    Process.send_after(self(), message, after_ms)
+    Phoenix.Component.assign(socket, :reload_pending, true)
+  end
 
   @impl true
   def render(assigns) do

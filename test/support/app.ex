@@ -156,7 +156,26 @@ defmodule TayoriTest.Audience do
   def events, do: [{"signed_up", "Signed up"}, {"story_published", "Published a story"}]
 
   @impl true
-  def order(query), do: order_by(query, [person: p], asc: p.id)
+  def key, do: dynamic([person: p], p.id)
+end
+
+defmodule TayoriTest.BoomAudience do
+  @moduledoc """
+  The audience of the tests, but a person named Boom raises, while the
+  process says so: a walk that stops half way.
+  """
+  @behaviour Tayori.Audience
+
+  defdelegate query, to: TayoriTest.Audience
+  defdelegate where_ids(query, ids), to: TayoriTest.Audience
+  defdelegate attributes, to: TayoriTest.Audience
+  defdelegate person_id, to: TayoriTest.Audience
+  defdelegate can_email?(recipient, purpose), to: TayoriTest.Audience
+
+  def recipient(person) do
+    if person.name == "Boom" and Process.get(:boom), do: raise("boom")
+    TayoriTest.Audience.recipient(person)
+  end
 end
 
 defmodule TayoriTest.Provider do

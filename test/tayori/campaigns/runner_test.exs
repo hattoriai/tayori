@@ -5,7 +5,7 @@ defmodule Tayori.Campaigns.RunnerTest do
   import Swoosh.TestAssertions
 
   alias Tayori.Campaigns
-  alias Tayori.Campaigns.{Delivery, Enrollment, Runner, Segments}
+  alias Tayori.Campaigns.{Delivery, Enrollment, Letter, Runner, Segments, Step}
 
   @t0 ~U[2026-03-02 09:00:00.000000Z]
 
@@ -41,6 +41,14 @@ defmodule Tayori.Campaigns.RunnerTest do
     postgres = %Tayori.Config{repo: PostgresLike, pubsub: nil}
     assert {:ok, {:done, [mode: :immediate]}} = Runner.transaction(sqlite, fn -> :done end)
     assert {:ok, {:done, []}} = Runner.transaction(postgres, fn -> :done end)
+  end
+
+  defp eventually(fun, tries \\ 50) do
+    cond do
+      fun.() -> true
+      tries == 0 -> false
+      true -> Process.sleep(20) && eventually(fun, tries - 1)
+    end
   end
 
   # What is due at a time, its letters sent here.
@@ -386,10 +394,12 @@ defmodule Tayori.Campaigns.RunnerTest do
       assert Campaigns.results(Campaigns.get(campaign.id)).steps |> hd() |> Map.get(:failed) == 1
     end
 
+    # A running sequence's step keeps its letter (Campaigns.add_step/2):
+    # one with none, made before or by hand, is left out all the same.
     test "a step with no letter is left out, and the sequence goes on", %{repo: repo} do
       ada = person!(name: "Ada")
       campaign = sequence!(%{"min_gap_hours" => 0}, [step(0, "Welcome"), step(60, "Next")])
-      {:ok, empty} = Campaigns.add_step(campaign, %{"wait" => 30, "letters" => []})
+      empty = repo.insert!(%Step{campaign_id: campaign.id, wait: 30, position: 2})
 
       {:ok, _} = Campaigns.enroll(campaign, person_id(ada), @t0)
       run(@t0)
@@ -414,7 +424,7 @@ defmodule Tayori.Campaigns.RunnerTest do
       {:ok, _} = Campaigns.enroll(other, person_id(grace), @t0)
       [hello] = other.steps
       queued(other, @t0)
-      :ok = Campaigns.delete_letter(hello, "en")
+      repo.delete_all(where(Letter, [l], l.step_id == ^hello.id))
 
       [d] = deliveries(other)
       assert :ok = Runner.deliver_letter(Tayori.Config.get(), d.id, @t0, true)
@@ -533,6 +543,108 @@ defmodule Tayori.Campaigns.RunnerTest do
       refute_email_sent()
       assert repo.aggregate(Delivery, :count) == 6
       assert {:error, :locked} = Campaigns.update(Campaigns.get(broadcast.id), %{"name" => "X"})
+    end
+
+    # A broadcast left "sending" (a node stopped, a walk raised) is walked
+    # again by the next run: no one gets two letters, and it is sent.
+    test "a broadcast whose walk stopped half way is taken up again", %{config: config} do
+      for name <- ["Ada", "Bob", "Boom", "Cleo"], do: person!(name: name)
+
+      put_config(config,
+        campaigns: Keyword.put(campaigns_config()[:campaigns], :audience, TayoriTest.BoomAudience)
+      )
+
+      broadcast = broadcast!("Spring")
+      {:ok, _} = Campaigns.send_broadcast_now(broadcast, @t0)
+
+      Process.put(:boom, true)
+      log = ExUnit.CaptureLog.capture_log(fn -> run(@t0, batch_size: 2) end)
+      assert log =~ "could not send the broadcast"
+      assert %{status: "sending"} = Campaigns.get(broadcast.id)
+      assert Enum.sort(sent()) == [{"Spring", "ada@app.test"}, {"Spring", "bob@app.test"}]
+
+      Process.delete(:boom)
+      run(later(@t0, 0, 1), batch_size: 2)
+      assert %{status: "sent"} = Campaigns.get(broadcast.id)
+      assert Enum.sort(sent()) == [{"Spring", "boom@app.test"}, {"Spring", "cleo@app.test"}]
+      assert length(deliveries(broadcast)) == 4
+    end
+
+    # Queued before the pause: it waits, and goes when the sequence goes
+    # on. Queued before the archive: it does not go.
+    test "a letter queued before a pause waits; before an archive, it is stopped" do
+      ada = person!(name: "Ada")
+      campaign = sequence!([step(0, "Welcome")])
+      {:ok, _} = Campaigns.enroll(campaign, person_id(ada), @t0)
+      queued(campaign, @t0)
+      [d] = deliveries(campaign)
+
+      {:ok, paused} = Campaigns.pause(campaign)
+      assert :ok = Runner.deliver_letter(Tayori.Config.get(), d.id, @t0, false)
+      assert :ok = Runner.deliver_letter(Tayori.Config.get(), d.id, @t0, true)
+      refute_email_sent()
+      assert statuses(campaign) == [{"queued", nil}]
+
+      # Resumed: the letter goes, from a task.
+      {:ok, _} = Campaigns.resume(paused)
+      assert_receive {:email, %{subject: "Welcome"}}, 1_000
+      assert eventually(fn -> statuses(campaign) == [{"sent", nil}] end)
+
+      grace = person!(name: "Grace")
+      other = sequence!(%{"name" => "Other"}, [step(0, "Hello")])
+      {:ok, _} = Campaigns.enroll(other, person_id(grace), @t0)
+      queued(other, @t0)
+      [d] = deliveries(other)
+      {:ok, _} = Campaigns.archive(other, @t0)
+
+      assert :ok = Runner.deliver_letter(Tayori.Config.get(), d.id, @t0, false)
+      refute_email_sent()
+      assert statuses(other) == [{"skipped", "stopped"}]
+    end
+
+    test "a letter taken by another job meanwhile is not sent twice", %{repo: repo} do
+      ada = person!(name: "Ada")
+      campaign = sequence!([step(0, "Welcome")])
+      {:ok, _} = Campaigns.enroll(campaign, person_id(ada), @t0)
+      queued(campaign, @t0)
+      [d] = deliveries(campaign)
+
+      # Another job is sending it.
+      repo.update_all(Delivery, set: [claimed_at: later(@t0, 0, -1)])
+      assert :ok = Runner.deliver_letter(Tayori.Config.get(), d.id, @t0, true)
+      refute_email_sent()
+      assert statuses(campaign) == [{"queued", nil}]
+
+      # That job stopped ten minutes ago: this one sends it.
+      assert :ok = Runner.deliver_letter(Tayori.Config.get(), d.id, later(@t0, 0, 10), true)
+      assert_email_sent(subject: "Welcome")
+      assert [%Delivery{status: "sent", claimed_at: nil}] = deliveries(campaign)
+    end
+
+    test "a run tells the pages once of each campaign it changed" do
+      campaign = sequence!([step(0, "Welcome")])
+
+      for name <- ["Ada", "Bob", "Cleo"],
+          do: {:ok, _} = Campaigns.enroll(campaign, person_id(person!(name: name)), @t0)
+
+      id = campaign.id
+      Tayori.subscribe()
+      run(@t0)
+
+      assert_received {Tayori, :campaign_changed, ^id}
+      refute_received {Tayori, :campaign_changed, _}
+      assert Enum.all?(deliveries(campaign), &(&1.status == "sent"))
+    end
+
+    test "the addresses of the letters are kept lowercased" do
+      ada = person!(name: "Ada", email: " Ada.Lovelace@App.TEST ")
+      campaign = sequence!([step(0, "Welcome")])
+      {:ok, _} = Campaigns.enroll(campaign, person_id(ada), @t0)
+      queued(campaign, @t0)
+      assert [%Delivery{email: "ada.lovelace@app.test"} = d] = deliveries(campaign)
+
+      assert :ok = Runner.deliver_letter(Tayori.Config.get(), d.id, @t0, true)
+      assert [%Delivery{status: "sent", email: "ada.lovelace@app.test"}] = deliveries(campaign)
     end
 
     test "a broadcast cancelled before its time does not go" do

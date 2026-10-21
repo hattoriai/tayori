@@ -156,6 +156,10 @@ defmodule TayoriDev.Audience do
   @impl true
   def person_id, do: dynamic([person: p], fragment("'person:' || CAST(? AS TEXT)", p.id))
 
+  # The batches are walked by it, as by default: a unique, sortable key.
+  @impl true
+  def key, do: dynamic([person: p], p.id)
+
   @impl true
   def attributes do
     [

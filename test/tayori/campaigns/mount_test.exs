@@ -75,6 +75,19 @@ defmodule Tayori.Campaigns.MountTest do
       assert html =~ "Deixar de receber dicas e notícias sobre o produto em grace@app.test?"
     end
 
+    test "the page is in the last letter's language, whatever the case of the address" do
+      grace = person!(name: "Grace", email: "Grace.Hopper@App.Test", locale: "pt-PT")
+      campaign = sequence!([step(0, "Olá")])
+      {:ok, _} = Campaigns.enroll(campaign, "person:#{grace.id}")
+      Tayori.Test.run_campaigns!()
+
+      for address <- ["Grace.Hopper@App.Test", "grace.hopper@app.test"] do
+        token = Letters.token(address, "product")
+        html = build_conn() |> get("/letters/unsubscribe/" <> token) |> html_response(200)
+        assert html =~ ~s(<html lang="pt-PT")
+      end
+    end
+
     test "the form unsubscribes from the purpose, or from everything", %{conn: conn} do
       token = Letters.token("ada@app.test", "marketing")
 

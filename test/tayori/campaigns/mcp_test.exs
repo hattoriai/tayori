@@ -514,6 +514,28 @@ if Code.ensure_loaded?(Sake.Server) do
                  call!("start_campaign", %{"id" => id})
 
         assert tool_error("start_campaign", %{"id" => id}) =~ "active already"
+
+        # Running: a new step comes with its whole letter.
+        assert tool_error("add_step", %{"campaign_id" => id, "after_days" => 1}) =~
+                 "each step keeps its letter in en with a subject and a body"
+
+        assert tool_error("add_step", %{
+                 "campaign_id" => id,
+                 "after_days" => 1,
+                 "subject" => "Day one"
+               }) =~ "Give them in the same call"
+
+        assert %{"letters" => [%{"complete" => true}]} =
+                 call!("add_step", %{
+                   "campaign_id" => id,
+                   "after_days" => 1,
+                   "subject" => "Day one",
+                   "body" => "A tip."
+                 })
+
+        assert tool_error("update_step", %{"step_id" => step_id, "body" => ""}) =~
+                 "under way"
+
         assert %{"status" => "paused"} = call!("pause_campaign", %{"id" => id})
         assert tool_error("pause_campaign", %{"id" => id}) =~ "only an active one pauses"
         assert %{"status" => "active"} = call!("start_campaign", %{"id" => id})

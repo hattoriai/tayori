@@ -57,9 +57,14 @@ defmodule Tayori.Jobs do
   their next time (one job each, moved when the time changes), a
   scheduled broadcast a job at its time, and each letter a job of its
   own, tried five times: a letter that fails its last attempt is marked
-  `"failed"`. The events are cleaned once a day by a job. At boot, the
-  task gives Oban the people of the sequences waiting for a time and the
-  broadcasts scheduled.
+  `"failed"`. The events are cleaned once a day by a job. A sweep, one
+  job at boot and then every hour, gives Oban what lost its job (written
+  before Tayori ran with Oban, by an Oban of another repo, or a job
+  discarded): the people of the sequences more than 5 minutes past their
+  time, the broadcasts more than 5 minutes past theirs, or being sent
+  with no batch in 5 minutes, and the letters queued for more than 15
+  minutes, but those of a paused sequence, which wait for it. A letter
+  is claimed before it is sent, so that one given two jobs goes once.
 
   ## Without Oban
 
@@ -75,13 +80,14 @@ defmodule Tayori.Jobs do
 
   The campaigns, without Oban, go the same way: the scheduler advances
   each person whose time came and sends the broadcasts whose time came,
-  every minute and when a campaign changes, and each letter is tried
-  once, from a task, and marked `"failed"` when it fails.
+  or that a stopped node left half sent, every minute and when a
+  campaign changes, and each letter is tried once, from a task, and
+  marked `"failed"` when it fails.
   """
 
   import Ecto.Query
 
-  alias Tayori.Campaigns.{Campaign, Enrollment, Events, Runner}
+  alias Tayori.Campaigns.{Campaign, Delivery, Enrollment, Events, Runner}
   alias Tayori.{Config, Entry, Scheduler, Subscribers, Webhooks}
 
   require Logger
@@ -90,6 +96,13 @@ defmodule Tayori.Jobs do
   @compile {:no_warn_undefined, [Oban, Tayori.Worker]}
 
   @letter_attempts 5
+  # The jobs given to Oban.insert_all at once.
+  @insert_chunk 500
+  # How long work may be past its time before the sweep gives it a job:
+  # the people and the broadcasts, then the letters.
+  @overdue 300
+  @overdue_letters 900
+  @sweep_every 3600
 
   @doc false
   # Sends what the publication of an entry sends, from the scheduler.
@@ -182,31 +195,59 @@ defmodule Tayori.Jobs do
     end
   end
 
-  # The campaigns' work that may have no job: the people of the
-  # sequences waiting for a time, the broadcasts scheduled (and those
-  # whose sending stopped half way: their deliveries are unique, so the
-  # walk again gives no one two), and the events' daily cleanup.
-  defp boot_campaigns(%Config{oban: oban} = config) do
+  # The campaigns' sweep, which gives Oban what lost its job, and the
+  # events' daily cleanup: one job each in the cluster. A node that boots
+  # moves the sweep to now.
+  defp boot_campaigns(%Config{oban: oban}) do
     now = DateTime.utc_now()
+    insert!(oban, :campaigns_sweep, now)
+    insert!(oban, :campaigns_cleanup, now)
+  end
+
+  @doc false
+  # The campaigns' work that lost its job, at a time: the people of the
+  # sequences more than 5 minutes past their next_at, the broadcasts more
+  # than 5 minutes past their send_at or being sent with no batch in 5
+  # minutes, and the letters queued for more than 15 minutes, but those of
+  # a paused sequence. Each is given a job, a batch at a time (the jobs
+  # are not unique: an enrollment and a letter are claimed, and a
+  # broadcast's deliveries are unique, so that a second job does
+  # nothing).
+  @spec sweep_campaigns(Config.t(), DateTime.t()) :: :ok
+  def sweep_campaigns(%Config{oban: nil}, _now), do: :ok
+
+  def sweep_campaigns(%Config{} = config, %DateTime{} = now) do
+    late = DateTime.add(now, -@overdue)
+    late_letters = DateTime.add(now, -@overdue_letters)
 
     from(e in Enrollment,
-      where: e.state == "active" and not is_nil(e.next_at),
-      select: {e.id, e.next_at}
+      where: e.state == "active" and not is_nil(e.next_at) and e.next_at < ^late
     )
-    |> config.repo.all(prefix: config.prefix)
-    |> Enum.each(fn {id, at} -> insert!(oban, {:enrollment, id}, at) end)
+    |> Runner.each_id(
+      config,
+      &campaign_requeued(config, Enum.map(&1, fn id -> {:enrollment, id, now} end))
+    )
 
     from(c in Campaign,
-      where: c.kind == "broadcast" and c.status in ["scheduled", "sending"],
-      select: {c.id, c.status, c.send_at}
+      where:
+        c.kind == "broadcast" and
+          ((c.status == "scheduled" and c.send_at < ^late) or
+             (c.status == "sending" and c.updated_at < ^late))
     )
-    |> config.repo.all(prefix: config.prefix)
-    |> Enum.each(fn
-      {id, "scheduled", at} -> insert!(oban, {:broadcast, id}, at || now)
-      {id, "sending", _at} -> insert!(oban, {:broadcast, id}, now)
-    end)
+    |> Runner.each_id(
+      config,
+      &campaign_requeued(config, Enum.map(&1, fn id -> {:broadcast, id, now} end))
+    )
 
-    insert!(oban, :campaigns_cleanup, now)
+    from(d in Delivery,
+      join: c in Campaign,
+      on: c.id == d.campaign_id,
+      where: d.status == "queued" and d.updated_at < ^late_letters and c.status != "paused"
+    )
+    |> Runner.each_id(
+      config,
+      &campaign_requeued(config, Enum.map(&1, fn id -> {:letter, id} end))
+    )
   end
 
   @doc false
@@ -219,17 +260,50 @@ defmodule Tayori.Jobs do
   def campaign_written(%Config{oban: nil}, _jobs), do: :ok
   def campaign_written(_config, []), do: :ok
 
-  def campaign_written(%Config{oban: oban}, jobs) do
+  def campaign_written(%Config{oban: oban} = config, jobs) do
     check_queue(oban)
     {letters, timed} = Enum.split_with(jobs, &match?({:letter, _}, &1))
     Enum.each(timed, fn {kind, id, at} -> insert!(oban, {kind, id}, at) end)
+    campaign_requeued(config, letters)
+  end
 
-    if letters != [] do
-      Oban.insert_all(oban.name, Enum.map(letters, &Tayori.Worker.new(args(&1), opts(&1, oban))))
-    end
+  @doc false
+  # With Oban, jobs for the campaigns' work, given to Oban.insert_all a
+  # chunk at a time: the letters, and what resume/2 and the sweep take up
+  # again. insert_all keeps no job unique: a second job of an enrollment
+  # or a letter finds it claimed, or done, and does nothing.
+  @spec campaign_requeued(Config.t(), [tuple()]) :: :ok
+  def campaign_requeued(%Config{oban: nil}, _jobs), do: :ok
+  def campaign_requeued(_config, []), do: :ok
+
+  def campaign_requeued(%Config{oban: oban}, jobs) do
+    jobs
+    |> Enum.map(fn
+      {:letter, _id} = job ->
+        Tayori.Worker.new(args(job), opts(job, oban))
+
+      {kind, id, at} ->
+        Tayori.Worker.new(args({kind, id}), [scheduled_at: at] ++ opts({kind, id}, oban))
+    end)
+    |> Enum.chunk_every(@insert_chunk)
+    |> Enum.each(&Oban.insert_all(oban.name, &1))
+  end
+
+  @doc false
+  # Without Oban, after resume/2: the letters of a campaign still queued,
+  # from a task, one after the other, each tried once.
+  @spec send_queued(Config.t(), Ecto.UUID.t()) :: :ok
+  def send_queued(%Config{oban: nil} = config, campaign_id) do
+    start(fn ->
+      campaign_id
+      |> Runner.queued()
+      |> Runner.each_id(config, fn ids -> Enum.each(ids, &try_once(config, {:letter, &1})) end)
+    end)
 
     :ok
   end
+
+  def send_queued(_config, _campaign_id), do: :ok
 
   @doc false
   # Without Oban, after the write that queued them: the letters, from a
@@ -332,6 +406,7 @@ defmodule Tayori.Jobs do
   defp args({:broadcast, id}), do: %{"job" => "broadcast", "id" => id}
   defp args({:letter, delivery_id}), do: %{"job" => "letter", "delivery_id" => delivery_id}
   defp args(:campaigns_cleanup), do: %{"job" => "campaigns_cleanup"}
+  defp args(:campaigns_sweep), do: %{"job" => "campaigns_sweep"}
 
   defp opts({:email, _, _}, oban), do: [queue: oban.queue, max_attempts: 5]
   defp opts({:webhook, _, _}, oban), do: [queue: oban.queue, max_attempts: 8]
@@ -343,6 +418,9 @@ defmodule Tayori.Jobs do
   # the time of the one that waits.
   defp opts({:enrollment, _}, oban), do: once(oban, [:job, :id])
   defp opts({:broadcast, _}, oban), do: once(oban, [:job, :id])
+
+  # One in the cluster: a node that starts moves it to now.
+  defp opts(:campaigns_sweep, oban), do: once(oban, [:job])
 
   # One a day: a node that starts does not move it.
   defp opts(:campaigns_cleanup, oban) do
@@ -415,12 +493,24 @@ defmodule Tayori.Jobs do
     :ok
   end
 
+  # What lost its job, then the next hour's sweep.
+  def perform(%Config{oban: oban} = config, %{"job" => "campaigns_sweep"}, _attempt) do
+    now = DateTime.utc_now()
+
+    if oban && Config.module?(config, :campaigns) do
+      sweep_campaigns(config, now)
+      insert!(oban, :campaigns_sweep, DateTime.add(now, @sweep_every))
+    end
+
+    :ok
+  end
+
   def perform(config, args, _attempt), do: perform(config, args)
 
   @doc false
   @spec perform(Config.t(), map()) :: :ok | {:error, term()} | {:cancel, term()}
   def perform(config, %{"job" => job} = args)
-      when job in ["enrollment", "broadcast", "letter", "campaigns_cleanup"],
+      when job in ["enrollment", "broadcast", "letter", "campaigns_cleanup", "campaigns_sweep"],
       do: perform(config, args, %{})
 
   def perform(config, %{"job" => "email", "entry_id" => entry, "subscriber_id" => subscriber}),
