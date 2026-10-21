@@ -22,10 +22,22 @@ defmodule Tayori.Router do
         tayori_page "/changelog", title: "What's new in MyApp"
       end
 
+      # The campaigns' letters: no session, no CSRF token.
+      pipeline :letters do
+        plug :accepts, ["html", "json"]
+      end
+
+      scope "/" do
+        pipe_through :letters
+        tayori_mail "/letters"
+      end
+
   `tayori_admin/2` mounts the admin (see the [Admin](admin.md) guide),
   `tayori_api/2` the news as JSON, for a frontend that Phoenix does not
   render (see [Any frontend](any_frontend.md)), and `tayori_page/2` the
-  public page and its feeds (see [The public page](public_page.md)). Each
+  public page and its feeds (see [The public page](public_page.md)), and
+  `tayori_mail/2` the addresses of the campaigns' letters, to unsubscribe
+  and for the mail providers' webhooks (see `Tayori.Campaigns.Mount`). Each
   is a library mounted with [PhoenixMountable](https://hexdocs.pm/phoenix_mountable):
   ordinary routes in the app's router (`mix phx.routes` lists them),
   behind the app's own scopes and pipelines. Every mount also takes the
@@ -38,7 +50,7 @@ defmodule Tayori.Router do
   of the build in their names, so it looks the same in any app.
   """
 
-  alias Tayori.Router.{API, Page}
+  alias Tayori.Router.{API, Mail, Page}
 
   use PhoenixMountable,
     otp_app: :tayori,
@@ -135,6 +147,19 @@ defmodule Tayori.Router do
     quote do
       require unquote(Page)
       unquote(Page).tayori_page(unquote(path), unquote(opts))
+    end
+  end
+
+  @doc """
+  Mounts the addresses of the campaigns' letters at `path`, the `:url` of
+  `:campaigns`: the page to unsubscribe and the mail providers' webhooks.
+  See `Tayori.Campaigns.Mount` for the routes, and why its pipeline has no
+  CSRF protection.
+  """
+  defmacro tayori_mail(path, opts \\ []) do
+    quote do
+      require unquote(Mail)
+      unquote(Mail).tayori_mail(unquote(path), unquote(opts))
     end
   end
 end

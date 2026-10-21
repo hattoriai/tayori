@@ -21,12 +21,16 @@ defmodule Tayori.Scheduler do
   # settings first, then the work goes to Tayori.Jobs.
   #
   # Without the changelog, it announces nothing and runs no schedule of
-  # it.
+  # it. With the campaigns, it also advances the people of the sequences
+  # whose time came, sends the broadcasts whose time came
+  # (Tayori.Campaigns.Runner.run_due/3), and deletes the old events once
+  # a day; Tayori.Campaigns wakes it after a write.
 
   use GenServer
 
   import Ecto.Query
 
+  alias Tayori.Campaigns.Runner
   alias Tayori.{Config, Entry}
 
   require Logger
@@ -114,8 +118,22 @@ defmodule Tayori.Scheduler do
       error -> Logger.error("Tayori could not run its schedules: " <> Exception.message(error))
     end
 
+    if Config.module?(config, :campaigns) do
+      try do
+        now = DateTime.utc_now()
+        Runner.run_due(config, now)
+        Runner.daily_cleanup(config, now)
+      rescue
+        error ->
+          Logger.error("Tayori could not run its campaigns: " <> Exception.message(error))
+      end
+    end
+
     {:noreply, %{state | timer: Process.send_after(self(), :tick, next_tick(config))}}
   end
+
+  # Anything else (a message of a task it started) is nothing to it.
+  def handle_info(_message, state), do: {:noreply, state}
 
   defp claim(config, id, now) do
     {count, _} =
@@ -133,8 +151,22 @@ defmodule Tayori.Scheduler do
     Tayori.Jobs.published(config, id)
   end
 
+  # The next time there is work: an entry's publication, a campaign's
+  # next time, else a minute from now.
   defp next_tick(config) do
-    if Config.module?(config, :changelog), do: next_announcement(config), else: @interval
+    Enum.min([
+      if(Config.module?(config, :changelog), do: next_announcement(config), else: @interval),
+      if(Config.module?(config, :campaigns), do: next_campaign(config), else: @interval)
+    ])
+  end
+
+  defp next_campaign(config) do
+    case Runner.next_due(config) do
+      nil -> @interval
+      at -> at |> DateTime.diff(DateTime.utc_now(), :millisecond) |> max(0) |> min(@interval)
+    end
+  rescue
+    _ -> @interval
   end
 
   defp next_announcement(config) do

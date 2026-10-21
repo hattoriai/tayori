@@ -112,28 +112,13 @@ defmodule Tayori.GitHub do
   @doc """
   A body reader for `Plug.Parsers` (`body_reader: {Tayori.GitHub,
   :read_body, []}`): it reads the body as `Plug.Conn.read_body/2` does,
-  and keeps a copy of a body GitHub signed, for `verify/2`.
+  and keeps a copy of a body GitHub signed, for `verify/2`. The same as
+  `Tayori.RawBody.read_body/2`, which also keeps the bodies of the mail
+  providers' webhooks.
   """
   @spec read_body(Plug.Conn.t(), keyword()) ::
           {:ok, binary(), Plug.Conn.t()} | {:more, binary(), Plug.Conn.t()} | {:error, term()}
-  def read_body(conn, opts) do
-    case Plug.Conn.read_body(conn, opts) do
-      {:ok, body, conn} -> {:ok, body, keep(conn, body)}
-      {:more, body, conn} -> {:more, body, keep(conn, body)}
-      {:error, reason} -> {:error, reason}
-    end
-  end
-
-  defp keep(conn, body) do
-    if Plug.Conn.get_req_header(conn, "x-hub-signature-256") == [] do
-      conn
-    else
-      Plug.Conn.put_private(conn, :tayori_raw_body, [
-        Map.get(conn.private, :tayori_raw_body, []),
-        body
-      ])
-    end
-  end
+  def read_body(conn, opts), do: Tayori.RawBody.read_body(conn, opts)
 
   @doc """
   The changes of an event of GitHub, `x-github-event` and its payload:

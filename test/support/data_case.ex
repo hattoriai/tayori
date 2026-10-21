@@ -133,6 +133,79 @@ defmodule TayoriTest.DataCase do
     Tayori.Config.get().repo.insert!(%TayoriTest.Story{person_id: id, published_at: published_at})
   end
 
+  @doc """
+  The attributes of a step: its wait in minutes and an English letter
+  with this subject. Options: `:skip_if`, `:body` (Markdown), and the
+  letter's other fields (`:preheader`, `:cta_label`, `:cta_url`).
+  """
+  def step(wait, subject, opts \\ []) do
+    {skip_if, opts} = Keyword.pop(opts, :skip_if)
+    {body, opts} = Keyword.pop(opts, :body, "About #{subject}.")
+
+    letter =
+      Map.merge(
+        %{"locale" => "en", "subject" => subject, "body" => Kotoba.Content.from_markdown(body)},
+        Map.new(opts, fn {key, value} -> {to_string(key), value} end)
+      )
+
+    %{"wait" => wait, "skip_if" => skip_if, "letters" => [letter]}
+  end
+
+  @doc """
+  A sequence with these steps (`step/3`), started: `attrs` of the
+  campaign, `"name"` and `"kind"` given.
+  """
+  def sequence!(attrs \\ %{}, steps) do
+    {:ok, campaign} =
+      Tayori.Campaigns.create(Map.merge(%{"name" => "Onboarding", "kind" => "sequence"}, attrs))
+
+    for step <- steps, do: {:ok, _} = Tayori.Campaigns.add_step(campaign, step)
+    {:ok, campaign} = Tayori.Campaigns.start(campaign)
+    campaign
+  end
+
+  @doc "A broadcast, a draft, with an English letter of this subject."
+  def broadcast!(attrs \\ %{}, subject) do
+    {:ok, campaign} =
+      Tayori.Campaigns.create(Map.merge(%{"name" => "News", "kind" => "broadcast"}, attrs))
+
+    [step] = campaign.steps
+
+    {:ok, _} =
+      Tayori.Campaigns.put_letter(step, "en", %{
+        "subject" => subject,
+        "body" => Kotoba.Content.from_markdown("About #{subject}.")
+      })
+
+    Tayori.Campaigns.get(campaign.id)
+  end
+
+  @doc "The enrollment of a person in a campaign, or nil."
+  def enrollment(campaign, person) do
+    config = Tayori.Config.get()
+
+    config.repo.get_by(Tayori.Campaigns.Enrollment,
+      campaign_id: campaign.id,
+      person: person_id(person)
+    )
+  end
+
+  @doc "The deliveries of a campaign, oldest first."
+  def deliveries(campaign) do
+    import Ecto.Query
+    config = Tayori.Config.get()
+
+    from(d in Tayori.Campaigns.Delivery,
+      where: d.campaign_id == ^campaign.id,
+      order_by: [asc: d.inserted_at, asc: d.id]
+    )
+    |> config.repo.all()
+  end
+
+  @doc "A time, days and minutes after another."
+  def later(at, days, minutes \\ 0),
+    do: at |> DateTime.add(days, :day) |> DateTime.add(minutes * 60)
+
   @doc "A time some minutes from now (negative for the past)."
   def minutes(n), do: DateTime.add(DateTime.utc_now(), n * 60, :second)
 

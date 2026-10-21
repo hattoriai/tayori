@@ -12,7 +12,7 @@ defmodule Tayori.Campaigns.Segments do
   The condition is checked against the audience's attributes
   (`Tayori.Conditions.validate/3`). Each change is told on the PubSub as
   `{Tayori, :segment_changed, id}` (see `Tayori.subscribe/0`). A segment
-  that a campaign names cannot be deleted.
+  that a campaign or another segment names cannot be deleted.
   """
 
   import Ecto.Query
@@ -83,7 +83,8 @@ defmodule Tayori.Campaigns.Segments do
 
   @doc """
   Deletes a segment, unless a campaign names it (its audience, its goal, a
-  step's skip): then `{:error, {:in_use, names}}`, the campaigns' names.
+  step's skip) or another segment's condition does: then
+  `{:error, {:in_use, names}}`, the names of the campaigns and segments.
   """
   @spec delete(Segment.t()) ::
           {:ok, Segment.t()} | {:error, {:in_use, [String.t()]}} | {:error, Ecto.Changeset.t()}
@@ -96,7 +97,7 @@ defmodule Tayori.Campaigns.Segments do
     end
   end
 
-  @doc "The names of the campaigns that name a segment, by name."
+  @doc "The names of the campaigns and the other segments that name a segment, by name."
   @spec used_by(String.t()) :: [String.t()]
   def used_by(id) when is_binary(id), do: used_by(Config.get(), id)
 
@@ -112,13 +113,21 @@ defmodule Tayori.Campaigns.Segments do
       |> config.repo.all(prefix: config.prefix)
       |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
 
-    campaigns
-    |> Enum.filter(fn {campaign_id, _name, audience, goal} ->
-      conditions = [audience, goal | Map.get(skips, campaign_id, [])]
-      Enum.any?(conditions, &(id in Conditions.segment_ids(&1)))
-    end)
-    |> Enum.map(&elem(&1, 1))
-    |> Enum.sort()
+    by_campaigns =
+      campaigns
+      |> Enum.filter(fn {campaign_id, _name, audience, goal} ->
+        conditions = [audience, goal | Map.get(skips, campaign_id, [])]
+        Enum.any?(conditions, &(id in Conditions.segment_ids(&1)))
+      end)
+      |> Enum.map(&elem(&1, 1))
+
+    by_segments =
+      from(s in Segment, where: s.id != ^id, select: {s.name, s.condition})
+      |> config.repo.all(prefix: config.prefix)
+      |> Enum.filter(fn {_name, condition} -> id in Conditions.segment_ids(condition) end)
+      |> Enum.map(&elem(&1, 0))
+
+    Enum.sort(by_campaigns ++ by_segments)
   end
 
   defp changed({:ok, segment}) do
