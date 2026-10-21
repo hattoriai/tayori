@@ -93,6 +93,92 @@ defmodule Tayori.JobsTest do
       assert [%{args: %{"job" => "notify"}}] =
                enqueued(repo)
     end
+
+    test "with Oban, an entry's announcement is a job at its time, moved with it",
+         %{config: config, repo: repo} do
+      config = subscriptions(config, oban: oban_of(repo))
+      at = DateTime.add(DateTime.utc_now(), 3600)
+
+      entry = entry!("Later", %{published_at: at})
+      assert [job] = jobs(repo, "announce")
+      assert job.args["entry_id"] == entry.id
+      assert_in_delta DateTime.to_unix(job.scheduled_at), DateTime.to_unix(at), 1
+
+      later = DateTime.add(at, 3600)
+      {:ok, entry} = Tayori.Entries.publish(entry, later)
+      assert [job] = jobs(repo, "announce")
+      assert_in_delta DateTime.to_unix(job.scheduled_at), DateTime.to_unix(later), 1
+
+      # A draft again: its job finds nothing to announce.
+      {:ok, _entry} = Tayori.Entries.unpublish(entry)
+      assert :ok = Tayori.Jobs.perform(config, job.args)
+      refute_received {:notified, _}
+      assert enqueued(repo) == []
+    end
+
+    test "with Oban, a taken slug is tried again in the write's transaction, with its job",
+         %{config: config, repo: repo} do
+      subscriptions(config, oban: oban_of(repo))
+      entry!("Same", %{published_at: minutes(-2)})
+      second = entry!("Same", %{published_at: minutes(-1)})
+
+      assert second.slug == "same-2"
+
+      assert repo
+             |> jobs("announce")
+             |> Enum.map(& &1.args["entry_id"])
+             |> Enum.member?(second.id)
+    end
+
+    test "with Oban, the announcement's job announces the entry once",
+         %{config: config, repo: repo} do
+      config = subscriptions(config, oban: oban_of(repo))
+      entry = entry!("Now", %{published_at: minutes(-1)})
+
+      assert [job] = jobs(repo, "announce")
+      assert :ok = Tayori.Jobs.perform(config, job.args)
+      assert [%{args: %{"job" => "notify", "entry_id" => id}}] = enqueued(repo)
+      assert id == entry.id
+
+      assert :ok = Tayori.Jobs.perform(config, job.args)
+      assert length(enqueued(repo)) == 1
+    end
+
+    test "with Oban, boot gives Oban the announcements that have no job, and the schedules",
+         %{config: config, repo: repo} do
+      # Written before Tayori ran with Oban: no job.
+      subscriptions(config)
+      entry = entry!("Waiting", %{published_at: DateTime.add(DateTime.utc_now(), 600)})
+      assert jobs(repo) == []
+
+      config =
+        subscriptions(config,
+          oban: oban_of(repo),
+          digest: [every: {:weekly, :monday}, at: ~T[09:00:00]]
+        )
+
+      assert :ok = Tayori.Jobs.boot(config)
+      assert [%{args: %{"entry_id" => id}}] = jobs(repo, "announce")
+      assert id == entry.id
+
+      # Again, as another node of the cluster: the same jobs.
+      assert :ok = Tayori.Jobs.boot(config)
+      assert length(jobs(repo, "announce")) == 1
+      assert [schedules] = jobs(repo, "schedules")
+
+      # The schedules' job runs what is due and gives Oban the next time:
+      # a Monday at nine.
+      assert :ok = Tayori.Jobs.perform(config, schedules.args)
+      assert [next] = jobs(repo, "schedules")
+      assert Date.day_of_week(next.scheduled_at) == 1
+      assert Time.compare(DateTime.to_time(next.scheduled_at), ~T[09:00:00]) == :eq
+    end
+
+    test "without a schedule, boot gives Oban no schedules' job", %{config: config, repo: repo} do
+      config = subscriptions(config, oban: oban_of(repo))
+      assert :ok = Tayori.Jobs.boot(config)
+      assert jobs(repo, "schedules") == []
+    end
   end
 
   test "the :oban option names an instance and a queue" do
@@ -145,11 +231,17 @@ defmodule Tayori.JobsTest do
     subscriber
   end
 
-  defp enqueued(TayoriTest.SQLiteRepo = repo) do
+  # What a publication sends: the jobs but the announcements and the
+  # schedules, which jobs/1 gives.
+  defp enqueued(repo), do: Enum.reject(jobs(repo), &(&1.args["job"] in ["announce", "schedules"]))
+
+  defp jobs(TayoriTest.SQLiteRepo = repo) do
     Oban.Testing.all_enqueued(repo: repo, engine: Oban.Engines.Lite, worker: Tayori.Worker)
   end
 
-  defp enqueued(repo), do: Oban.Testing.all_enqueued(repo: repo, worker: Tayori.Worker)
+  defp jobs(repo), do: Oban.Testing.all_enqueued(repo: repo, worker: Tayori.Worker)
+
+  defp jobs(repo, job), do: Enum.filter(jobs(repo), &(&1.args["job"] == job))
 
   defp oban_of(TayoriTest.SQLiteRepo), do: TayoriTest.SQLiteOban
   defp oban_of(TayoriTest.PostgresRepo), do: TayoriTest.PostgresOban

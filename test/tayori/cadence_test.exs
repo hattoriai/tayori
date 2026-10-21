@@ -295,11 +295,14 @@ defmodule Tayori.CadenceTest do
     end
   end
 
-  defp enqueued(TayoriTest.SQLiteRepo = repo) do
+  # The emails: not the entries' announcements, nor the schedules' next run.
+  defp enqueued(repo), do: Enum.reject(jobs(repo), &(&1.args["job"] in ["announce", "schedules"]))
+
+  defp jobs(TayoriTest.SQLiteRepo = repo) do
     Oban.Testing.all_enqueued(repo: repo, engine: Oban.Engines.Lite, worker: Tayori.Worker)
   end
 
-  defp enqueued(repo), do: Oban.Testing.all_enqueued(repo: repo, worker: Tayori.Worker)
+  defp jobs(repo), do: Oban.Testing.all_enqueued(repo: repo, worker: Tayori.Worker)
 
   defp oban_of(TayoriTest.SQLiteRepo), do: %{name: TayoriTest.SQLiteOban, queue: :default}
   defp oban_of(TayoriTest.PostgresRepo), do: %{name: TayoriTest.PostgresOban, queue: :default}

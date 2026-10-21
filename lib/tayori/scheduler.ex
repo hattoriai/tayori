@@ -4,6 +4,11 @@ defmodule Tayori.Scheduler do
   # scheduled time: it tells the PubSub, and Tayori.Jobs sends the rest
   # (emails, webhooks, the app's notifier), as Oban jobs or from tasks.
   #
+  # The GenServer runs only without Oban. With Oban, the same work is
+  # jobs (Tayori.Jobs): an entry's announcement at its time, the schedules
+  # at theirs, and nothing looks every minute. announce_due/2 and
+  # run_due/2 are the work either way.
+  #
   # One runs in the cluster, a PhoenixMountable.Singleton. The announcement
   # is also claimed in the database (the row whose announced_at is still
   # nil), so that an entry is announced once even while a node takes the

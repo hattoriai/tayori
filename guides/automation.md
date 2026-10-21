@@ -422,10 +422,12 @@ With fewer changes waiting than `:minimum` (`1`), it makes nothing, and
 the changes wait for the next time. The time is kept all the same, so a
 weekly digest with too little to say waits a week, not a minute.
 
-Tayori's scheduler looks every minute, on one node of the cluster. A
-schedule begins the first time it looks: a weekly digest added on a
-Wednesday first runs the next Monday, not at once. A time missed while
-the app was down runs once, at the next look.
+With the `:oban` option, the schedule is a job at its next time, which
+gives Oban the one after; without, Tayori's scheduler looks every
+minute, on one node of the cluster. A schedule begins when Tayori first
+starts with it: a weekly digest added on a Wednesday first runs the next
+Monday, not at once. A time missed while the app was down runs once,
+when it starts again.
 
 With the `:oban` option, the digest is a job of `Tayori.Worker`. Asked
 for again while one waits, it is the same job, which takes the changes

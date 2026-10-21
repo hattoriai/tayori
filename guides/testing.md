@@ -34,10 +34,12 @@ end
 
 Tayori is in your app's supervision tree in the tests too, with your test
 repo; the entries are in the sandbox of each test. Start it there with
-`scheduler: false`: the scheduler queries the repo by itself, when an
-entry is published and on a timer, and a query that outlives a test's
-sandbox fails. Without it, `announce!/0` announces what is due, in the
-test's process:
+`scheduler: false`: without Oban, the scheduler queries the repo by
+itself, when an entry is published and on a timer, and with Oban a task
+does at boot; a query that outlives a test's sandbox fails. Without
+them, `announce!/0` announces what is due, in the test's process. With
+Oban, each write of an entry still gives it an `"announce"` job, which
+your Oban's testing mode keeps:
 
 ```elixir
 # application.ex

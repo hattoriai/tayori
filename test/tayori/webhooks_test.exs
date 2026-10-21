@@ -258,8 +258,10 @@ defmodule Tayori.WebhooksTest do
 
       engine = if repo == TayoriTest.SQLiteRepo, do: Oban.Engines.Lite, else: Oban.Engines.Basic
 
+      # What the announcement sends; the entry's own job is its announcement.
       assert [%{args: args, max_attempts: 8}] =
                Oban.Testing.all_enqueued(repo: repo, engine: engine, worker: Tayori.Worker)
+               |> Enum.reject(&(&1.args["job"] == "announce"))
 
       assert args == %{"job" => "webhook", "entry_id" => entry.id, "hook_id" => id_of("Ours")}
     end

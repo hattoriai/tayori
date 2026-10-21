@@ -57,6 +57,29 @@ The jobs go to the `:default` queue, or the one you give
 (`oban: [name: Oban, queue: :news]`), which must be one your Oban runs.
 `mix tayori.install` sets `oban: Oban` when your app has Oban.
 
+The announcement itself is a job too: each write of an entry gives Oban
+a job at its publication time, in the same transaction as the write, so
+an entry is never saved without its announcement. Nothing looks at the
+database on a timer. For that:
+
+* **Start Tayori after Oban** in your supervision tree. At boot, Tayori
+  gives Oban the jobs that may be missing: those of entries published
+  before it ran with Oban, and its schedules (see
+  [Automation](automation.md)).
+* **Run Oban on Tayori's repo.** An Oban of another repo still gets each
+  job, just after the write rather than in its transaction; an insert
+  that fails then is given again at the next boot.
+
+```elixir
+children = [
+  MyApp.Repo,
+  {Phoenix.PubSub, name: MyApp.PubSub},
+  {Oban, Application.fetch_env!(:my_app, Oban)},
+  {Tayori, repo: MyApp.Repo, pubsub: MyApp.PubSub, oban: Oban},
+  MyAppWeb.Endpoint
+]
+```
+
 Without Oban, Tayori sends them from tasks in the node that announced the
 entry: a webhook is tried three times, an email once, and a failure is
 logged. A node stopped while it sends (a deploy, a crash) loses what it
