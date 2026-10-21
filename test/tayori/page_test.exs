@@ -114,6 +114,18 @@ defmodule Tayori.PageTest do
     end
   end
 
+  test "the language links say the names the app gives, else the tags", %{
+    conn: conn,
+    config: config
+  } do
+    put_config(config, locales: [{"en", "English"}, {"pt-PT", "Português"}, "zh-Hant"])
+
+    html = conn |> get("/changelog") |> html_response(200)
+    assert html =~ ~r{hreflang="pt-PT"[^>]*>\s*Português\s*</a>}
+    assert html =~ ~r{hreflang="zh-Hant"[^>]*>\s*zh-Hant\s*</a>}
+    refute html =~ "Português (Portugal)"
+  end
+
   test "a visitor gets the app's language, unless ?lang= says another", %{conn: conn} do
     conn = with_session(conn, %{"locale" => "pt_PT"})
     assert conn |> page("/news") |> attribute("html", "lang") == ["pt-PT"]

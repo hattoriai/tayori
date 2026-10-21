@@ -330,7 +330,13 @@ defmodule Tayori.AI do
     """
   end
 
-  defp language(locale), do: "#{Locales.name(locale)} (#{locale})"
+  defp language(locale) do
+    # A language the app does not name is told by its tag.
+    case Locales.name(locale) do
+      ^locale -> "the language whose BCP 47 tag is #{locale}"
+      name -> "#{name} (#{locale})"
+    end
+  end
 
   defp adapter, do: Application.get_env(:tayori, :ai_adapter, Tayori.AI.ReqLLM)
 

@@ -7,6 +7,16 @@ and Tayori follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+### Changed
+
+- The app names the languages of its entries, in `:locales`:
+  `[{"en", "English"}, {"pt-PT", "Português"}]`. Tayori no longer keeps
+  names of its own, as an app can write its news in any language: a tag
+  without a name shows as its tag in the admin and in the readers'
+  language links, where 0.2.0 named some (`pt-PT` was "Português
+  (Portugal)", `es-ES` "Español"). Tags alone are still accepted.
+  `Tayori.Locales.name/2` takes the config.
+
 ## [0.2.0] - 2026-10-21
 
 ### Changed
