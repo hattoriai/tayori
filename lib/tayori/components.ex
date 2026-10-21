@@ -20,6 +20,9 @@ defmodule Tayori.Components do
 
   `news/1` and `entry/1` are the list and an entry alone, for a page of
   the app's own.
+
+  Without the `:changelog` module, `@tayori` is nil, and the button, the
+  panel and the announcement render nothing.
   """
 
   use Phoenix.Component
@@ -28,7 +31,7 @@ defmodule Tayori.Components do
 
   alias Tayori.{Category, Entry, Messages}
 
-  attr :tayori, Tayori.Live.State, required: true
+  attr :tayori, :any, required: true, doc: "`@tayori`, a `Tayori.Live.State`, or nil"
   attr :class, :any, default: nil, doc: "classes of the button, besides `tayori-button`"
   attr :label, :boolean, default: false, doc: "show the word \"What's new\" beside the icon"
   attr :rest, :global
@@ -37,6 +40,8 @@ defmodule Tayori.Components do
   The button that opens the panel, with the count of unread entries. Its
   accessible name says the count ("What's new, 2 new updates").
   """
+  def news_button(%{tayori: nil} = assigns), do: ~H""
+
   def news_button(assigns) do
     ~H"""
     <button
@@ -63,7 +68,7 @@ defmodule Tayori.Components do
   defp label(%{unread: n, messages: messages}),
     do: messages["button"] <> ", " <> Messages.unread(messages, n)
 
-  attr :tayori, Tayori.Live.State, required: true
+  attr :tayori, :any, required: true, doc: "`@tayori`, a `Tayori.Live.State`, or nil"
   attr :class, :any, default: nil
   attr :rest, :global
 
@@ -74,6 +79,8 @@ defmodule Tayori.Components do
   to the public page. Escape goes back to the list, then closes; so does
   a click outside.
   """
+  def news_panel(%{tayori: nil} = assigns), do: ~H""
+
   def news_panel(assigns) do
     ~H"""
     <div
@@ -475,7 +482,7 @@ defmodule Tayori.Components do
     """
   end
 
-  attr :tayori, Tayori.Live.State, required: true
+  attr :tayori, :any, required: true, doc: "`@tayori`, a `Tayori.Live.State`, or nil"
 
   @doc """
   The entry announced to the reader now, if the app has the
@@ -483,6 +490,7 @@ defmodule Tayori.Components do
   or a banner, as the admin chose, with its button. Dismissing it is
   remembered for the reader on every device.
   """
+  def announcement(%{tayori: nil} = assigns), do: ~H""
   def announcement(%{tayori: %{announcement: nil}} = assigns), do: ~H""
 
   # The open panel has the news: a popup or a toast would cover it.

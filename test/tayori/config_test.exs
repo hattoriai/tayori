@@ -107,4 +107,150 @@ defmodule Tayori.ConfigTest do
       Config.new(@base ++ [secret_key_base: "short"])
     end
   end
+
+  describe "modules" do
+    @campaigns [
+      modules: [:changelog, :campaigns],
+      mailer: TayoriTest.Mailer,
+      secret_key_base: String.duplicate("tayori-test-secret-", 4),
+      campaigns: [audience: TayoriTest.Audience, url: "https://app.test/letters/"],
+      email_from: {"Atelier", "news@atelier.test"}
+    ]
+
+    test "the changelog alone by default, as before" do
+      config = Config.new(@base)
+      assert config.modules == [:changelog]
+      assert Config.module?(config, :changelog)
+      refute Config.module?(config, :campaigns)
+      assert config.campaigns == nil
+      assert Config.modules() == [:changelog, :campaigns]
+    end
+
+    test "the modules given, once each; an unknown one or none is refused" do
+      config = Config.new(@base ++ Keyword.put(@campaigns, :modules, [:campaigns, :campaigns]))
+      assert config.modules == [:campaigns]
+      refute Config.module?(config, :changelog)
+
+      for bad <- [[], [:polls], :changelog, [:changelog, :polls]] do
+        assert_raise ArgumentError, ~r/:modules must be a list of/, fn ->
+          Config.new(@base ++ [modules: bad])
+        end
+      end
+    end
+
+    test "the features are the changelog's" do
+      assert_raise ArgumentError, ~r/:features are the changelog's/, fn ->
+        Config.new(
+          @base ++ Keyword.merge(@campaigns, modules: [:campaigns], features: [:reactions])
+        )
+      end
+
+      assert Config.new(@base ++ Keyword.put(@campaigns, :features, [:reactions])).features ==
+               [:reactions]
+    end
+
+    test "the campaigns' option, checked" do
+      config = Config.new(@base ++ @campaigns)
+
+      assert config.campaigns == %{
+               audience: TayoriTest.Audience,
+               url: "https://app.test/letters",
+               from: {"Atelier", "news@atelier.test"},
+               reply_to: nil,
+               providers: %{},
+               keep_events_days: 400
+             }
+
+      config =
+        Config.new(
+          @base ++
+            Keyword.put(@campaigns, :campaigns,
+              audience: TayoriTest.Audience,
+              url: "https://app.test/letters",
+              from: "rui@app.test",
+              reply_to: "help@app.test",
+              keep_events_days: 30,
+              providers: [
+                resend: [secret: "whsec_abc"],
+                postmark: [username: "u", password: "p"],
+                custom: {TayoriTest.Provider, topic: "t"}
+              ]
+            )
+        )
+
+      assert %{from: "rui@app.test", reply_to: "help@app.test", keep_events_days: 30} =
+               config.campaigns
+
+      assert config.campaigns.providers == %{
+               resend: {Tayori.Campaigns.Providers.Resend, %{secret: "whsec_abc"}},
+               postmark: {Tayori.Campaigns.Providers.Postmark, %{username: "u", password: "p"}},
+               custom: {TayoriTest.Provider, %{topic: "t"}}
+             }
+
+      # Without the module, the option is not read.
+      assert Config.new(@base ++ [campaigns: :nonsense]).campaigns == nil
+    end
+
+    test "the campaigns need a mailer, a secret, an audience, an address and a sender" do
+      for key <- [:mailer, :secret_key_base] do
+        assert_raise ArgumentError,
+                     "the :campaigns module needs the #{inspect(key)} option",
+                     fn ->
+                       Config.new(@base ++ Keyword.delete(@campaigns, key))
+                     end
+      end
+
+      assert_raise ArgumentError, ~r/needs the :campaigns option/, fn ->
+        Config.new(@base ++ Keyword.delete(@campaigns, :campaigns))
+      end
+
+      assert_raise ArgumentError, ~r/needs who the letters are from/, fn ->
+        Config.new(@base ++ Keyword.delete(@campaigns, :email_from))
+      end
+
+      bad = [
+        {[url: "https://app.test/letters"], ~r/needs :audience/},
+        {[audience: Kernel, url: "https://app.test/letters"], ~r/must be a Tayori.Audience/},
+        {[audience: TayoriTest.Audience], ~r/needs :url/},
+        {[audience: TayoriTest.Audience, url: "/letters"], ~r/http\(s\) address/},
+        {[audience: TayoriTest.Audience, url: "https://app.test", from: "nobody"],
+         ~r/:from of :campaigns must be an address/},
+        {[audience: TayoriTest.Audience, url: "https://app.test", reply_to: "nobody"],
+         ~r/:reply_to/},
+        {[audience: TayoriTest.Audience, url: "https://app.test", keep_events_days: 0],
+         ~r/:keep_events_days/},
+        {[audience: TayoriTest.Audience, url: "https://app.test", providers: [resend: []]],
+         ~r/whsec_/},
+        {[audience: TayoriTest.Audience, url: "https://app.test", providers: [postmark: []]],
+         ~r/username/},
+        {[audience: TayoriTest.Audience, url: "https://app.test", providers: [ses: {Kernel, []}]],
+         ~r/is not a Tayori.Campaigns.Provider/},
+        {[audience: TayoriTest.Audience, url: "https://app.test", providers: [ses: :nope]],
+         ~r/:providers of :campaigns takes/},
+        {[audience: TayoriTest.Audience, url: "https://app.test", sender: "x"],
+         ~r/:campaigns takes/},
+        {:nonsense, ~r/must be a keyword list/}
+      ]
+
+      for {campaigns, message} <- bad do
+        assert_raise ArgumentError, message, fn ->
+          Config.new(@base ++ Keyword.put(@campaigns, :campaigns, campaigns))
+        end
+      end
+    end
+
+    test "option/2 checks the modules and the campaigns, for the tests" do
+      assert Config.option(:modules, [:campaigns]) == [:campaigns]
+      assert_raise ArgumentError, fn -> Config.option(:modules, []) end
+
+      assert %{audience: TayoriTest.Audience, from: "a@app.test"} =
+               Config.option(:campaigns,
+                 audience: TayoriTest.Audience,
+                 url: "https://app.test",
+                 from: "a@app.test"
+               )
+
+      assert Config.option(:campaigns, nil) == nil
+    end
+  end
 end

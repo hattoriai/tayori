@@ -64,6 +64,21 @@ if config_env() == :test do
     pool: Ecto.Adapters.SQL.Sandbox,
     pool_size: 5
 
+  # A database of its own for the checks of Tayori's migrations, which
+  # empty it (test/tayori/migrations_test.exs).
+  config :tayori, TayoriTest.MigrationsRepo,
+    database: Path.expand("../tmp/tayori_migrations_test.sqlite3", __DIR__),
+    pool_size: 1
+
+  # And on PostgreSQL, in a schema of its own (a prefix).
+  config :tayori, TayoriTest.PostgresMigrationsRepo,
+    url:
+      System.get_env(
+        "TAYORI_TEST_DATABASE_URL",
+        "ecto://postgres:postgres@localhost/tayori_test"
+      ),
+    pool_size: 2
+
   config :tayori, ecto_repos: [TayoriTest.SQLiteRepo, TayoriTest.PostgresRepo]
 
   config :tayori, TayoriTest.Mailer, adapter: Swoosh.Adapters.Test

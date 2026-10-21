@@ -19,6 +19,9 @@ defmodule Tayori.Scheduler do
   # (Tayori.Digest) and the email of a period's entries (the :emails
   # config) when their time has come: the time of the run is kept in the
   # settings first, then the work goes to Tayori.Jobs.
+  #
+  # Without the changelog, it announces nothing and runs no schedule of
+  # it.
 
   use GenServer
 
@@ -46,7 +49,13 @@ defmodule Tayori.Scheduler do
 
   @doc false
   # The tests run the announcements in their own process.
-  def announce_due(%Config{} = config, now \\ DateTime.utc_now()) do
+  def announce_due(config, now \\ DateTime.utc_now())
+
+  def announce_due(%Config{} = config, now) do
+    if Config.module?(config, :changelog), do: announce_all(config, now), else: []
+  end
+
+  defp announce_all(config, now) do
     due =
       config.repo.all(
         from(e in Entry,
@@ -65,9 +74,15 @@ defmodule Tayori.Scheduler do
   # Starts what a schedule says is due: the digest of the inbox (the
   # :digest config) and the email of a period's entries (the :emails
   # config). The tests run it in their own process.
-  def run_due(%Config{} = config, now \\ DateTime.utc_now()) do
-    Tayori.Digest.tick(config, now)
-    Tayori.Subscribers.tick(config, now)
+  def run_due(config, now \\ DateTime.utc_now())
+
+  def run_due(%Config{} = config, now) do
+    if Config.module?(config, :changelog) do
+      Tayori.Digest.tick(config, now)
+      Tayori.Subscribers.tick(config, now)
+    end
+
+    :ok
   end
 
   @impl GenServer
@@ -75,7 +90,8 @@ defmodule Tayori.Scheduler do
     send(self(), :tick)
 
     # A deploy's new code may bring new changes (Tayori.Inbox).
-    if config.inbox.ingest_on_start and config.inbox.sources != [] do
+    if Config.module?(config, :changelog) and config.inbox.ingest_on_start and
+         config.inbox.sources != [] do
       Task.Supervisor.start_child(Tayori.TaskSupervisor, &Tayori.Inbox.ingest/0)
     end
 
@@ -118,6 +134,10 @@ defmodule Tayori.Scheduler do
   end
 
   defp next_tick(config) do
+    if Config.module?(config, :changelog), do: next_announcement(config), else: @interval
+  end
+
+  defp next_announcement(config) do
     now = DateTime.utc_now()
 
     next =

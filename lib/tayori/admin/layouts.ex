@@ -70,24 +70,58 @@ defmodule Tayori.Admin.Layouts do
   slot :inner_block, required: true
 
   def page(assigns) do
+    config = Tayori.Config.get()
+
+    assigns =
+      assign(assigns,
+        changelog: Tayori.Config.module?(config, :changelog),
+        campaigns: Tayori.Config.module?(config, :campaigns)
+      )
+
     ~H"""
     <div class="ta-app">
       <header class="ta-bar">
         <div class="ta-bar-inner">
-          <.link navigate={~m"/"} class="ta-brand" aria-label="Tayori, the entries">
+          <.link
+            navigate={if @changelog, do: ~m"/", else: ~m"/campaigns"}
+            class="ta-brand"
+            aria-label={if @changelog, do: "Tayori, the entries", else: "Tayori, the campaigns"}
+          >
             <.mark />
             <span class="ta-wordmark">Tayori</span>
           </.link>
           <nav class="ta-nav" aria-label="Admin">
-            <.link navigate={~m"/"} aria-current={@page == :entries && "page"}>
+            <.link :if={@changelog} navigate={~m"/"} aria-current={@page == :entries && "page"}>
               <.icon name="newspaper" /><span class="ta-nav-label">Entries</span>
             </.link>
-            <.link navigate={~m"/inbox"} aria-current={@page == :inbox && "page"}>
+            <.link
+              :if={@changelog}
+              navigate={~m"/inbox"}
+              aria-current={@page == :inbox && "page"}
+            >
               <.icon name="inbox" /><span class="ta-nav-label">Inbox</span>
               <span :if={@inbox > 0} class="ta-nav-count" title={"#{@inbox} new"}>{@inbox}</span>
             </.link>
-            <.link navigate={~m"/categories"} aria-current={@page == :categories && "page"}>
+            <.link
+              :if={@changelog}
+              navigate={~m"/categories"}
+              aria-current={@page == :categories && "page"}
+            >
               <.icon name="tags" /><span class="ta-nav-label">Categories</span>
+            </.link>
+            <.link
+              :if={@campaigns}
+              navigate={~m"/campaigns"}
+              aria-current={@page == :campaigns && "page"}
+            >
+              <.icon name="send" /><span class="ta-nav-label">Campaigns</span>
+            </.link>
+            <.link
+              :if={@campaigns}
+              navigate={~m"/audience"}
+              aria-current={@page == :audience && "page"}
+            >
+              <.icon name="users" /><span class="ta-nav-label">Audience</span>
             </.link>
             <.link navigate={~m"/settings"} aria-current={@page == :settings && "page"}>
               <.icon name="settings" /><span class="ta-nav-label">Settings</span>
@@ -95,7 +129,11 @@ defmodule Tayori.Admin.Layouts do
           </nav>
           <div class="ta-bar-actions">
             <.appearance />
-            <.link :if={@access == :all} navigate={~m"/new"} class="ta-button ta-primary">
+            <.link
+              :if={@access == :all and @changelog}
+              navigate={~m"/new"}
+              class="ta-button ta-primary"
+            >
               <.icon name="plus" /><span class="ta-bar-label">New entry</span>
             </.link>
           </div>

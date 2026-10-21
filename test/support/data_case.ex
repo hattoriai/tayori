@@ -78,6 +78,61 @@ defmodule TayoriTest.DataCase do
     end
   end
 
+  @doc """
+  The options that turn the campaigns on, with the audience of the tests
+  (`TayoriTest.Audience`): for `checkout/2`, or `put_config/2` in a
+  test's setup (`setup :campaigns`).
+  """
+  def campaigns_config do
+    [
+      modules: [:changelog, :campaigns],
+      mailer: TayoriTest.Mailer,
+      campaigns: [
+        audience: TayoriTest.Audience,
+        url: "https://app.test/letters",
+        from: {"Rui at the app", "rui@app.test"}
+      ]
+    ]
+  end
+
+  @doc "A setup that turns the campaigns on: `setup :campaigns`."
+  def campaigns(%{config: config}), do: {:ok, config: put_config(config, campaigns_config())}
+
+  @doc """
+  A person of the app of the tests: `%{name:, email:, plan:, ...}`, with
+  an English locale and signed up now unless given.
+  """
+  def person!(attrs \\ %{}) do
+    attrs = Map.new(attrs)
+    name = Map.get(attrs, :name, "Ada Lovelace")
+
+    struct!(
+      TayoriTest.Person,
+      Map.merge(
+        %{
+          name: name,
+          email: Map.get(attrs, :email, "#{String.downcase(hd(String.split(name)))}@app.test"),
+          locale: "en",
+          inserted_at: DateTime.utc_now()
+        },
+        attrs
+      )
+    )
+    |> Tayori.Config.get().repo.insert!()
+  end
+
+  @doc "The id of a person of the app, as their recipient has it."
+  def person_id(%TayoriTest.Person{id: id}), do: "person:#{id}"
+
+  @doc "A photo of a person."
+  def photo!(%TayoriTest.Person{id: id}),
+    do: Tayori.Config.get().repo.insert!(%TayoriTest.Photo{person_id: id})
+
+  @doc "A story of a person, published at a time or not."
+  def story!(%TayoriTest.Person{id: id}, published_at \\ nil) do
+    Tayori.Config.get().repo.insert!(%TayoriTest.Story{person_id: id, published_at: published_at})
+  end
+
   @doc "A time some minutes from now (negative for the past)."
   def minutes(n), do: DateTime.add(DateTime.utc_now(), n * 60, :second)
 

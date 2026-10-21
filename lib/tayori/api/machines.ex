@@ -3,7 +3,7 @@ defmodule Tayori.API.Machines do
   # The routes of the JSON API for machines, not readers: the changes CI
   # sends (Tayori.Ingest), and GitHub's webhook (Tayori.GitHub). They read
   # no session and no reader, and answer no CORS: each request carries
-  # its own proof, a token or a signature.
+  # its own proof, a token or a signature. Without the changelog, a 404.
 
   @behaviour Plug
 
@@ -23,7 +23,13 @@ defmodule Tayori.API.Machines do
   def init(action), do: action
 
   @impl Plug
-  def call(conn, :changes) do
+  def call(conn, action) do
+    if Tayori.Config.module?(Tayori.Config.get(), :changelog),
+      do: serve(conn, action),
+      else: json(conn, 404, %{error: "not_found"})
+  end
+
+  defp serve(conn, :changes) do
     cond do
       not Ingest.token?() -> json(conn, 404, %{error: "not_found"})
       not Ingest.verify(bearer(conn)) -> unauthorized(conn)
@@ -31,7 +37,7 @@ defmodule Tayori.API.Machines do
     end
   end
 
-  def call(conn, :github) do
+  defp serve(conn, :github) do
     if GitHub.secret?(), do: github(conn), else: json(conn, 404, %{error: "not_found"})
   end
 

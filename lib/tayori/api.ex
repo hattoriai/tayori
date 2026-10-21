@@ -121,6 +121,9 @@ defmodule Tayori.API do
       request's only credential: no session, no CSRF token (see the
       [MCP](mcp.md) guide for a `tayori_api` behind `protect_from_forgery`).
 
+  Without the `:changelog` module (`Tayori.Config`), every route is a
+  404.
+
   An error is `{"error": code}`: `"not_found"`, `"unauthorized"` (a
   visitor reacts), `"unknown_emoji"`, `"token_expired"` (a reader token
   older than its `:max_age`, a 401).
@@ -159,12 +162,17 @@ defmodule Tayori.API do
     end
   end
 
+  # Every route is the changelog's: without it, a 404.
   @impl Plug
-  def call(conn, :preflight), do: preflight(conn)
-  def call(conn, :asset), do: asset(Embed.cors(conn))
-  def call(conn, :upload), do: upload(conn)
-
   def call(conn, action) do
+    if Config.module?(Config.get(), :changelog), do: serve(conn, action), else: not_found(conn)
+  end
+
+  defp serve(conn, :preflight), do: preflight(conn)
+  defp serve(conn, :asset), do: asset(Embed.cors(conn))
+  defp serve(conn, :upload), do: upload(conn)
+
+  defp serve(conn, action) do
     opts = Map.put(conn.assigns.mount.options, :page, page_url(conn))
     conn = Embed.cors(conn)
 

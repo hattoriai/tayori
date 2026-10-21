@@ -138,11 +138,19 @@ defmodule Tayori.Jobs do
   # published and not announced (those written before Tayori ran with
   # Oban, or by an Oban of another repo), the schedules, and the reading of
   # the inbox's sources. The jobs are unique: the nodes of a cluster give
-  # Oban each one once.
+  # Oban each one once. Without the changelog, none of it.
   @spec boot(Config.t()) :: :ok
   def boot(%Config{oban: oban} = config) do
     check_queue(oban)
+    if Config.module?(config, :changelog), do: boot_changelog(config)
+    :ok
+  rescue
+    error ->
+      Logger.error("Tayori could not give Oban its work at boot: " <> Exception.message(error))
+      :ok
+  end
 
+  defp boot_changelog(%Config{oban: oban} = config) do
     from(e in Entry,
       where: not is_nil(e.published_at) and is_nil(e.announced_at),
       select: {e.id, e.published_at}
@@ -155,12 +163,6 @@ defmodule Tayori.Jobs do
     if config.inbox.ingest_on_start and config.inbox.sources != [] do
       insert!(oban, :ingest, DateTime.utc_now())
     end
-
-    :ok
-  rescue
-    error ->
-      Logger.error("Tayori could not give Oban its work at boot: " <> Exception.message(error))
-      :ok
   end
 
   defp unannounced?(%Entry{__meta__: %{state: :deleted}}), do: false
