@@ -386,16 +386,19 @@ defmodule Tayori.Conditions do
         []
 
       id ->
-        if id in reachable(segment_ids(condition), MapSet.new()),
+        if id in reachable(segment_ids(condition), %{}),
           do: ["The segment refers back to itself."],
           else: []
     end
   end
 
-  defp reachable([], seen), do: MapSet.to_list(seen)
+  # The segments seen are the keys of a map, not a MapSet: an opaque term
+  # carried through the recursion is one dialyzer refuses on OTP 28 and
+  # later.
+  defp reachable([], seen), do: Map.keys(seen)
 
   defp reachable([id | rest], seen) do
-    if MapSet.member?(seen, id) do
+    if Map.has_key?(seen, id) do
       reachable(rest, seen)
     else
       named =
@@ -404,7 +407,7 @@ defmodule Tayori.Conditions do
           nil -> []
         end
 
-      reachable(named ++ rest, MapSet.put(seen, id))
+      reachable(named ++ rest, Map.put(seen, id, true))
     end
   end
 
@@ -447,7 +450,7 @@ defmodule Tayori.Conditions do
       attributes: Map.new(attributes, &{&1.key, &1}),
       now: DateTime.shift_zone!(now, "Etc/UTC"),
       person_id: Keyword.get_lazy(opts, :person_id, &person_id/0),
-      seen: MapSet.new()
+      seen: %{}
     }
 
     build(stringify(condition), ctx)
@@ -503,9 +506,9 @@ defmodule Tayori.Conditions do
   end
 
   defp build(%{"segment" => id, "op" => op}, ctx) when op in @segment_ops do
-    with false <- MapSet.member?(ctx.seen, id),
+    with false <- Map.has_key?(ctx.seen, id),
          %Segment{condition: condition} <- segment(id) do
-      inner = build(stringify(condition), %{ctx | seen: MapSet.put(ctx.seen, id)})
+      inner = build(stringify(condition), %{ctx | seen: Map.put(ctx.seen, id, true)})
       if op == "in", do: inner, else: dynamic(not (^inner))
     else
       _ -> nothing({:segment, id}, "the segment #{inspect(id)} is gone, or leads back to itself")

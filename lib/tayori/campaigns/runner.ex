@@ -603,7 +603,7 @@ defmodule Tayori.Campaigns.Runner do
   @spec run_due(Config.t(), DateTime.t(), keyword()) :: :ok
   def run_due(%Config{} = config, %DateTime{} = now, opts \\ []) do
     if Config.module?(config, :campaigns) do
-      config |> run_enrollments(now, opts, MapSet.new(), MapSet.new()) |> changed()
+      config |> run_enrollments(now, opts, %{}, %{}) |> Map.keys() |> changed()
 
       from(c in Campaign,
         where:
@@ -628,7 +628,9 @@ defmodule Tayori.Campaigns.Runner do
       )
   end
 
-  # The ids of the campaigns whose people changed.
+  # The ids of the campaigns whose people changed, as the keys of a map.
+  # The ids already seen are a map too: a MapSet carried through the
+  # recursion is an opaque term dialyzer refuses on OTP 28 and later.
   defp run_enrollments(config, now, opts, seen, changed) do
     ids =
       from(e in Enrollment,
@@ -639,19 +641,19 @@ defmodule Tayori.Campaigns.Runner do
       )
       |> config.repo.all(prefix: config.prefix)
 
-    new = Enum.reject(ids, &MapSet.member?(seen, &1))
+    new = Enum.reject(ids, &Map.has_key?(seen, &1))
 
     changed =
       new
       |> Enum.map(&advance_logged(config, &1, now, opts))
       |> Enum.reject(&is_nil/1)
-      |> MapSet.new()
-      |> MapSet.union(changed)
+      |> Map.new(&{&1, true})
+      |> Map.merge(changed)
 
     # A full batch has more after it; one whose every id was seen is held
     # elsewhere, or failed: the next run tries again.
     if length(ids) == @batch and new != [],
-      do: run_enrollments(config, now, opts, MapSet.union(seen, MapSet.new(ids)), changed),
+      do: run_enrollments(config, now, opts, Map.merge(seen, Map.new(ids, &{&1, true})), changed),
       else: changed
   end
 

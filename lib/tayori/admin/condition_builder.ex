@@ -390,8 +390,6 @@ defmodule Tayori.Admin.ConditionBuilder do
 
   defp put_leaf(leaf, _values, _attributes), do: leaf
 
-  defp attribute_values(leaf, _values, nil), do: leaf
-
   defp attribute_values(leaf, values, %Attribute{} = attribute) do
     op =
       if Attribute.type_name(attribute) == :boolean,
