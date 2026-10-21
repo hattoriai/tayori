@@ -1,10 +1,11 @@
 defmodule Tayori.Campaigns.RunnerTest do
   use TayoriTest.DataCase
 
+  import Ecto.Query
   import Swoosh.TestAssertions
 
   alias Tayori.Campaigns
-  alias Tayori.Campaigns.{Delivery, Enrollment, Runner}
+  alias Tayori.Campaigns.{Delivery, Enrollment, Runner, Segments}
 
   @t0 ~U[2026-03-02 09:00:00.000000Z]
 
@@ -19,6 +20,27 @@ defmodule Tayori.Campaigns.RunnerTest do
       send(self(), {:email, email})
       {:ok, %{id: "msg-" <> elem(hd(email.to), 1)}}
     end
+  end
+
+  defmodule SQLiteLike do
+    @moduledoc "A repo that says what its transactions were given."
+    def __adapter__, do: Ecto.Adapters.SQLite3
+    def transaction(fun, opts \\ []), do: {:ok, {fun.(), opts}}
+  end
+
+  defmodule PostgresLike do
+    @moduledoc "The same, on PostgreSQL."
+    def __adapter__, do: Ecto.Adapters.Postgres
+    def transaction(fun, opts \\ []), do: {:ok, {fun.(), opts}}
+  end
+
+  # A claim reads, then writes: on SQLite, begun as a write, so that it
+  # waits for another writer instead of failing at once ("Database busy").
+  test "the campaigns' transactions take the write lock at once on SQLite" do
+    sqlite = %Tayori.Config{repo: SQLiteLike, pubsub: nil}
+    postgres = %Tayori.Config{repo: PostgresLike, pubsub: nil}
+    assert {:ok, {:done, [mode: :immediate]}} = Runner.transaction(sqlite, fn -> :done end)
+    assert {:ok, {:done, []}} = Runner.transaction(postgres, fn -> :done end)
   end
 
   # What is due at a time, its letters sent here.
@@ -38,6 +60,18 @@ defmodule Tayori.Campaigns.RunnerTest do
   end
 
   defp statuses(campaign), do: Enum.map(deliveries(campaign), &{&1.status, &1.reason})
+
+  # What is due at a time, its letters queued and not sent: they wait for
+  # their jobs.
+  defp queued(campaign, at) do
+    config = Tayori.Config.get()
+    put_config(config, mailer: DownMailer)
+    run(at)
+    put_config(config, mailer: TayoriTest.Mailer)
+
+    from(d in Delivery, where: d.campaign_id == ^campaign.id)
+    |> config.repo.update_all(set: [status: "queued", reason: nil])
+  end
 
   for_each_repo do
     setup :campaigns
@@ -350,6 +384,93 @@ defmodule Tayori.Campaigns.RunnerTest do
       assert {:error, :down} = Runner.deliver_letter(config, d.id, @t0, true)
       assert [%Delivery{status: "failed"}] = deliveries(campaign)
       assert Campaigns.results(Campaigns.get(campaign.id)).steps |> hd() |> Map.get(:failed) == 1
+    end
+
+    test "a step with no letter is left out, and the sequence goes on", %{repo: repo} do
+      ada = person!(name: "Ada")
+      campaign = sequence!(%{"min_gap_hours" => 0}, [step(0, "Welcome"), step(60, "Next")])
+      {:ok, empty} = Campaigns.add_step(campaign, %{"wait" => 30, "letters" => []})
+
+      {:ok, _} = Campaigns.enroll(campaign, person_id(ada), @t0)
+      run(@t0)
+      assert_email_sent(subject: "Welcome")
+      run(later(@t0, 0, 60))
+      assert_email_sent(subject: "Next")
+
+      by_step = Map.new(deliveries(campaign), &{&1.step_id, {&1.status, &1.reason}})
+      [welcome, next] = campaign.steps
+
+      assert by_step == %{
+               welcome.id => {"sent", nil},
+               empty.id => {"skipped", "no_letter"},
+               next.id => {"sent", nil}
+             }
+
+      assert %{state: "completed", reason: "finished"} = enrollment(campaign, ada)
+
+      # The step's letter deleted while its letter waits: left out too.
+      grace = person!(name: "Grace")
+      other = sequence!(%{"name" => "Other"}, [step(0, "Hello")])
+      {:ok, _} = Campaigns.enroll(other, person_id(grace), @t0)
+      [hello] = other.steps
+      queued(other, @t0)
+      :ok = Campaigns.delete_letter(hello, "en")
+
+      [d] = deliveries(other)
+      assert :ok = Runner.deliver_letter(Tayori.Config.get(), d.id, @t0, true)
+      refute_email_sent()
+      assert statuses(other) == [{"skipped", "no_letter"}]
+      assert repo.aggregate(Delivery, :count) == 4
+    end
+
+    test "a letter waiting when its step or its campaign is deleted is not sent" do
+      ada = person!(name: "Ada")
+      campaign = sequence!([step(0, "Welcome")])
+      [welcome] = campaign.steps
+      {:ok, _} = Campaigns.enroll(campaign, person_id(ada), @t0)
+      queued(campaign, @t0)
+      {:ok, _} = Campaigns.remove_step(welcome)
+
+      [d] = deliveries(campaign)
+      assert :ok = Runner.deliver_letter(Tayori.Config.get(), d.id, @t0, true)
+      refute_email_sent()
+      assert statuses(campaign) == [{"skipped", "step_removed"}]
+
+      # The campaign archived and deleted: its person and letters go with it.
+      other = sequence!(%{"name" => "Other"}, [step(0, "Hello")])
+      {:ok, enrollment} = Campaigns.enroll(other, person_id(ada), @t0)
+      queued(other, @t0)
+      [d] = deliveries(other)
+      {:ok, archived} = Campaigns.archive(Campaigns.get(other.id))
+      {:ok, _} = Campaigns.delete(archived)
+
+      assert :ok = Runner.deliver_letter(Tayori.Config.get(), d.id, @t0, true)
+      assert :ok = Runner.advance(Tayori.Config.get(), enrollment.id, later(@t0, 1), inline: true)
+      assert :ok = run(later(@t0, 1))
+      refute_email_sent()
+    end
+
+    test "a person with no locale gets the first letter" do
+      ada = person!(name: "Ada", locale: nil)
+      campaign = sequence!([step(0, "Welcome")])
+      {:ok, _} = Campaigns.enroll(campaign, person_id(ada), @t0)
+
+      run(@t0)
+      assert_email_sent(subject: "Welcome", to: [{"Ada", "ada@app.test"}])
+    end
+
+    test "a skip on a deleted segment skips no one", %{repo: repo} do
+      ada = person!(name: "Ada")
+      {:ok, segment} = Segments.create(%{"name" => "Everyone", "condition" => %{"all" => []}})
+
+      campaign =
+        sequence!([step(0, "Welcome", skip_if: %{"segment" => segment.id, "op" => "in"})])
+
+      repo.delete!(segment)
+      {:ok, _} = Campaigns.enroll(campaign, person_id(ada), @t0)
+
+      ExUnit.CaptureLog.capture_log(fn -> run(@t0) end)
+      assert_email_sent(subject: "Welcome")
     end
 
     test "the provider's id of a sent letter is kept", %{config: config} do

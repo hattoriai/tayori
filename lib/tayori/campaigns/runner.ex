@@ -55,7 +55,7 @@ defmodule Tayori.Campaigns.Runner do
   @spec advance(Config.t(), Ecto.UUID.t(), DateTime.t(), keyword()) :: :ok
   def advance(%Config{} = config, id, %DateTime{} = now, opts \\ []) do
     if Config.module?(config, :campaigns) do
-      {:ok, jobs} = config.repo.transaction(fn -> advance_due(config, id, now) end)
+      {:ok, jobs} = transaction(config, fn -> advance_due(config, id, now) end)
       Jobs.campaign_committed(config, jobs, Keyword.put(opts, :now, now))
     end
 
@@ -88,18 +88,24 @@ defmodule Tayori.Campaigns.Runner do
       {changes, jobs} = judge(config, campaign, enrollment, now)
       changes = Map.put(changes, :updated_at, usec(now))
 
-      {1, _} =
+      # No row when the campaign, and its people with it, was deleted
+      # meanwhile: there is nothing left to do.
+      {count, _} =
         config.repo.update_all(
           from(e in Enrollment, where: e.id == ^enrollment.id),
           [set: Enum.to_list(changes)],
           prefix: config.prefix
         )
 
-      next = for {:next_at, %DateTime{} = at} <- changes, do: {:enrollment, enrollment.id, at}
-      jobs = next ++ jobs
-      Jobs.campaign_written(config, jobs)
-      if changes[:state], do: Tayori.broadcast({Tayori, :campaign_changed, campaign.id})
-      jobs
+      if count == 1 do
+        next = for {:next_at, %DateTime{} = at} <- changes, do: {:enrollment, enrollment.id, at}
+        jobs = next ++ jobs
+        Jobs.campaign_written(config, jobs)
+        if changes[:state], do: Tayori.broadcast({Tayori, :campaign_changed, campaign.id})
+        jobs
+      else
+        []
+      end
     else
       # Another node has it.
       []
@@ -124,7 +130,8 @@ defmodule Tayori.Campaigns.Runner do
         steps =
           from(s in Step,
             where: s.campaign_id == ^campaign.id,
-            order_by: [asc: s.wait, asc: s.position]
+            order_by: [asc: s.wait, asc: s.position],
+            preload: :letters
           )
           |> config.repo.all(prefix: config.prefix)
 
@@ -209,6 +216,11 @@ defmodule Tayori.Campaigns.Runner do
 
       step.skip_if && Audience.match?(ctx.enrollment.person, step.skip_if, ctx.now) ->
         {:skip, "skip_if"}
+
+      # A step an admin left with no letter, in any language: there is
+      # nothing to send, and the sequence goes on.
+      step.letters == [] ->
+        {:skip, "no_letter"}
 
       gap_until && DateTime.after?(gap_until, ctx.now) ->
         {:wait, gap_until}
@@ -386,7 +398,7 @@ defmodule Tayori.Campaigns.Runner do
       end)
 
     {:ok, jobs} =
-      config.repo.transaction(fn ->
+      transaction(config, fn ->
         config.repo.insert_all(Delivery, rows,
           on_conflict: :nothing,
           conflict_target: [:campaign_id, :step_id, :person],
@@ -427,14 +439,29 @@ defmodule Tayori.Campaigns.Runner do
   end
 
   defp send_letter(config, delivery, now, last_attempt?) do
-    campaign = config.repo.get!(Campaign, delivery.campaign_id, prefix: config.prefix)
+    case config.repo.get(Campaign, delivery.campaign_id, prefix: config.prefix) do
+      # Deleted since, with its deliveries: nothing to send.
+      nil -> :ok
+      campaign -> send_letter(config, campaign, delivery, now, last_attempt?)
+    end
+  end
+
+  defp send_letter(config, campaign, delivery, now, last_attempt?) do
     purpose = purpose(campaign)
-    step = delivery.step_id && config.repo.get(Step, delivery.step_id, prefix: config.prefix)
+
+    step =
+      delivery.step_id &&
+        config.repo.get(Step, delivery.step_id, prefix: config.prefix)
+        |> config.repo.preload(:letters, prefix: config.prefix)
+
     recipient = Audience.get(delivery.person)
 
     cond do
       step == nil ->
         finish(config, delivery, "skipped", "step_removed", now)
+
+      step.letters == [] ->
+        finish(config, delivery, "skipped", "no_letter", now)
 
       recipient == nil ->
         finish(config, delivery, "skipped", "left", now)
@@ -449,8 +476,6 @@ defmodule Tayori.Campaigns.Runner do
         finish(config, delivery, "skipped", "cannot_email", now)
 
       true ->
-        step = config.repo.preload(step, :letters, prefix: config.prefix)
-
         mail(
           config,
           delivery,
@@ -584,6 +609,22 @@ defmodule Tayori.Campaigns.Runner do
   end
 
   # ── Helpers ─────────────────────────────────────────────────────
+
+  @doc false
+  # A transaction of the campaigns. On SQLite it takes the write lock as
+  # it begins (BEGIN IMMEDIATE): a transaction that reads first and
+  # writes after (the claim of an enrollment reads it, then updates it)
+  # would otherwise fail at once with "Database busy" when another
+  # connection wrote meanwhile, as SQLite cannot wait for a lock it would
+  # take over a read that is no longer current. Begun immediate, it waits
+  # its turn, for the repo's busy timeout.
+  @spec transaction(Config.t(), (-> result)) :: {:ok, result} | {:error, term()}
+        when result: term()
+  def transaction(%Config{repo: repo}, fun) do
+    if repo.__adapter__() == Ecto.Adapters.SQLite3,
+      do: repo.transaction(fun, mode: :immediate),
+      else: repo.transaction(fun)
+  end
 
   defp purpose(%Campaign{purpose: "marketing"}), do: :marketing
   defp purpose(%Campaign{}), do: :product
