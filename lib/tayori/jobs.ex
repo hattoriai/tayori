@@ -25,13 +25,24 @@ defmodule Tayori.Jobs do
   Start Tayori after Oban in the supervision tree.
 
   Nothing then looks at the database on a timer. Each write of an entry
-  gives Oban its announcement, a job at its publication time: one for
-  each entry, moved when the time changes, doing nothing when the entry
-  is a draft again or was announced already. A scheduled digest and the
-  email of a period are a job at their next time, which gives Oban the
-  one after. At boot, a task gives Oban what may have none: the
-  announcements of entries published and not announced, the schedules,
-  and the reading of the inbox's sources (`:ingest_on_start`).
+  gives Oban its announcement, a job at its publication time, in the
+  write's own transaction: the entry and its job are kept together, or
+  neither is. There is one job for each entry, moved when the time
+  changes, doing nothing when the entry is a draft again or was
+  announced already. A scheduled digest and the email of a period are a
+  job at their next time, which gives Oban the one after. At boot, a task
+  gives Oban what may have none: the announcements of entries published
+  before Tayori ran with Oban, the schedules, and the reading of the
+  inbox's sources (`:ingest_on_start`).
+
+  Two things this asks of the app:
+
+    * **Oban in the same repo as Tayori**, for the job to be in the
+      write's transaction. An Oban of another repo still gets the job, just
+      after the write; the boot task then gives a job to an entry whose
+      insert failed.
+    * **Tayori after Oban in the supervision tree**, so that the boot
+      task finds Oban running.
 
   Each email, each webhook and the notifier's call is a job of its own,
   retried with Oban's backoff, through deploys and crashes, and seen in
@@ -111,29 +122,23 @@ defmodule Tayori.Jobs do
   end
 
   @doc false
-  # An entry was written: with Oban, its announcement is a job at its
-  # publication time; without, the scheduler looks again.
-  @spec entry_changed(Config.t(), Entry.t()) :: :ok
-  def entry_changed(%Config{oban: nil}, _entry), do: Scheduler.wake()
+  # With Oban, in the transaction of an entry's write (Tayori.Entries):
+  # its announcement, a job at its publication time. A failure fails the
+  # write, so an entry is never published without its job.
+  @spec entry_written(Config.t(), Entry.t()) :: :ok
+  def entry_written(%Config{oban: nil}, _entry), do: :ok
 
-  def entry_changed(%Config{oban: oban}, %Entry{} = entry) do
+  def entry_written(%Config{oban: oban}, %Entry{} = entry) do
     if unannounced?(entry), do: announce_at(oban, entry.id, entry.published_at)
     :ok
-  rescue
-    error ->
-      Logger.error(
-        "Tayori could not give Oban the announcement of #{entry.id}; " <>
-          "it is given again when Tayori starts: " <> Exception.message(error)
-      )
-
-      :ok
   end
 
   @doc false
   # With Oban, at boot, on each node: the announcements of the entries
-  # published and not announced (one job each, so a write that left none
-  # gets one), the schedules, and the reading of the inbox's sources. The
-  # jobs are unique: the nodes of a cluster give Oban each one once.
+  # published and not announced (those written before Tayori ran with
+  # Oban, or by an Oban of another repo), the schedules, and the reading of
+  # the inbox's sources. The jobs are unique: the nodes of a cluster give
+  # Oban each one once.
   @spec boot(Config.t()) :: :ok
   def boot(%Config{oban: oban} = config) do
     check_queue(oban)

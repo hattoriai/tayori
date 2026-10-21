@@ -161,15 +161,23 @@ defmodule Tayori.Entries do
 
     given? = (attrs[:slug] || attrs["slug"]) not in [nil, ""]
 
-    changeset
-    |> insert(config, if(given?, do: nil, else: Ecto.Changeset.get_change(changeset, :slug)), 2)
-    |> changed()
+    write(config, fn ->
+      insert(
+        changeset,
+        config,
+        if(given?, do: nil, else: Ecto.Changeset.get_change(changeset, :slug)),
+        2
+      )
+    end)
   end
 
   @max_slug_tries 50
 
+  # In a savepoint: a slug taken rolls back this insert alone, and the
+  # write's transaction goes on with the next slug (PostgreSQL aborts a
+  # transaction at its first error otherwise).
   defp insert(changeset, config, base, n) do
-    case config.repo.insert(changeset, prefix: config.prefix) do
+    case config.repo.insert(changeset, prefix: config.prefix, mode: :savepoint) do
       {:error, failed} when is_binary(base) and n <= @max_slug_tries ->
         if slug_taken?(failed) do
           slug = String.slice(base, 0, 150) <> "-#{n}"
@@ -194,10 +202,7 @@ defmodule Tayori.Entries do
   def update(%Entry{} = entry, attrs) do
     config = Config.get()
 
-    entry
-    |> change(attrs)
-    |> config.repo.update(prefix: config.prefix)
-    |> changed()
+    write(config, fn -> entry |> change(attrs) |> config.repo.update(prefix: config.prefix) end)
   end
 
   @doc """
@@ -216,10 +221,11 @@ defmodule Tayori.Entries do
   defp put_published_at(entry, at) do
     config = Config.get()
 
-    entry
-    |> Ecto.Changeset.change(published_at: usec(at), announced_at: nil)
-    |> config.repo.update(prefix: config.prefix)
-    |> changed()
+    write(config, fn ->
+      entry
+      |> Ecto.Changeset.change(published_at: usec(at), announced_at: nil)
+      |> config.repo.update(prefix: config.prefix)
+    end)
   end
 
   # The times are kept to the microsecond; a time read from a form has
@@ -282,10 +288,9 @@ defmodule Tayori.Entries do
   defp put(entry, changes) do
     config = Config.get()
 
-    entry
-    |> Ecto.Changeset.change(changes)
-    |> config.repo.update(prefix: config.prefix)
-    |> changed()
+    write(config, fn ->
+      entry |> Ecto.Changeset.change(changes) |> config.repo.update(prefix: config.prefix)
+    end)
   end
 
   @doc "Deletes an entry and its translations."
@@ -293,16 +298,27 @@ defmodule Tayori.Entries do
   def delete(%Entry{} = entry) do
     config = Config.get()
 
-    entry
-    |> config.repo.delete(prefix: config.prefix)
-    |> changed()
+    write(config, fn -> config.repo.delete(entry, prefix: config.prefix) end)
   end
 
-  defp changed({:ok, entry}) do
+  # A write of an entry, and with Oban its announcement's job, in one
+  # transaction: both are kept, or neither. Then the pages hear of it, and
+  # without Oban the scheduler looks again.
+  defp write(config, fun) do
+    config.repo.transaction(fn ->
+      case fun.() do
+        {:ok, entry} -> tap(entry, &Tayori.Jobs.entry_written(config, &1))
+        {:error, changeset} -> config.repo.rollback(changeset)
+      end
+    end)
+    |> changed(config)
+  end
+
+  defp changed({:ok, entry}, config) do
     Tayori.broadcast({Tayori, :changed, entry.id})
-    Tayori.Jobs.entry_changed(Config.get(), entry)
+    if config.oban == nil, do: Tayori.Scheduler.wake()
     {:ok, entry}
   end
 
-  defp changed(error), do: error
+  defp changed(error, _config), do: error
 end

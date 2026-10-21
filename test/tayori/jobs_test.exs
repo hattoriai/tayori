@@ -116,6 +116,20 @@ defmodule Tayori.JobsTest do
       assert enqueued(repo) == []
     end
 
+    test "with Oban, a taken slug is tried again in the write's transaction, with its job",
+         %{config: config, repo: repo} do
+      subscriptions(config, oban: oban_of(repo))
+      entry!("Same", %{published_at: minutes(-2)})
+      second = entry!("Same", %{published_at: minutes(-1)})
+
+      assert second.slug == "same-2"
+
+      assert repo
+             |> jobs("announce")
+             |> Enum.map(& &1.args["entry_id"])
+             |> Enum.member?(second.id)
+    end
+
     test "with Oban, the announcement's job announces the entry once",
          %{config: config, repo: repo} do
       config = subscriptions(config, oban: oban_of(repo))

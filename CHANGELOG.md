@@ -11,7 +11,8 @@ and Tayori follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - With Oban (the `:oban` option), nothing looks at the database on a
   timer: each write of an entry gives Oban its announcement, a job at
-  its publication time (one for each entry, moved with it), and a
+  its publication time (one for each entry, moved with it), in the
+  write's transaction when Oban runs on Tayori's repo, and a
   scheduled digest or period email is a job at its next time, which gives
   Oban the one after. At boot, a task gives Oban the announcements of
   entries that have no job, the schedules and the reading of the
