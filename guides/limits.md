@@ -57,3 +57,30 @@ accept.
 The search ignores case. On SQLite it does so for ASCII letters only:
 "ação" finds "ação" and "Ação" only where the accented letters have the
 same case. PostgreSQL has no such limit.
+
+## Campaigns
+
+* **One entry per person.** A person enters a sequence once, ever: no
+  re-entry, and no entry on joining a segment. Each step's letter goes
+  to a person once.
+* **Steps are judged when reached.** A person goes from step to step by
+  the steps' waits. A step whose moment passed while it was not wanted
+  is left out; a step added at or before where a person is does not go
+  to them. A sequence has no branches and no waits for an event.
+* **Batches.** The runner reads the people whose time came 200 at a
+  time, a broadcast its audience 500 at a time, and takes a segment into
+  a sequence 500 at a time; a broadcast to many people takes a while
+  to go. Without Oban the letters go one after the other from a task.
+* **Events** are kept 400 days (`keep_events_days`), and a condition
+  reads them with the audience's `person_id/0`, in one query.
+* **No tracking.** No opens and no clicks; a provider's webhook tells of
+  bounces and complaints, and a delivery changes nothing.
+* **No cap across campaigns.** The gap between letters is a sequence's
+  own: two sequences may write to one person the same day. No quiet
+  hours, no time zone per person: a letter goes at its time after the
+  entry, whatever the hour where the person is.
+* **SQLite.** The campaigns' transactions begin immediate on SQLite, so
+  that a write waits its turn (the repo's `busy_timeout`, 2000 ms by
+  default) instead of failing. A big broadcast holds the write lock for
+  a batch at a time; other writes of the app wait behind it. Strings
+  are compared without case for ASCII letters only, as the search is.

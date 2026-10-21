@@ -1,5 +1,27 @@
 # Features
 
+## Modules
+
+Tayori has two modules, in the `:modules` of `Tayori.Config`:
+
+* `:changelog` - the news for everyone: entries, the admin to write
+  them, the news in your app, the public page. On by default.
+* `:campaigns` - letters to each person, by what they did, at their own
+  time: sequences and broadcasts. See [Campaigns](campaigns.md).
+
+```elixir
+modules: [:changelog]               # the default
+modules: [:changelog, :campaigns]   # both
+modules: [:campaigns]               # letters, and no changelog
+```
+
+A module that is off has no admin page, no route that answers, no MCP
+tool, no process and no job. The two share Tayori's core (the config,
+the admin's frame, the mailer, the jobs) and never each other. Settings
+→ Modules in the admin lists what is on.
+
+## The changelog's features
+
 A changelog is always there: entries in your languages, categories,
 covers, pinned entries, a search, the admin, the news in your app and the
 public page. The rest is yours to turn on, in the `:features` of
@@ -13,9 +35,11 @@ public page. The rest is yours to turn on, in the `:features` of
 ```
 
 A feature that is off has no admin page, no route, no form, no element
-and no process. Settings → Features in the admin lists what is on.
+and no process. Settings → Features in the admin lists what is on. The
+features are the changelog's: with `:changelog` off, giving one is an
+error.
 
-## Always there
+### Always there
 
 * **Categories**, managed in the admin (Categories): a name in each of your
   languages, a colour, an order. An entry has any number of them; the
@@ -30,7 +54,7 @@ and no process. Settings → Features in the admin lists what is on.
   Graph, Twitter cards, `hreflang`, JSON-LD and a sitemap.
 * **Preview links** for drafts and scheduled entries, valid a week.
 
-## Reactions
+### Reactions
 
 `:reactions`. Readers react to an entry with an emoji, in the panel and on
 the public page, and see how many did. A reaction is a reader's: a visitor
@@ -43,7 +67,7 @@ The emoji are yours to choose:
 features: [:reactions], reactions: ["👍", "🎉", "❤️", "🚀", "👀"]
 ```
 
-## Announcements
+### Announcements
 
 `:announcements`. The admin announces an entry as a popup, a toast or a
 banner, until a date, with a button of its own (a label and a path of
@@ -53,7 +77,7 @@ remembered for them on every device. A visitor sees it until the page
 closes it. Put `Tayori.Components.announcement/1` in your layout (see
 [In the app](in_app.md)).
 
-## Analytics
+### Analytics
 
 `:analytics`. The views of each entry, by day and by where it was read:
 opened in the panel or in `<tayori-news>`, on the public page, or from an
@@ -66,7 +90,7 @@ Nothing about a reader is kept but their id, for a reader your resolver
 gives; a visitor is counted with the other visitors of the day. No
 address, no device, no cookie.
 
-## Subscriptions
+### Subscriptions
 
 `:subscriptions`. Readers subscribe by email on the public page; the
 admin chooses, for each entry, whether it is emailed when it is
@@ -91,7 +115,7 @@ page_url: "https://myapp.com/changelog"
 `:page_url` is the address of the public page, for the links of the
 emails. Settings → Email shows the subscribers, confirmed and waiting.
 
-## Webhooks
+### Webhooks
 
 `:webhooks`. The admin adds places told of each entry when it is
 published, in Settings → Integrations:
@@ -112,12 +136,12 @@ Tayori posts them with Req:
 {:req, "~> 0.5"}
 ```
 
-## Embed
+### Embed
 
 `:embed`. The news on another domain than your app's: see
 [Any frontend](any_frontend.md).
 
-## Sending, with Oban or not
+### Sending, with Oban or not
 
 The emails, the webhooks and the call to your notifier are sent when an
 entry is published. With Oban they are jobs, retried through deploys;

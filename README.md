@@ -3,8 +3,10 @@
 ![Tayori — Product news for Phoenix](https://raw.githubusercontent.com/hattoriai/tayori/main/media/banner.png)
 
 Tayori (便り, "news, a letter from someone") is product news for Phoenix:
-what your app has to say to its people. It starts with the changelog. It
-gives your app:
+what your app has to say to its people. It has two modules: the
+**changelog**, the same news for everyone, and the **campaigns**,
+letters to each person by what they did, at their own time. Turn on one
+or both. The changelog gives your app:
 
 * an admin, mounted in your router behind your own admin pipeline, to
   write the news: each entry in Kotoba's editor, with images, videos and
@@ -27,6 +29,19 @@ gives your app:
   published, through your own mailer;
 * `Tayori.Test`, to publish entries and read the news in
   `Phoenix.LiveViewTest` with no browser.
+
+The campaigns give it:
+
+* sequences: a person enters on an event of your app (`Tayori.track/3`),
+  then gets a letter at each step's time, unless a condition says it is
+  not wanted then, until a goal, the end, or they cannot be emailed;
+* broadcasts: one letter to everyone in a segment, now or at a time;
+* your audience as Ecto queries on your own schemas: the facts
+  conditions test (a plan, a count, a date, whether something exists),
+  run as SQL in your database, with nothing copied;
+* letters in your languages, with merge tags, a button, one-click
+  unsubscribing, your consent rules, and your mail provider's bounces
+  and complaints (Resend, Postmark, or an adapter of your own).
 
 The admin is a page of its own, with its own script and styles, so it
 looks the same in any app. The news in your app is a prebuilt JavaScript
@@ -53,7 +68,8 @@ the hook and one style sheet.
 | Any frontend | a JSON API (`tayori_api`) and `<tayori-news>`, the same button, panel and announcement; on another origin with the `:embed` feature: CORS for your sites and a signed reader token |
 | Public page | `tayori_page`: the news for everyone, with filters, a search, pinned entries and email subscriptions; a page for each entry with previous and next; Atom and JSON Feed; shared-link cards, JSON-LD and a sitemap; in the reader's language |
 | Automation | an inbox of what shipped: your `CHANGELOG.md` and fragments at each deploy, CI with a token, GitHub's merged pull requests and releases, your code; the team's changes kept out; digests, plain or by the model, when you ask, as changes come, or each week or month; drafts or published; emails each entry or once a period |
-| MCP | `Tayori.MCP`, mounted with Sake beside your app's other servers: an agent reads the news and the inbox, drafts and writes entries with screenshots, and publishes when asked |
+| Campaigns | the `:campaigns` module: sequences (a trigger event, who may enter, steps at waits after entry, skips, a goal, a gap, an end) and broadcasts; segments and a condition builder with live counts; your audience as Ecto queries, run in your database; letters in each language with merge tags; consent, suppressions and one-click unsubscribing; Resend and Postmark webhooks, or your own; results per step; mounted with `tayori_mail` |
+| MCP | `Tayori.MCP`, mounted with Sake beside your app's other servers: an agent reads the news and the inbox, drafts and writes entries with screenshots, and publishes when asked; with the campaigns, writes segments, sequences and broadcasts, and sends only when asked |
 | AI | any model of ReqLLM with your key, kept encrypted; draft, translate, rewrite, shorter, warmer, fix the spelling; suggestions you accept or reject |
 | Words | eight languages (`Tayori.Messages`), your own in the config |
 | Database | PostgreSQL and SQLite, in a migration of your app (`Tayori.Migrations`) |
@@ -156,6 +172,71 @@ end
 For a frontend that Phoenix does not render, mount `tayori_api` and use
 `<tayori-news api="/api/news">` (see [Any frontend](guides/any_frontend.md)).
 
+## Campaigns
+
+Turn the module on, with the module that says who your people are:
+
+```elixir
+{Tayori,
+ repo: MyApp.Repo,
+ pubsub: MyApp.PubSub,
+ oban: Oban,
+ secret_key_base: ...,
+ mailer: MyApp.Mailer,
+ modules: [:changelog, :campaigns],
+ campaigns: [
+   audience: MyApp.TayoriAudience,
+   url: "https://myapp.com/letters",
+   from: {"Rui at MyApp", "rui@myapp.com"}
+ ]}
+```
+
+```elixir
+defmodule MyApp.TayoriAudience do
+  @behaviour Tayori.Audience
+  import Ecto.Query
+
+  @impl true
+  def query, do: from(u in MyApp.User, as: :person)
+
+  @impl true
+  def where_ids(query, ids) do
+    ids = for "user:" <> id <- ids, do: id
+    where(query, [person: u], u.id in ^ids)
+  end
+
+  @impl true
+  def recipient(u),
+    do: %Tayori.Recipient{id: "user:#{u.id}", email: u.email, name: u.name, locale: u.locale}
+
+  @impl true
+  def attributes do
+    [
+      Tayori.Audience.attribute(:has_projects, "Has a project", :boolean,
+        dynamic([person: u], exists(from p in MyApp.Project, where: p.owner_id == parent_as(:person).id)))
+    ]
+  end
+end
+```
+
+Mount the page to unsubscribe and the providers' webhooks, tell Tayori
+what people do, and write the sequence in the admin (Campaigns → New
+sequence):
+
+```elixir
+scope "/" do
+  pipe_through :letters
+  tayori_mail "/letters"
+end
+```
+
+```elixir
+Tayori.track("user:#{user.id}", "signed_up")
+```
+
+The [Campaigns](guides/campaigns.md) guide has it all, with a whole
+onboarding sequence.
+
 ## Guides
 
 * [Quickstart](guides/quickstart.md): from the dependency to the first entry your readers see.
@@ -164,11 +245,12 @@ For a frontend that Phoenix does not render, mount `tayori_api` and use
 * [In the app](guides/in_app.md): the news in your LiveViews.
 * [Any frontend](guides/any_frontend.md): the JSON API and `<tayori-news>`.
 * [The public page](guides/public_page.md): the page, each entry's page, the feeds.
-* [Features](guides/features.md): categories, covers, pinned entries, and the extras you turn on: reactions, announcements, analytics, email subscriptions, webhooks, the embed.
+* [Features](guides/features.md): the modules; categories, covers, pinned entries, and the extras you turn on: reactions, announcements, analytics, email subscriptions, webhooks, the embed.
 * [Writing with AI](guides/ai.md): the model, the key, drafts, translations, rewrites.
 * [Automation](guides/automation.md): the inbox, its sources, CI and GitHub, digests, their cadence, the emails.
-* [MCP](guides/mcp.md): the news and the inbox for an agent, with Sake; screenshots in entries.
+* [MCP](guides/mcp.md): the news, the inbox and the campaigns for an agent, with Sake; screenshots in entries.
 * [Notifications](guides/notifications.md): what a publication sends, with Oban or not.
+* [Campaigns](guides/campaigns.md): the audience, conditions, segments, events, sequences, broadcasts, letters, consent, providers.
 * [Testing](guides/testing.md): `Tayori.Test`.
 * [Theming](guides/theming.md): the properties, dark mode, the Sumi theme.
 * [Known limits](guides/limits.md).

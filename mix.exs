@@ -103,7 +103,7 @@ defmodule Tayori.MixProject do
   end
 
   defp description do
-    "Product news for Phoenix: a changelog with an admin to write it, news in the app for LiveView and any frontend, a public page and feeds, and drafts written with AI."
+    "Product news for Phoenix: a changelog with an admin to write it, news in the app for LiveView and any frontend, a public page and feeds, drafts written with AI; and campaigns, letters to each person by what they did, sequences and broadcasts."
   end
 
   defp package do
@@ -153,6 +153,7 @@ defmodule Tayori.MixProject do
         "guides/automation.md",
         "guides/mcp.md",
         "guides/notifications.md",
+        "guides/campaigns.md",
         "guides/testing.md",
         "guides/theming.md",
         "guides/limits.md",
@@ -173,6 +174,7 @@ defmodule Tayori.MixProject do
           "guides/automation.md",
           "guides/mcp.md",
           "guides/notifications.md",
+          "guides/campaigns.md",
           "guides/testing.md",
           "guides/theming.md"
         ],
@@ -199,6 +201,32 @@ defmodule Tayori.MixProject do
         Publishing: [Tayori.Notifier, Tayori.Jobs, Tayori.Worker],
         Database: [Tayori.Migrations],
         AI: [Tayori.AI],
+        Campaigns: [
+          Tayori.Campaigns,
+          Tayori.Campaigns.Campaign,
+          Tayori.Campaigns.Step,
+          Tayori.Campaigns.Letter,
+          Tayori.Campaigns.Letters,
+          Tayori.Campaigns.Enrollment,
+          Tayori.Campaigns.Delivery,
+          Tayori.Campaigns.Segment,
+          Tayori.Campaigns.Segments,
+          Tayori.Campaigns.Event,
+          Tayori.Campaigns.Suppression
+        ],
+        Audience: [
+          Tayori.Audience,
+          Tayori.Audience.Attribute,
+          Tayori.Recipient,
+          Tayori.Conditions
+        ],
+        "Mail providers": [
+          Tayori.Campaigns.Mount,
+          Tayori.Campaigns.Provider,
+          Tayori.Campaigns.Providers.Resend,
+          Tayori.Campaigns.Providers.Postmark,
+          Tayori.RawBody
+        ],
         MCP: [Tayori.MCP],
         Testing: [Tayori.Test]
       ]
