@@ -42,7 +42,7 @@ if Code.ensure_loaded?(Sake.Server) do
            person: Campaigns.person(person),
            locale: letter.locale,
            subject: email.subject,
-           preheader: letter.preheader && Letters.merge(letter.preheader, values(person)),
+           preheader: letter.preheader && Letters.merge(letter.preheader, Letters.values(person)),
            text: email.text_body,
            missing_tags: Letters.missing(campaign, person)
          }}
@@ -67,11 +67,5 @@ if Code.ensure_loaded?(Sake.Server) do
 
     defp email(person),
       do: {:error, "#{person.id} has no email address: no letter goes to them."}
-
-    defp values(person) do
-      (person.data || %{})
-      |> Map.new(fn {key, value} -> {to_string(key), value} end)
-      |> Map.merge(%{"name" => person.name, "email" => person.email})
-    end
   end
 end

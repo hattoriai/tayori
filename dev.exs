@@ -222,11 +222,11 @@ defmodule TayoriDev.Resolver do
   def resolve_access(%{role: :viewer}), do: :read_only
   def resolve_access(_reader), do: {:forbidden, "/"}
 
-  # The address prefills the campaigns' test letters: hanzo@atelier.test.
+  # The address prefills the campaigns' test letters.
   @impl true
   def author(user) do
-    first = user.name |> String.split() |> hd() |> String.downcase()
-    %{"id" => user.id, "name" => user.name, "email" => "#{first}@atelier.test"}
+    author = %{"id" => user.id, "name" => user.name}
+    if user[:email], do: Map.put(author, "email", user.email), else: author
   end
 
   @impl true
@@ -261,6 +261,7 @@ defmodule TayoriDev.Who do
     "admin" => %{
       id: 1,
       name: "Hattori Hanzo",
+      email: "hanzo@atelier.test",
       role: :admin,
       plan: "pro",
       team_role: "owner",
@@ -269,6 +270,7 @@ defmodule TayoriDev.Who do
     "viewer" => %{
       id: 2,
       name: "Viewer",
+      email: "viewer@atelier.test",
       role: :viewer,
       plan: "pro",
       team_role: "member",

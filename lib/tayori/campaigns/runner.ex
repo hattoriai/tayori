@@ -86,28 +86,30 @@ defmodule Tayori.Campaigns.Runner do
     if count == 1 do
       campaign = config.repo.get(Campaign, enrollment.campaign_id, prefix: config.prefix)
       {changes, jobs} = judge(config, campaign, enrollment, now)
-      changes = Map.put(changes, :updated_at, usec(now))
-
-      # No row when the campaign, and its people with it, was deleted
-      # meanwhile: there is nothing left to do.
-      {count, _} =
-        config.repo.update_all(
-          from(e in Enrollment, where: e.id == ^enrollment.id),
-          [set: Enum.to_list(changes)],
-          prefix: config.prefix
-        )
-
-      if count == 1 do
-        next = for {:next_at, %DateTime{} = at} <- changes, do: {:enrollment, enrollment.id, at}
-        jobs = next ++ jobs
-        Jobs.campaign_written(config, jobs)
-        if changes[:state], do: Tayori.broadcast({Tayori, :campaign_changed, campaign.id})
-        jobs
-      else
-        []
-      end
+      save(config, campaign, enrollment, Map.put(changes, :updated_at, usec(now)), jobs)
     else
       # Another node has it.
+      []
+    end
+  end
+
+  # The enrollment as judged, and its jobs. No row when the campaign, and
+  # its people with it, was deleted meanwhile: there is nothing to do.
+  defp save(config, campaign, enrollment, changes, jobs) do
+    {count, _} =
+      config.repo.update_all(
+        from(e in Enrollment, where: e.id == ^enrollment.id),
+        [set: Enum.to_list(changes)],
+        prefix: config.prefix
+      )
+
+    if count == 1 do
+      next = for {:next_at, %DateTime{} = at} <- changes, do: {:enrollment, enrollment.id, at}
+      jobs = next ++ jobs
+      Jobs.campaign_written(config, jobs)
+      if changes[:state], do: Tayori.broadcast({Tayori, :campaign_changed, campaign.id})
+      jobs
+    else
       []
     end
   end
@@ -206,10 +208,6 @@ defmodule Tayori.Campaigns.Runner do
   defp judge_step(ctx, state, step) do
     at = DateTime.add(ctx.enrollment.entered_at, step.wait * 60, :second)
 
-    gap_until =
-      state.last_sent_at &&
-        DateTime.add(state.last_sent_at, ctx.campaign.min_gap_hours * 3600, :second)
-
     cond do
       DateTime.after?(at, ctx.now) ->
         {:wait, at}
@@ -222,14 +220,22 @@ defmodule Tayori.Campaigns.Runner do
       step.letters == [] ->
         {:skip, "no_letter"}
 
-      gap_until && DateTime.after?(gap_until, ctx.now) ->
-        {:wait, gap_until}
-
-      ctx.recipient.email in [nil, ""] ->
-        {:skip, "no_email"}
-
       true ->
-        :send
+        sendable(ctx, state)
+    end
+  end
+
+  # A step whose letter is wanted now: held by the gap since the last
+  # letter, or sent, if the person has an address.
+  defp sendable(ctx, state) do
+    gap_until =
+      state.last_sent_at &&
+        DateTime.add(state.last_sent_at, ctx.campaign.min_gap_hours * 3600, :second)
+
+    cond do
+      gap_until && DateTime.after?(gap_until, ctx.now) -> {:wait, gap_until}
+      ctx.recipient.email in [nil, ""] -> {:skip, "no_email"}
+      true -> :send
     end
   end
 

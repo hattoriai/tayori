@@ -211,7 +211,12 @@ if Code.ensure_loaded?(Swoosh.Email) do
       Enum.reject(tags(campaign), &value(values, &1))
     end
 
-    defp values(%Recipient{} = recipient) do
+    @doc """
+    The values of a person's merge tags, by tag: `"name"`, `"email"`,
+    and the keys of their recipient's `:data`.
+    """
+    @spec values(Recipient.t()) :: %{String.t() => term()}
+    def values(%Recipient{} = recipient) do
       data = Map.new(recipient.data || %{}, fn {key, value} -> {to_string(key), value} end)
       Map.merge(data, %{"name" => recipient.name, "email" => recipient.email})
     end
