@@ -48,7 +48,7 @@ defmodule TayoriTest.DataCase do
           [
             repo: repo,
             pubsub: TayoriTest.PubSub,
-            locales: ["en", "pt-PT"],
+            locales: [{"en", "English"}, {"pt-PT", "Português"}],
             secret_key_base: String.duplicate("tayori-test-secret-", 4)
           ],
           opts
@@ -92,7 +92,16 @@ defmodule TayoriTest.DataCase do
 
   @doc "Puts the config of the test with these options changed, and returns it."
   def put_config(%Tayori.Config{} = config, changes) do
-    changes = Enum.map(changes, fn {key, value} -> {key, Tayori.Config.option(key, value)} end)
+    changes =
+      Enum.flat_map(changes, fn
+        {:locales, value} ->
+          {locales, names} = Tayori.Config.option(:locales, value)
+          [locales: locales, locale_names: names]
+
+        {key, value} ->
+          [{key, Tayori.Config.option(key, value)}]
+      end)
+
     config = struct!(config, changes)
     Tayori.Config.put(config)
     config

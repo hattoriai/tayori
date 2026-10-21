@@ -90,6 +90,19 @@ defmodule Tayori.ConfigTest do
     assert Config.default_locale(Config.new(@base ++ [locales: ["pt-PT", "en"]])) == "pt-PT"
     assert_raise ArgumentError, ~r/:locales/, fn -> Config.new(@base ++ [locales: []]) end
 
+    assert_raise ArgumentError, ~r/:locales/, fn ->
+      Config.new(@base ++ [locales: [{"en", ""}]])
+    end
+
+    # The app names its languages; Tayori names none.
+    config =
+      Config.new(@base ++ [locales: [{"en", "English"}, "zh-Hant", {"pt-PT", "Português"}]])
+
+    assert config.locales == ["en", "zh-Hant", "pt-PT"]
+    assert config.locale_names == %{"en" => "English", "pt-PT" => "Português"}
+    assert Tayori.Locales.name(config, "pt-PT") == "Português"
+    assert Tayori.Locales.name(config, "zh-Hant") == "zh-Hant"
+
     assert_raise ArgumentError, ~r/:secret_key_base/, fn ->
       Config.new(@base ++ [secret_key_base: "short"])
     end

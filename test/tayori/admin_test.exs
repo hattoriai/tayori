@@ -159,8 +159,8 @@ defmodule Tayori.AdminTest do
 
     test "adds a language, and shows errors", %{conn: conn} do
       {:ok, view, _html} = conn |> as_admin() |> live("/admin/news/new")
-      html = view |> element(".ta-add-language", "Português (Portugal)") |> render_click()
-      assert html =~ ~s|aria-label="Português (Portugal)"|
+      html = view |> element(".ta-add-language", "Português") |> render_click()
+      assert html =~ ~s|aria-label="Português"|
 
       html =
         view

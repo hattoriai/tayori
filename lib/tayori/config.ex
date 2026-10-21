@@ -25,7 +25,11 @@ defmodule Tayori.Config do
       there is no `:vault`. With neither, the admin cannot keep a key, and
       has no AI.
     * `:locales` - the languages the entries are written in, the first the
-      one every entry has (`["en"]`).
+      one every entry has (`["en"]`). Each is a language tag, or a tag with
+      the name the admin and the readers see it by:
+      `[{"en", "English"}, {"pt-PT", "Português"}]`. The entries can be in
+      any language, so Tayori names none: a language without a name shows
+      its tag.
     * `:prefix` - the schema of the tables, in PostgreSQL.
     * `:notifier` - a module of the `Tayori.Notifier` behaviour, told of
       each entry once, when it is published.
@@ -142,6 +146,7 @@ defmodule Tayori.Config do
     :mcp,
     scheduler: true,
     locales: ["en"],
+    locale_names: %{},
     features: [],
     reactions: @reactions
   ]
@@ -164,6 +169,7 @@ defmodule Tayori.Config do
           mcp: mcp() | nil,
           scheduler: boolean(),
           locales: [String.t(), ...],
+          locale_names: %{String.t() => String.t()},
           features: [feature()],
           reactions: [String.t(), ...]
         }
@@ -181,6 +187,7 @@ defmodule Tayori.Config do
     pubsub = Keyword.get(opts, :pubsub) || raise ArgumentError, "Tayori needs the :pubsub option"
     features = features(Keyword.get(opts, :features, []))
     check_dependencies(features, opts)
+    {locales, locale_names} = locales(Keyword.get(opts, :locales, ["en"]))
 
     %__MODULE__{
       oban: oban(opts[:oban]),
@@ -201,7 +208,8 @@ defmodule Tayori.Config do
       prefix: opts[:prefix],
       notifier: opts[:notifier],
       scheduler: scheduler(Keyword.get(opts, :scheduler, true)),
-      locales: locales(Keyword.get(opts, :locales, ["en"]))
+      locales: locales,
+      locale_names: locale_names
     }
   end
 
@@ -210,13 +218,26 @@ defmodule Tayori.Config do
   defp scheduler(other),
     do: raise(ArgumentError, ":scheduler must be true or false, got: #{inspect(other)}")
 
+  # The tags, in their order, and the names the app gave some of them.
   defp locales(locales) do
-    unless is_list(locales) and locales != [] and Enum.all?(locales, &is_binary/1) do
-      raise ArgumentError, ":locales must be a list of language tags, got: #{inspect(locales)}"
+    unless is_list(locales) and locales != [] and Enum.all?(locales, &locale?/1) do
+      raise ArgumentError,
+            ":locales must be a list of language tags, each alone or with its name " <>
+              "({\"pt-PT\", \"Português\"}), got: #{inspect(locales)}"
     end
 
-    locales
+    tags =
+      Enum.map(locales, fn
+        {tag, _name} -> tag
+        tag -> tag
+      end)
+
+    names = for {tag, name} <- locales, into: %{}, do: {tag, name}
+    {tags, names}
   end
+
+  defp locale?({tag, name}), do: is_binary(tag) and is_binary(name) and name != ""
+  defp locale?(tag), do: is_binary(tag)
 
   defp secret_key_base(secret) do
     if secret != nil and (not is_binary(secret) or byte_size(secret) < 32) do
@@ -327,6 +348,7 @@ defmodule Tayori.Config do
   def option(:mcp, value), do: mcp(value)
   def option(:oban, %{name: _, queue: _} = oban), do: oban
   def option(:oban, value), do: oban(value)
+  def option(:locales, value), do: locales(value)
   def option(_key, value), do: value
 
   @typedoc "The `:inbox` option, checked."

@@ -688,7 +688,7 @@ Task.async(fn ->
          repo: TayoriDev.Repo,
          pubsub: TayoriDev.PubSub,
          secret_key_base: String.duplicate("tayori-development-secret-", 3),
-         locales: ["en", "pt-PT"],
+         locales: [{"en", "English"}, {"pt-PT", "Português"}],
          features: [:reactions, :announcements, :analytics, :subscriptions, :webhooks, :embed],
          embed: [origins: ["http://localhost:#{port}", "http://127.0.0.1:#{port}"]],
          mailer: TayoriDev.Mailer,
