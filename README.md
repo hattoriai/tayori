@@ -80,7 +80,7 @@ adds the hook to `assets/js/app.js` and the style sheets to
 you say who your admins are. It shows each change as a diff before it
 writes, and running it again changes nothing.
 
-Without Igniter, add `{:tayori, "~> 0.2"}` (and `{:req_llm, "~> 1.6"}`
+Without Igniter, add `{:tayori, "~> 0.3"}` (and `{:req_llm, "~> 1.6"}`
 for AI) to your deps, and Tayori to your supervision tree, after the repo
 and the PubSub:
 

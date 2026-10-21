@@ -7,6 +7,8 @@ and Tayori follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+## [0.3.0] - 2026-10-21
+
 ### Added
 
 - `<tayori-news button="none">`: no button of the element's own, for a
