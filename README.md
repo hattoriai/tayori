@@ -89,7 +89,7 @@ and the PubSub:
  repo: MyApp.Repo,
  pubsub: MyApp.PubSub,
  secret_key_base: Application.fetch_env!(:my_app, MyAppWeb.Endpoint)[:secret_key_base],
- locales: ["en", "pt-PT"]}
+ locales: [{"en", "English"}, {"pt-PT", "Português"}]}
 ```
 
 The [Quickstart](guides/quickstart.md) goes through it all, with the

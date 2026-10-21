@@ -27,7 +27,11 @@ defmodule TayoriTest.FakeAI do
   end
 
   defp write(system, prompt, opts) do
-    [_, locale] = Regex.run(~r/Write in\s.*?\(([^)]+)\)\./s, system)
+    locale =
+      case Regex.run(~r/Write in\s.*?(?:\(([^)]+)\)|tag is (\S+?))\./s, system) do
+        [_, locale] -> locale
+        [_, "", locale] -> locale
+      end
 
     cond do
       prompt =~ "Write one entry" ->

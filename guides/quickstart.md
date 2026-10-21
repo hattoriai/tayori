@@ -103,13 +103,15 @@ children = [
    repo: MyApp.Repo,
    pubsub: MyApp.PubSub,
    secret_key_base: Application.fetch_env!(:my_app, MyAppWeb.Endpoint)[:secret_key_base],
-   locales: ["en"]},
+   locales: [{"en", "English"}]},
   MyAppWeb.Endpoint
 ]
 ```
 
 `locales` are the languages you write the news in, the first the one every
-entry has. `secret_key_base` lets the admin keep an AI key, encrypted; see
+entry has, each with the name the admin and your readers see it by. The
+news can be in any language, so Tayori names none: a tag without a name
+(`"en"`) shows as its tag. `secret_key_base` lets the admin keep an AI key, encrypted; see
 `Tayori.Config` for the other options.
 
 ## 5. Say who your admins and readers are

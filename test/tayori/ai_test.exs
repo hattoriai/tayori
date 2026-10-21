@@ -101,7 +101,7 @@ defmodule Tayori.AITest do
                          prompt: prompt
                        }}
 
-      assert system =~ "Português (Portugal) (pt-PT)"
+      assert system =~ "Português (pt-PT)"
       assert system =~ "Atelier, a studio's projects."
       assert prompt =~ "- Export button"
     end
@@ -182,7 +182,7 @@ defmodule Tayori.AITest do
         })
 
       {:ok, view, _html} = live(conn, "/admin/news/#{entry.id}")
-      view |> element(".ta-add-language", "Português (Portugal)") |> render_click()
+      view |> element(".ta-add-language", "Português") |> render_click()
       view |> element("button", "Write with AI") |> render_click()
 
       FakeAI.answer(["TITLE: Exportações\nSUMMARY: \n---\nCada **projeto**."])
