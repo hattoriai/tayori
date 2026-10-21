@@ -63,6 +63,41 @@ test("<tayori-news> shows the news over the JSON API, and marks it seen", async 
   await expect(button).toHaveAttribute("aria-expanded", "false");
 });
 
+test('<tayori-news button="none">: the page\'s own button opens it, gets the focus back, and shows the count', async ({ browser }) => {
+  const reader = await browser.newContext();
+  const admin = await browser.newContext();
+  const page = await reader.newPage();
+  const adminPage = await admin.newPage();
+
+  await page.goto("/plain/own?as=pro");
+  const own = page.locator("#own-news");
+  const panel = page.locator("tayori-news .tayori-panel");
+  await expect(page.locator("tayori-news .tayori-button")).toHaveCount(0);
+
+  await own.click();
+  await expect(panel.locator(".tayori-card").first()).toBeVisible();
+  await expect(own.locator(".own-news-dot")).toBeHidden();
+  await page.keyboard.press("Escape");
+  await expect(panel).toHaveCount(0);
+  await expect(own).toBeFocused();
+
+  // Pressing it again while the panel is open closes it.
+  await own.click();
+  await expect(panel).toBeVisible();
+  await own.click();
+  await expect(panel).toHaveCount(0);
+
+  await publishEntry(adminPage, unique("Own buttons"), "A button of the page's own.");
+  await page.reload();
+  await expect(own.locator(".own-news-dot")).toBeVisible();
+  await own.click();
+  await expect(panel).toBeVisible();
+  await expect(own.locator(".own-news-dot")).toBeHidden();
+
+  await reader.close();
+  await admin.close();
+});
+
 test("<tayori-news> has the panel of the LiveView: pinned first, covers, categories", async ({ page }) => {
   const { panel } = await openElement(page, "/plain?as=pro");
 

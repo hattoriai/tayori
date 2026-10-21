@@ -213,7 +213,7 @@ defmodule TayoriDev.PlainController do
 
   def show(conn, _params) do
     inner =
-      %{dev_user: conn.assigns[:dev_user], here: "/plain"}
+      %{dev_user: conn.assigns[:dev_user], here: conn.request_path}
       |> TayoriDev.Layouts.plain_page()
       |> Safe.to_iodata()
       |> IO.iodata_to_binary()
@@ -362,6 +362,9 @@ defmodule TayoriDev.Layouts do
           .dev a { display: inline-block; margin: 0 0.375rem 0.25rem 0; }
           .dev a[aria-current] { color: var(--atelier-ink); font-weight: 600; text-decoration: none; }
           .dev-main { max-width: 40rem; padding: 2rem 1.5rem; }
+          .own-news { position: relative; font: inherit; background: none; border: 1px solid var(--atelier-line); border-radius: 8px; padding: 0.375rem 0.75rem; cursor: pointer; }
+          .own-news-dot { position: absolute; top: 0.25rem; right: 0.25rem; width: 0.5rem; height: 0.5rem; border-radius: 99px; background: #c47a35; }
+          .own-news-dot[hidden] { display: none; }
         </style>
         <script type="importmap">
           {"imports": {
@@ -405,6 +408,7 @@ defmodule TayoriDev.Layouts do
           <p>My work</p>
           <p>Calendar</p>
           <a href="/plain" aria-current={@here == "/plain" && "page"}>A page without LiveView</a>
+          <a href="/plain/own" aria-current={@here == "/plain/own" && "page"}>With a button of its own</a>
           <a href="/elsewhere">A site on another origin</a>
           <a href="/changelog">Changelog</a>
           <a href="/admin/news">Write the news</a>
@@ -451,6 +455,39 @@ defmodule TayoriDev.Layouts do
         </div>
       </div>
     </div>
+    """
+  end
+
+  def plain_page(%{here: "/plain/own"} = assigns) do
+    ~H"""
+    <.shell dev_user={@dev_user} here={@here}>
+      <:button>
+        <%!-- A classic script, before the element is defined: it hears the first count. --%>
+        <script>
+          document.addEventListener("tayori:unread", (event) => {
+            const own = document.getElementById("own-news")
+            own.querySelector(".own-news-dot").hidden = event.detail.count === 0
+            own.setAttribute("aria-label", event.detail.count ? "What's new, new updates" : "What's new")
+          })
+          document.addEventListener("click", (event) => {
+            const own = event.target.closest("#own-news")
+            if (own) document.querySelector("tayori-news").toggle(own)
+          })
+        </script>
+        <button type="button" id="own-news" class="own-news" aria-label="What's new">
+          What's new <span class="own-news-dot" hidden></span>
+        </button>
+        <tayori-news api="/api/news" button="none"></tayori-news>
+      </:button>
+      <div class="dev-main">
+        <h2>With a button of its own</h2>
+        <p>
+          <code>&lt;tayori-news button="none"&gt;</code> draws no button: the page's own
+          opens the panel with <code>toggle(button)</code>, and shows a dot when
+          <code>tayori:unread</code> says something is new.
+        </p>
+      </div>
+    </.shell>
     """
   end
 
@@ -573,6 +610,7 @@ defmodule TayoriDev.Router do
     end
 
     get "/plain", TayoriDev.PlainController, :show
+    get "/plain/own", TayoriDev.PlainController, :show
     get "/elsewhere", TayoriDev.ElsewhereController, :show
 
     tayori_page("/changelog",

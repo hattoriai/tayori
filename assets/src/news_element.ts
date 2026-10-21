@@ -64,7 +64,10 @@ export class TayoriNews extends HTMLElement {
   private announcementId: string | null = null;
   private timer: number | undefined;
   private token: string | null = null;
-  private count = 0;
+  private count: number | null = null;
+  // With button="none", the page's own control that opened the panel,
+  // which gets the focus back.
+  private opener: HTMLElement | null = null;
 
   // The view of the open panel, which the server renders again.
   private category: string | null = null;
@@ -92,7 +95,11 @@ export class TayoriNews extends HTMLElement {
   // phx-click-away: a press outside the panel closes it.
   private readonly onPointer = (event: PointerEvent) => {
     const target = event.target as Node;
-    const inside = this.panel?.contains(target) || this.button?.contains(target) || this.announcementEl?.contains(target);
+    const inside =
+      this.panel?.contains(target) ||
+      this.button?.contains(target) ||
+      this.opener?.contains(target) ||
+      this.announcementEl?.contains(target);
     if (this.panel && !inside) this.close(false);
   };
 
@@ -102,7 +109,12 @@ export class TayoriNews extends HTMLElement {
 
   /** The number of entries the reader has not seen. */
   get unread(): number {
-    return this.count;
+    return this.count ?? 0;
+  }
+
+  /** False with `button="none"`: the page has its own control, which calls open(). */
+  get hasButton(): boolean {
+    return this.getAttribute("button") !== "none";
   }
 
   /** The path or URL of Tayori.API (`api`, or `src`, its older name). */
@@ -138,30 +150,40 @@ export class TayoriNews extends HTMLElement {
 
   /** Asks the button again (its count of unread entries), and the announcement. */
   async refresh(): Promise<void> {
-    const label = this.hasAttribute("label") ? "?label=1" : "";
-    const data = await this.request<Html & { unread: number }>(`/ui/button${label}`);
-    if (data?.html) {
-      const button = fragment(data.html);
-      if (button) {
-        if (this.button) this.button.replaceWith(button);
-        else this.prepend(button);
-        this.button = button;
-        this.count = this.panel ? 0 : data.unread;
-        if (this.panel) this.markOpen(true);
+    if (this.hasButton) {
+      const label = this.hasAttribute("label") ? "?label=1" : "";
+      const data = await this.request<Html & { unread: number }>(`/ui/button${label}`);
+      if (data?.html) {
+        const button = fragment(data.html);
+        if (button) {
+          if (this.button) this.button.replaceWith(button);
+          else this.prepend(button);
+          this.button = button;
+          this.setCount(this.panel ? 0 : data.unread);
+          if (this.panel) this.markOpen(true);
+        }
       }
+    } else {
+      const data = await this.request<{ unread: number }>("/unread");
+      if (data) this.setCount(this.panel ? 0 : data.unread);
     }
     await this.loadAnnouncement();
   }
 
-  /** Opens the panel on the newest entries, and marks them seen. */
-  async open(): Promise<void> {
+  /**
+   * Opens the panel on the newest entries, and marks them seen. `control`
+   * is the page's own button, with `button="none"`: a press on it does not
+   * count as outside, and it gets the focus back when the panel closes.
+   */
+  async open(control?: HTMLElement): Promise<void> {
+    if (control) this.opener = control;
     const data = await this.request<Html & { since: string | null }>("/ui/panel", { method: "POST" });
     if (!data?.html) return;
     this.category = null;
     this.pages = 1;
     this.entry = null;
     this.since = data.since;
-    this.count = 0;
+    this.setCount(0);
     this.putPanel(data.html);
     this.button?.querySelector(".tayori-badge")?.remove();
     this.button?.setAttribute("aria-label", this.button.getAttribute("aria-label")?.split(",")[0] ?? "");
@@ -173,7 +195,13 @@ export class TayoriNews extends HTMLElement {
     this.dispatchEvent(new CustomEvent("tayori:open", { bubbles: true }));
   }
 
-  /** Closes the panel; `focus` gives the focus back to the button. */
+  /** Opens the panel, or closes it when it is open: for the page's own control (see open()). */
+  async toggle(control?: HTMLElement): Promise<void> {
+    if (this.panel) this.close(true);
+    else await this.open(control);
+  }
+
+  /** Closes the panel; `focus` gives the focus back to the button, or to the page's control that opened it. */
   close(focus: boolean): void {
     if (!this.panel) return;
     this.panel.remove();
@@ -181,7 +209,8 @@ export class TayoriNews extends HTMLElement {
     this.entry = null;
     this.markOpen(false);
     document.removeEventListener("pointerdown", this.onPointer);
-    if (focus) this.button?.focus();
+    if (focus) (this.button ?? this.opener)?.focus();
+    this.opener = null;
     void this.loadAnnouncement();
     this.dispatchEvent(new CustomEvent("tayori:close", { bubbles: true }));
   }
@@ -244,7 +273,7 @@ export class TayoriNews extends HTMLElement {
     if (!id) return;
     const hadFocus = this.announcementEl?.contains(document.activeElement) ?? false;
     this.removeAnnouncement(true);
-    if (hadFocus) this.button?.focus();
+    if (hadFocus) (this.button ?? this.opener)?.focus();
     await this.request(`/announcement/${encodeURIComponent(id)}/dismiss`, { method: "POST" });
   }
 
@@ -267,6 +296,14 @@ export class TayoriNews extends HTMLElement {
     this.panel = panel;
     this.markOpen(true);
     document.addEventListener("pointerdown", this.onPointer);
+  }
+
+  // The count, and tayori:unread when it changes, for a page that shows it
+  // itself (a dot on its own control, with button="none").
+  private setCount(count: number): void {
+    if (count === this.count) return;
+    this.count = count;
+    this.dispatchEvent(new CustomEvent("tayori:unread", { bubbles: true, detail: { count } }));
   }
 
   private markOpen(open: boolean): void {
