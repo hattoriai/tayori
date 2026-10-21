@@ -378,6 +378,14 @@ defmodule Tayori.Digest do
   def after_ingest(_added), do: :ok
 
   @doc false
+  # The time of the next scheduled digest, or nil when it has no time
+  # (:manual, :ingest).
+  @spec next_at(Config.t(), DateTime.t()) :: DateTime.t() | nil
+  def next_at(%Config{} = config, now) do
+    if timed?(config.digest), do: next_run(config.digest, last_run(@setting, now), now)
+  end
+
+  @doc false
   # From the scheduler: starts the digest when its time has come. The run
   # is recorded first, so that the next look does not start it again.
   @spec tick(Config.t(), DateTime.t()) :: :ok

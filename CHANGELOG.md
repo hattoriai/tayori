@@ -5,7 +5,20 @@ All notable changes to Tayori are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and Tayori follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.0] - unreleased
+## Unreleased
+
+### Changed
+
+- With Oban (the `:oban` option), nothing looks at the database on a
+  timer: each write of an entry gives Oban its announcement, a job at
+  its publication time (one for each entry, moved with it), and a
+  scheduled digest or period email is a job at its next time, which gives
+  Oban the one after. At boot, a task gives Oban the announcements of
+  entries that have no job, the schedules and the reading of the
+  inbox's sources. Without Oban, the scheduler is as it was. Start
+  Tayori after Oban.
+
+## [0.1.0] - 2026-10-20
 
 The first release.
 

@@ -55,16 +55,23 @@ defmodule Tayori do
 
     children = [
       {Task.Supervisor, name: Tayori.TaskSupervisor},
-      # One scheduler for the cluster: the node that registers it runs it,
-      # and another takes over when that node goes down.
-      config.scheduler &&
-        {PhoenixMountable.Singleton, name: Tayori.Scheduler, child: {Tayori.Scheduler, config}}
+      config.scheduler && scheduler(config)
     ]
 
     children = Enum.filter(children, & &1)
 
     Supervisor.init(children, strategy: :one_for_one)
   end
+
+  # Without Oban, one scheduler for the cluster: the node that registers
+  # it runs it, and another takes over when that node goes down. With
+  # Oban, the schedules are jobs (Tayori.Jobs): a task at boot gives Oban
+  # what is due, and nothing polls.
+  defp scheduler(%Config{oban: nil} = config),
+    do: {PhoenixMountable.Singleton, name: Tayori.Scheduler, child: {Tayori.Scheduler, config}}
+
+  defp scheduler(config),
+    do: Supervisor.child_spec({Task, fn -> Tayori.Jobs.boot(config) end}, id: Tayori.Jobs)
 
   @doc """
   The news a reader sees, the newest first, each entry with its

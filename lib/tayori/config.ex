@@ -106,9 +106,9 @@ defmodule Tayori.Config do
           images, in the call.
         * `:storage` - the `Kotoba.Storage` of the uploads (Kotoba's own
           config when not given), the one of the admin's editor.
-    * `:scheduler` - `false` runs no scheduler: nothing is announced, and
-      no schedule runs, by itself. For an app's tests, where the
-      scheduler's queries would outlive a test's sandbox, and
+    * `:scheduler` - `false` starts nothing that runs by itself: no
+      scheduler, and with Oban no look at boot for what is due. For an
+      app's tests, where those queries would outlive a test's sandbox, and
       `Tayori.Test.announce!/0` announces in the test's process (`true`).
     * `:embed` - the sites of the `:embed` feature (required with it):
         * `:origins` - the origins the JSON API answers, each a scheme

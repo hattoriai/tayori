@@ -300,7 +300,7 @@ defmodule Tayori.Entries do
 
   defp changed({:ok, entry}) do
     Tayori.broadcast({Tayori, :changed, entry.id})
-    Tayori.Scheduler.wake()
+    Tayori.Jobs.entry_changed(Config.get(), entry)
     {:ok, entry}
   end
 
