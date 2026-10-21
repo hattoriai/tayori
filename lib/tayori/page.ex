@@ -42,6 +42,9 @@ defmodule Tayori.Page do
 
   The forms (reactions, subscribe) post with the session's CSRF token: the
   page belongs behind the app's `:browser` pipeline.
+
+  Without the `:changelog` module (`Tayori.Config`), every route is a
+  404.
   """
 
   @behaviour Plug
@@ -63,6 +66,10 @@ defmodule Tayori.Page do
 
   @impl Plug
   def call(conn, action) do
+    if Config.module?(Config.get(), :changelog), do: serve(conn, action), else: not_found(conn)
+  end
+
+  defp serve(conn, action) do
     mount = conn.assigns.mount
     opts = Map.put(mount.options, :mount, mount)
     conn = fetch_query_params(conn)

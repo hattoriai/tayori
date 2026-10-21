@@ -1,0 +1,5 @@
+Confirme o seu endereço para receber as novidades por email.
+
+https://atelier.test/changelog/subscription/confirm/tok-123
+
+Se não pediu isto, ignore este email.

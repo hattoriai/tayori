@@ -35,6 +35,7 @@ defmodule Tayori do
 
   import Ecto.Query
 
+  alias Tayori.Campaigns.{Events, Runner}
   alias Tayori.{Config, Entry, Query, Reader}
 
   @external_resource "mix.exs"
@@ -298,6 +299,30 @@ defmodule Tayori do
     entries
     |> config.repo.preload(:translations, prefix: config.prefix)
     |> Enum.map(&%{&1 | translation: Entry.translation(&1, reader.locale, config.locales)})
+  end
+
+  @doc """
+  Tracks an event of a person of the app, for the campaigns: `person_id`
+  is the id their recipient has (`c:Tayori.Audience.recipient/1`), `name`
+  what they did (`"signed_up"`, `"story_published"`), 64 characters at
+  most. Conditions test it (`Tayori.Conditions`), and a sequence whose
+  trigger is the event takes the person in.
+
+  Options: `:meta` - a map kept with it; `:at` - when it happened (now).
+
+  Without the `:campaigns` module, it does nothing.
+  """
+  @spec track(String.t(), String.t(), keyword()) :: :ok
+  def track(person_id, name, opts \\ []) when is_binary(person_id) and is_binary(name) do
+    config = Config.get()
+
+    if Config.module?(config, :campaigns) do
+      at = Keyword.get_lazy(opts, :at, &DateTime.utc_now/0)
+      Events.insert!(config, person_id, name, opts[:meta], at)
+      Runner.event_tracked(config, person_id, name, at)
+    end
+
+    :ok
   end
 
   @doc """

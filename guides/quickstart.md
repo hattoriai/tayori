@@ -114,6 +114,27 @@ news can be in any language, so Tayori names none: a tag without a name
 (`"en"`) shows as its tag. `secret_key_base` lets the admin keep an AI key, encrypted; see
 `Tayori.Config` for the other options.
 
+Tayori runs the changelog by default. For letters to each of your people
+by what they did (a welcome at sign-up, a word two days later), add the
+campaigns module, with your audience and your mailer:
+
+```elixir
+{Tayori,
+ repo: MyApp.Repo,
+ pubsub: MyApp.PubSub,
+ secret_key_base: ...,
+ mailer: MyApp.Mailer,
+ modules: [:changelog, :campaigns],
+ campaigns: [
+   audience: MyApp.TayoriAudience,
+   url: "https://myapp.com/letters",
+   from: {"Rui at MyApp", "rui@myapp.com"}
+ ]}
+```
+
+The [Campaigns](campaigns.md) guide goes through the audience, the
+`tayori_mail` mount and the rest.
+
 ## 5. Say who your admins and readers are
 
 The installer wrote `lib/my_app_web/tayori_resolver.ex`. Say who may write
@@ -202,4 +223,5 @@ Publish another entry: the button of every open page shows it at once.
 * [The admin](admin.md): access, segments, attachments, the CSP.
 * [Writing with AI](ai.md): a model and your key, in the admin's Settings.
 * [Notifications](notifications.md): an email when an entry is published.
+* [Campaigns](campaigns.md): sequences and broadcasts, letters to each person.
 * [Any frontend](any_frontend.md): the news in a React or Vue frontend.

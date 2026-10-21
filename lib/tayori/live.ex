@@ -23,6 +23,9 @@ defmodule Tayori.Live do
       for the panel's link to all the news.
     * `:limit` - the entries of the panel, and of each "Show more" (10).
 
+  Without the `:changelog` module (`Tayori.Config`), the hook does
+  nothing: `@tayori` is nil, and the components render nothing.
+
   `@tayori` holds the reader, the number of entries they have not seen
   (`@tayori.unread`), and, once the panel is open, its entries. It stays
   live: an entry published, scheduled or changed in the admin reaches
@@ -107,7 +110,13 @@ defmodule Tayori.Live do
     on_mount([resolver: resolver], params, session, socket)
   end
 
-  def on_mount(opts, _params, _session, socket) when is_list(opts) do
+  def on_mount(opts, params, session, socket) when is_list(opts) do
+    if Tayori.Config.module?(Tayori.Config.get(), :changelog),
+      do: mount(opts, params, session, socket),
+      else: {:cont, assign(socket, :tayori, nil)}
+  end
+
+  defp mount(opts, _params, _session, socket) do
     resolver = Keyword.fetch!(opts, :resolver)
     reader = Resolver.reader(resolver, socket)
     state = Panel.new(reader, page: opts[:page], limit: Keyword.get(opts, :limit, 10))

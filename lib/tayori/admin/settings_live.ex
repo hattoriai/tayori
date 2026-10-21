@@ -5,7 +5,9 @@ defmodule Tayori.Admin.SettingsLive do
   # (the inbox's sources, the digest, the ingest token and GitHub's
   # secret, each shown once); where the audiences come from; the extras of
   # the app; the subscribers; the webhooks, Slack and Discord; and the
-  # embed on another domain.
+  # embed on another domain: the changelog's, shown when it is on. Then
+  # the modules that are on, and with the campaigns, where their letters
+  # are from and the addresses of the mail providers' webhooks.
 
   use Phoenix.LiveView, layout: false
   use PhoenixMountable.Path, mountable: Tayori.Router
@@ -46,11 +48,19 @@ defmodule Tayori.Admin.SettingsLive do
   end
 
   defp load(socket) do
+    config = socket.assigns.config
+    socket = assign(socket, campaigns: Config.module?(config, :campaigns))
+
+    if Config.module?(config, :changelog),
+      do: load_changelog(socket, config),
+      else: assign(socket, changelog: false)
+  end
+
+  defp load_changelog(socket, config) do
     settings = AI.settings()
 
-    config = socket.assigns.config
-
     assign(socket,
+      changelog: true,
       hooks: if(Config.feature?(config, :webhooks), do: Webhooks.list(), else: []),
       subscribers: if(Config.feature?(config, :subscriptions), do: Tayori.Subscribers.counts()),
       settings: settings,
@@ -65,6 +75,9 @@ defmodule Tayori.Admin.SettingsLive do
   end
 
   @impl true
+  def handle_event(_event, _params, %{assigns: %{changelog: false}} = socket),
+    do: {:noreply, socket}
+
   def handle_event("save", %{"ai" => params}, %{assigns: %{access: :all}} = socket) do
     key =
       case String.trim(params["key"] || "") do
@@ -208,24 +221,33 @@ defmodule Tayori.Admin.SettingsLive do
       <div class="ta-heading">
         <div>
           <h1>Settings</h1>
-          <p class="ta-subtitle">How Tayori writes, who reads, and where the news goes.</p>
+          <p :if={@changelog} class="ta-subtitle">
+            How Tayori writes, who reads, and where the news goes.
+          </p>
+          <p :if={!@changelog} class="ta-subtitle">What Tayori does here, and where its letters go.</p>
         </div>
       </div>
 
       <div class="ta-settings">
         <nav class="ta-settings-nav" aria-label="Settings">
-          <a href="#ai"><.icon name="sparkles" />Writing with AI</a>
-          <a href="#automation"><.icon name="zap" />Automation</a>
-          <a href="#audiences"><.icon name="users" />Audiences</a>
-          <a href="#features"><.icon name="layers" />Features</a>
-          <a :if={@subscribers} href="#email"><.icon name="mail" />Email</a>
-          <a :if={:webhooks in @config.features} href="#integrations">
+          <a href="#modules"><.icon name="layers" />Modules</a>
+          <a :if={@campaigns} href="#campaigns"><.icon name="send" />Campaigns</a>
+          <a :if={@changelog} href="#ai"><.icon name="sparkles" />Writing with AI</a>
+          <a :if={@changelog} href="#automation"><.icon name="zap" />Automation</a>
+          <a :if={@changelog} href="#audiences"><.icon name="users" />Audiences</a>
+          <a :if={@changelog} href="#features"><.icon name="layers" />Features</a>
+          <a :if={@changelog and @subscribers} href="#email"><.icon name="mail" />Email</a>
+          <a :if={@changelog and :webhooks in @config.features} href="#integrations">
             <.icon name="webhook" />Integrations
           </a>
-          <a href="#embed"><.icon name="code-xml" />Embed</a>
+          <a :if={@changelog} href="#embed"><.icon name="code-xml" />Embed</a>
         </nav>
 
         <div class="ta-settings-body">
+          <.modules config={@config} />
+          <.campaigns_card :if={@campaigns} config={@config} />
+
+          <%= if @changelog do %>
           <.card title="Writing with AI" icon="sparkles" id="ai">
             <p class="ta-lead">
               With a model and your own key, the editor drafts an entry from what shipped,
@@ -558,11 +580,117 @@ defmodule Tayori.Admin.SettingsLive do
               <p class="ta-hint">Then mount the JSON API for the sites, as the Any frontend guide says.</p>
             </div>
           </.card>
+          <% end %>
         </div>
       </div>
     </.page>
     """
   end
+
+  attr :config, Config, required: true
+
+  # The modules of Tayori: which are on here.
+  defp modules(assigns) do
+    ~H"""
+    <.card title="Modules" icon="layers" id="modules">
+      <p class="ta-lead">
+        What Tayori does in this app, in the <code>:modules</code> option of Tayori.
+      </p>
+      <ul class="ta-features">
+        <li :for={{module, label, icon, text} <- module_labels()}>
+          <span class="ta-feature-icon"><.icon name={icon} /></span>
+          <span>
+            <strong>{label}</strong>
+            <span class="ta-hint">{text}</span>
+          </span>
+          <span class={["ta-badge", Config.module?(@config, module) && "ta-badge-on"]}>
+            {if Config.module?(@config, module), do: "On", else: "Off"}
+          </span>
+        </li>
+      </ul>
+      <pre class="ta-code"><code>{"{Tayori,\n repo: MyApp.Repo,\n pubsub: MyApp.PubSub,\n modules: [:changelog, :campaigns]}"}</code></pre>
+    </.card>
+    """
+  end
+
+  defp module_labels do
+    [
+      {:changelog, "Changelog", "newspaper",
+       "The same news for everyone: in the app, on a public page, in feeds and by email."},
+      {:campaigns, "Campaigns", "send",
+       "Letters to each person, by what they did: sequences and broadcasts."}
+    ]
+  end
+
+  attr :config, Config, required: true
+
+  # Where the letters are from, and what the mail providers are told.
+  defp campaigns_card(assigns) do
+    campaigns = assigns.config.campaigns
+
+    assigns =
+      assign(assigns,
+        campaigns: campaigns,
+        hooks:
+          campaigns.providers
+          |> Enum.map(fn {name, {module, _opts}} ->
+            {name, module, campaigns.url <> "/webhooks/" <> to_string(name)}
+          end)
+          |> Enum.sort()
+      )
+
+    ~H"""
+    <.card title="Campaigns" icon="send" id="campaigns">
+      <dl class="ta-facts">
+        <div><dt>Audience</dt><dd><code>{inspect(@campaigns.audience)}</code></dd></div>
+        <div><dt>From</dt><dd>{from_text(@campaigns.from)}</dd></div>
+        <div :if={@campaigns.reply_to}><dt>Replies go to</dt><dd>{@campaigns.reply_to}</dd></div>
+        <div><dt>Letters' address</dt><dd><code>{@campaigns.url}</code></dd></div>
+        <div><dt>Events kept</dt><dd>{@campaigns.keep_events_days} days</dd></div>
+      </dl>
+
+      <h3 class="ta-subheading">Mail providers</h3>
+      <p class="ta-lead">
+        A provider tells Tayori of the letters that bounced and the people who marked one as
+        spam: Tayori writes to them no more. Paste each address in your provider's webhooks.
+      </p>
+      <ul :if={@hooks != []} class="ta-hooks">
+        <li :for={{name, module, url} <- @hooks}>
+          <span class="ta-feature-icon"><.icon name="webhook" /></span>
+          <span>
+            <strong>{provider_name(name)}</strong>
+            <code class="ta-hook-url">{url}</code>
+            <span :if={name not in [:resend, :postmark]} class="ta-hint">{inspect(module)}</span>
+          </span>
+          <button
+            type="button"
+            class="ta-icon-button"
+            id={"copy-hook-#{name}"}
+            phx-hook="TayoriCopy"
+            data-copy-text={url}
+            aria-label={"Copy the address for #{provider_name(name)}"}
+          >
+            <.icon name="copy" />
+          </button>
+        </li>
+      </ul>
+      <div :if={@hooks == []} class="ta-notice">
+        <.icon name="info" />
+        <p>
+          No provider yet. Give <code>:providers</code> to <code>:campaigns</code>, Resend's
+          signing secret or Postmark's user and password, and its address shows here.
+        </p>
+      </div>
+    </.card>
+    """
+  end
+
+  defp from_text({name, address}), do: "#{name} <#{address}>"
+  defp from_text(address), do: address
+
+  defp provider_name(:resend), do: "Resend"
+  defp provider_name(:postmark), do: "Postmark"
+  defp provider_name(name), do: name |> to_string() |> String.capitalize()
 
   # The inbox's sources, the digest, and what the app's CI and GitHub
   # send: the ingest token and GitHub's secret, each shown once, when

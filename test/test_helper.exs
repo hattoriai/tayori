@@ -7,17 +7,20 @@ Application.put_env(:tayori, :ai_adapter, TayoriTest.FakeAI)
 # reachable (TAYORI_TEST_DATABASE_URL, or postgres:postgres@localhost).
 File.mkdir_p!(Path.expand("../tmp", __DIR__))
 
-migrate = fn repo ->
-  Ecto.Migrator.run(repo, [{0, TayoriTest.Migration}, {1, TayoriTest.ObanMigration}], :up,
-    all: true,
-    log: false
-  )
-end
+# The app's own tables (TayoriTest.AppMigration) come after Tayori's.
+migrations = [
+  {0, TayoriTest.Migration},
+  {1, TayoriTest.ObanMigration},
+  {2, TayoriTest.AppMigration}
+]
+
+migrate = fn repo -> Ecto.Migrator.run(repo, migrations, :up, all: true, log: false) end
 
 _ = Ecto.Adapters.SQLite3.storage_up(TayoriTest.SQLiteRepo.config())
 {:ok, _pid} = TayoriTest.SQLiteRepo.start_link()
 migrate.(TayoriTest.SQLiteRepo)
 Ecto.Adapters.SQL.Sandbox.mode(TayoriTest.SQLiteRepo, :manual)
+{:ok, _pid} = TayoriTest.MigrationsRepo.start_link()
 
 # An Oban for each repo, which keeps its jobs for the tests to run.
 {:ok, _pid} =
@@ -34,6 +37,7 @@ postgres? =
       {:ok, _pid} = TayoriTest.PostgresRepo.start_link()
       migrate.(TayoriTest.PostgresRepo)
       Ecto.Adapters.SQL.Sandbox.mode(TayoriTest.PostgresRepo, :manual)
+      {:ok, _pid} = TayoriTest.PostgresMigrationsRepo.start_link()
 
       {:ok, _pid} =
         Oban.start_link(

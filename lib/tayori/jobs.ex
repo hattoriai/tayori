@@ -53,6 +53,19 @@ defmodule Tayori.Jobs do
 
   `mix tayori.install` sets `oban: Oban` when the app has Oban.
 
+  With the `:campaigns` module, each person of a sequence is a job at
+  their next time (one job each, moved when the time changes), a
+  scheduled broadcast a job at its time, and each letter a job of its
+  own, tried five times: a letter that fails its last attempt is marked
+  `"failed"`. The events are cleaned once a day by a job. A sweep, one
+  job at boot and then every hour, gives Oban what lost its job (written
+  before Tayori ran with Oban, by an Oban of another repo, or a job
+  discarded): the people of the sequences more than 5 minutes past their
+  time, the broadcasts more than 5 minutes past theirs, or being sent
+  with no batch in 5 minutes, and the letters queued for more than 15
+  minutes, but those of a paused sequence, which wait for it. A letter
+  is claimed before it is sent, so that one given two jobs goes once.
+
   ## Without Oban
 
   A scheduler, one in the cluster, announces the entries and runs the
@@ -64,16 +77,32 @@ defmodule Tayori.Jobs do
   loses what it had not sent yet: the entry is not sent twice, but some
   subscribers may not get it. For a changelog with subscribers or
   webhooks that matter, run Oban.
+
+  The campaigns, without Oban, go the same way: the scheduler advances
+  each person whose time came and sends the broadcasts whose time came,
+  or that a stopped node left half sent, every minute and when a
+  campaign changes, and each letter is tried once, from a task, and
+  marked `"failed"` when it fails.
   """
 
   import Ecto.Query
 
+  alias Tayori.Campaigns.{Campaign, Delivery, Enrollment, Events, Runner}
   alias Tayori.{Config, Entry, Scheduler, Subscribers, Webhooks}
 
   require Logger
 
   # Oban is an optional dependency, used with the :oban option.
   @compile {:no_warn_undefined, [Oban, Tayori.Worker]}
+
+  @letter_attempts 5
+  # The jobs given to Oban.insert_all at once.
+  @insert_chunk 500
+  # How long work may be past its time before the sweep gives it a job:
+  # the people and the broadcasts, then the letters.
+  @overdue 300
+  @overdue_letters 900
+  @sweep_every 3600
 
   @doc false
   # Sends what the publication of an entry sends, from the scheduler.
@@ -138,11 +167,20 @@ defmodule Tayori.Jobs do
   # published and not announced (those written before Tayori ran with
   # Oban, or by an Oban of another repo), the schedules, and the reading of
   # the inbox's sources. The jobs are unique: the nodes of a cluster give
-  # Oban each one once.
+  # Oban each one once. Without the changelog, none of it.
   @spec boot(Config.t()) :: :ok
   def boot(%Config{oban: oban} = config) do
     check_queue(oban)
+    if Config.module?(config, :changelog), do: boot_changelog(config)
+    if Config.module?(config, :campaigns), do: boot_campaigns(config)
+    :ok
+  rescue
+    error ->
+      Logger.error("Tayori could not give Oban its work at boot: " <> Exception.message(error))
+      :ok
+  end
 
+  defp boot_changelog(%Config{oban: oban} = config) do
     from(e in Entry,
       where: not is_nil(e.published_at) and is_nil(e.announced_at),
       select: {e.id, e.published_at}
@@ -155,12 +193,140 @@ defmodule Tayori.Jobs do
     if config.inbox.ingest_on_start and config.inbox.sources != [] do
       insert!(oban, :ingest, DateTime.utc_now())
     end
+  end
+
+  # The campaigns' sweep, which gives Oban what lost its job, and the
+  # events' daily cleanup: one job each in the cluster. A node that boots
+  # moves the sweep to now.
+  defp boot_campaigns(%Config{oban: oban}) do
+    now = DateTime.utc_now()
+    insert!(oban, :campaigns_sweep, now)
+    insert!(oban, :campaigns_cleanup, now)
+  end
+
+  @doc false
+  # The campaigns' work that lost its job, at a time: the people of the
+  # sequences more than 5 minutes past their next_at, the broadcasts more
+  # than 5 minutes past their send_at or being sent with no batch in 5
+  # minutes, and the letters queued for more than 15 minutes, but those of
+  # a paused sequence. Each is given a job, a batch at a time (the jobs
+  # are not unique: an enrollment and a letter are claimed, and a
+  # broadcast's deliveries are unique, so that a second job does
+  # nothing).
+  @spec sweep_campaigns(Config.t(), DateTime.t()) :: :ok
+  def sweep_campaigns(%Config{oban: nil}, _now), do: :ok
+
+  def sweep_campaigns(%Config{} = config, %DateTime{} = now) do
+    late = DateTime.add(now, -@overdue)
+    late_letters = DateTime.add(now, -@overdue_letters)
+
+    from(e in Enrollment,
+      where: e.state == "active" and not is_nil(e.next_at) and e.next_at < ^late
+    )
+    |> Runner.each_id(
+      config,
+      &campaign_requeued(config, Enum.map(&1, fn id -> {:enrollment, id, now} end))
+    )
+
+    from(c in Campaign,
+      where:
+        c.kind == "broadcast" and
+          ((c.status == "scheduled" and c.send_at < ^late) or
+             (c.status == "sending" and c.updated_at < ^late))
+    )
+    |> Runner.each_id(
+      config,
+      &campaign_requeued(config, Enum.map(&1, fn id -> {:broadcast, id, now} end))
+    )
+
+    from(d in Delivery,
+      join: c in Campaign,
+      on: c.id == d.campaign_id,
+      where: d.status == "queued" and d.updated_at < ^late_letters and c.status != "paused"
+    )
+    |> Runner.each_id(
+      config,
+      &campaign_requeued(config, Enum.map(&1, fn id -> {:letter, id} end))
+    )
+  end
+
+  @doc false
+  # With Oban, in the transaction of a campaign's write (Tayori.Campaigns,
+  # Tayori.Campaigns.Runner): an enrollment's job at its next time, a
+  # broadcast's at its time (one job each, moved when the time changes),
+  # and a job for each letter. Without Oban, nothing: the scheduler finds
+  # the times, and the letters go after the write (campaign_committed/3).
+  @spec campaign_written(Config.t(), [tuple()]) :: :ok
+  def campaign_written(%Config{oban: nil}, _jobs), do: :ok
+  def campaign_written(_config, []), do: :ok
+
+  def campaign_written(%Config{oban: oban} = config, jobs) do
+    check_queue(oban)
+    {letters, timed} = Enum.split_with(jobs, &match?({:letter, _}, &1))
+    Enum.each(timed, fn {kind, id, at} -> insert!(oban, {kind, id}, at) end)
+    campaign_requeued(config, letters)
+  end
+
+  @doc false
+  # With Oban, jobs for the campaigns' work, given to Oban.insert_all a
+  # chunk at a time: the letters, and what resume/2 and the sweep take up
+  # again. insert_all keeps no job unique: a second job of an enrollment
+  # or a letter finds it claimed, or done, and does nothing.
+  @spec campaign_requeued(Config.t(), [tuple()]) :: :ok
+  def campaign_requeued(%Config{oban: nil}, _jobs), do: :ok
+  def campaign_requeued(_config, []), do: :ok
+
+  def campaign_requeued(%Config{oban: oban}, jobs) do
+    jobs
+    |> Enum.map(fn
+      {:letter, _id} = job ->
+        Tayori.Worker.new(args(job), opts(job, oban))
+
+      {kind, id, at} ->
+        Tayori.Worker.new(args({kind, id}), [scheduled_at: at] ++ opts({kind, id}, oban))
+    end)
+    |> Enum.chunk_every(@insert_chunk)
+    |> Enum.each(&Oban.insert_all(oban.name, &1))
+  end
+
+  @doc false
+  # Without Oban, after resume/2: the letters of a campaign still queued,
+  # from a task, one after the other, each tried once.
+  @spec send_queued(Config.t(), Ecto.UUID.t()) :: :ok
+  def send_queued(%Config{oban: nil} = config, campaign_id) do
+    start(fn ->
+      campaign_id
+      |> Runner.queued()
+      |> Runner.each_id(config, fn ids -> Enum.each(ids, &try_once(config, {:letter, &1})) end)
+    end)
 
     :ok
-  rescue
-    error ->
-      Logger.error("Tayori could not give Oban its work at boot: " <> Exception.message(error))
-      :ok
+  end
+
+  def send_queued(_config, _campaign_id), do: :ok
+
+  @doc false
+  # Without Oban, after the write that queued them: the letters, from a
+  # task, one after the other, each tried once (a failure marks it
+  # "failed"). Options: `:inline` - sent here, in the caller's process;
+  # `:now` - the time they are sent at. With Oban, nothing: they are jobs.
+  @spec campaign_committed(Config.t(), [tuple()], keyword()) :: :ok
+  def campaign_committed(%Config{oban: nil} = config, jobs, opts),
+    do: send_letters(config, for({:letter, id} <- jobs, do: id), opts)
+
+  def campaign_committed(_config, _jobs, _opts), do: :ok
+
+  defp send_letters(_config, [], _opts), do: :ok
+
+  defp send_letters(config, ids, opts) do
+    if opts[:inline] do
+      now = Keyword.get_lazy(opts, :now, &DateTime.utc_now/0)
+      Enum.each(ids, &Runner.deliver_letter(config, &1, now, true))
+    else
+      start(fn -> Enum.each(ids, &try_once(config, {:letter, &1})) end)
+    end
+
+    :ok
   end
 
   defp unannounced?(%Entry{__meta__: %{state: :deleted}}), do: false
@@ -236,11 +402,34 @@ defmodule Tayori.Jobs do
   defp args(:schedules), do: %{"job" => "schedules"}
   defp args(:ingest), do: %{"job" => "ingest"}
   defp args({:announce, entry_id}), do: %{"job" => "announce", "entry_id" => entry_id}
+  defp args({:enrollment, id}), do: %{"job" => "enrollment", "id" => id}
+  defp args({:broadcast, id}), do: %{"job" => "broadcast", "id" => id}
+  defp args({:letter, delivery_id}), do: %{"job" => "letter", "delivery_id" => delivery_id}
+  defp args(:campaigns_cleanup), do: %{"job" => "campaigns_cleanup"}
+  defp args(:campaigns_sweep), do: %{"job" => "campaigns_sweep"}
 
   defp opts({:email, _, _}, oban), do: [queue: oban.queue, max_attempts: 5]
   defp opts({:webhook, _, _}, oban), do: [queue: oban.queue, max_attempts: 8]
   defp opts({:notify, _}, oban), do: [queue: oban.queue, max_attempts: 5]
   defp opts({:digest_email, _, _}, oban), do: [queue: oban.queue, max_attempts: 5]
+  defp opts({:letter, _}, oban), do: [queue: oban.queue, max_attempts: @letter_attempts]
+
+  # One job for each enrollment and each broadcast: a later write moves
+  # the time of the one that waits.
+  defp opts({:enrollment, _}, oban), do: once(oban, [:job, :id])
+  defp opts({:broadcast, _}, oban), do: once(oban, [:job, :id])
+
+  # One in the cluster: a node that starts moves it to now.
+  defp opts(:campaigns_sweep, oban), do: once(oban, [:job])
+
+  # One a day: a node that starts does not move it.
+  defp opts(:campaigns_cleanup, oban) do
+    [
+      queue: oban.queue,
+      max_attempts: 3,
+      unique: [period: :infinity, keys: [:job], states: [:available, :scheduled, :retryable]]
+    ]
+  end
 
   # One job for each entry, and one for the schedules: a later write moves
   # the time of the one that waits.
@@ -276,8 +465,54 @@ defmodule Tayori.Jobs do
   end
 
   @doc false
-  # Does one job, in an Oban worker or a task.
+  # Does one job, in an Oban worker or a task. `attempt` is Oban's
+  # `%{attempt: n, max_attempts: n}`: a letter that fails its last
+  # attempt is "failed" (without it, this attempt is the last).
+  @spec perform(Config.t(), map(), map()) :: :ok | {:error, term()} | {:cancel, term()}
+  def perform(config, args, attempt)
+
+  def perform(config, %{"job" => "enrollment", "id" => id}, _attempt),
+    do: Runner.advance(config, id, DateTime.utc_now())
+
+  def perform(config, %{"job" => "broadcast", "id" => id}, _attempt),
+    do: Runner.send_broadcast(config, id, DateTime.utc_now(), resume: true)
+
+  def perform(config, %{"job" => "letter", "delivery_id" => id}, attempt) do
+    last? = Map.get(attempt, :attempt, 1) >= Map.get(attempt, :max_attempts, 1)
+    Runner.deliver_letter(config, id, DateTime.utc_now(), last?)
+  end
+
+  # The events' retention, then the next day's.
+  def perform(%Config{oban: oban} = config, %{"job" => "campaigns_cleanup"}, _attempt) do
+    now = DateTime.utc_now()
+    Events.delete_old(config, now)
+
+    if oban && Config.module?(config, :campaigns),
+      do: insert!(oban, :campaigns_cleanup, DateTime.add(now, 1, :day))
+
+    :ok
+  end
+
+  # What lost its job, then the next hour's sweep.
+  def perform(%Config{oban: oban} = config, %{"job" => "campaigns_sweep"}, _attempt) do
+    now = DateTime.utc_now()
+
+    if oban && Config.module?(config, :campaigns) do
+      sweep_campaigns(config, now)
+      insert!(oban, :campaigns_sweep, DateTime.add(now, @sweep_every))
+    end
+
+    :ok
+  end
+
+  def perform(config, args, _attempt), do: perform(config, args)
+
+  @doc false
   @spec perform(Config.t(), map()) :: :ok | {:error, term()} | {:cancel, term()}
+  def perform(config, %{"job" => job} = args)
+      when job in ["enrollment", "broadcast", "letter", "campaigns_cleanup", "campaigns_sweep"],
+      do: perform(config, args, %{})
+
   def perform(config, %{"job" => "email", "entry_id" => entry, "subscriber_id" => subscriber}),
     do: Subscribers.email(config, entry, subscriber)
 
@@ -359,6 +594,7 @@ defmodule Tayori.Jobs do
 
   defp email?({:email, _, _}), do: true
   defp email?({:digest_email, _, _}), do: true
+  defp email?({:letter, _}), do: true
   defp email?(_job), do: false
 
   defp start(fun), do: Task.Supervisor.start_child(Tayori.TaskSupervisor, fun)
@@ -389,6 +625,9 @@ defmodule Tayori.Jobs do
 
   defp failed({:digest_email, _entry_ids, subscriber_id}, reason),
     do: Logger.warning("Tayori could not email #{subscriber_id}: #{inspect(reason)}")
+
+  defp failed({:letter, delivery_id}, reason),
+    do: Logger.warning("Tayori could not send the letter #{delivery_id}: #{inspect(reason)}")
 
   defp failed(:digest, reason),
     do: Logger.warning("Tayori could not make the digest: #{inspect(reason)}")

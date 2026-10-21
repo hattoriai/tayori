@@ -7,6 +7,47 @@ and Tayori follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+### Added
+
+- Modules: `:modules` in `Tayori.Config`, `[:changelog]` by default, so
+  that an app is as it was. `[:changelog, :campaigns]` runs both,
+  `[:campaigns]` only the letters. A module that is off has no admin
+  page, no route that answers, no MCP tool, no process and no job. The
+  `:features` are the changelog's.
+- The campaigns: letters to each person, by what they did, at their own
+  time (`Tayori.Campaigns`, and the [Campaigns](guides/campaigns.md)
+  guide).
+  - The audience (`Tayori.Audience`): the app's people as an Ecto query
+    on its own schemas, the facts conditions test as `dynamic`
+    expressions, their consent (`can_email?/2`). Nothing is copied.
+  - Conditions (`Tayori.Conditions`) on attributes, events and segments,
+    compiled to SQL for PostgreSQL and SQLite, checked and said in
+    words; segments, saved conditions.
+  - Events: `Tayori.track/3`, kept 400 days.
+  - Sequences: a trigger event or by hand, who may enter, steps at waits
+    after entry with a skip, a goal, a gap between letters, a number of
+    days; start, pause, resume, archive. Broadcasts: one letter to a
+    segment, now or at a time.
+  - Letters in each language with merge tags and fallbacks, a button, a
+    preheader, the sender's name and reply-to; a link to unsubscribe
+    and one-click unsubscribing; suppressions by purpose.
+  - The mount `tayori_mail`: the page to unsubscribe and the mail
+    providers' webhooks: Resend, Postmark, or an adapter of
+    `Tayori.Campaigns.Provider`.
+  - With Oban, a job for each person's next step, each broadcast and
+    each letter; without, the scheduler.
+  - The admin: Campaigns and Audience, a condition builder with live
+    counts, the editor of a sequence's steps, the preview of a letter
+    for a person, a test letter, results by step.
+  - MCP: the campaigns' tools, in three scopes
+    (`tayori:campaigns:read`, `:write`, `:send`): read the audience, try
+    and save segments, write campaigns and their letters, preview and
+    test, start, take people in (`enroll_people`) and send only when
+    asked, at the count expected.
+  - `Tayori.Test`: `track!/3`, `run_campaigns!/2`, `post_webhook!/2`.
+- `Tayori.Migrations` version 2: the campaigns' tables, made whatever
+  the modules. `mix tayori.gen.migration` writes the upgrade.
+
 ## [0.3.0] - 2026-10-21
 
 ### Added

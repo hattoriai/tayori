@@ -6,11 +6,33 @@ defmodule Tayori.Admin.Auth do
   # the mount, and stops those who may not see the admin. It keeps the
   # count of the inbox's new changes for the bar, as the pages that follow
   # Tayori's events hear of them.
+  #
+  # The pages of a module that is off are not there: a 404, as for an
+  # admin who may not see the admin. Without the changelog, the admin's
+  # first page is the campaigns; without the campaigns, their pages and
+  # the audience's are not there.
+
+  use PhoenixMountable.Path, mountable: Tayori.Router
 
   import Phoenix.Component, only: [assign: 2]
   import Phoenix.LiveView
 
+  alias Tayori.Admin.{
+    AudienceLive,
+    CampaignLive,
+    CampaignsLive,
+    CategoriesLive,
+    EntriesLive,
+    EntryLive,
+    InboxLive,
+    SegmentLive
+  }
+
+  alias Tayori.Config
   alias Tayori.Router.Page
+
+  @changelog [EntriesLive, EntryLive, InboxLive, CategoriesLive]
+  @campaigns [AudienceLive, SegmentLive, CampaignsLive, CampaignLive]
 
   def on_mount(:default, _params, session, socket) do
     options = socket.assigns.mount.options
@@ -25,13 +47,19 @@ defmodule Tayori.Admin.Auth do
         access: session["access"],
         time_zone: time_zone(socket),
         locale: locale(socket),
-        config: Tayori.Config.get()
+        config: Config.get()
       )
 
+    changelog? = Config.module?(socket.assigns.config, :changelog)
+
     case socket.assigns.access do
+      access when access in [:all, :read_only] and not changelog? ->
+        socket |> campaigns!() |> without_changelog()
+
       access when access in [:all, :read_only] ->
         {:cont,
          socket
+         |> campaigns!()
          |> assign(inbox_new: Tayori.Inbox.pending_count())
          |> attach_hook(:tayori_inbox, :handle_info, &count_inbox/2)}
 
@@ -40,6 +68,21 @@ defmodule Tayori.Admin.Auth do
 
       _forbidden ->
         raise Tayori.Admin.NotFound
+    end
+  end
+
+  # The campaigns' pages, only with the campaigns.
+  defp campaigns!(socket) do
+    if socket.view in @campaigns and not Config.module?(socket.assigns.config, :campaigns),
+      do: raise(Tayori.Admin.NotFound),
+      else: socket
+  end
+
+  defp without_changelog(socket) do
+    cond do
+      socket.view == EntriesLive -> {:halt, redirect(socket, to: ~m"/campaigns")}
+      socket.view in @changelog -> raise Tayori.Admin.NotFound
+      true -> {:cont, assign(socket, inbox_new: 0)}
     end
   end
 

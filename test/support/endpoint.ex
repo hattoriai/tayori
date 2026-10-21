@@ -137,6 +137,17 @@ defmodule TayoriTest.Host do
            tayori_api "/news", resolver: TayoriTest.Resolver, as: :tayori_machines
          end
 
+         # The campaigns' letters, as Tayori.Campaigns.Mount says: no
+         # session, no CSRF protection; the links are signed.
+         pipeline :letters do
+           plug :accepts, ["html", "json"]
+         end
+
+         scope "/" do
+           pipe_through :letters
+           tayori_mail("/letters")
+         end
+
          # The API for the :embed feature, as the guide mounts it: no
          # CSRF protection, the readers come with a token.
          pipeline :embed do

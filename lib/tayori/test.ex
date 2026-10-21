@@ -20,6 +20,34 @@ defmodule Tayori.Test do
   The entries are written in the app's test database, through
   `Tayori.Entries`, so Tayori must be in the app's supervision tree in the
   tests too (it is when the app starts).
+
+  ## Campaigns
+
+  With the `:campaigns` module, a test tracks what a person did, then
+  runs the campaigns at a time of its own, and reads the letters with
+  `Swoosh.TestAssertions`:
+
+      import Swoosh.TestAssertions
+
+      test "the welcome, then the tips two days later" do
+        user = user_fixture()
+        now = DateTime.utc_now()
+
+        track!("user:\#{user.id}", "signed_up", at: now)
+        run_campaigns!(now)
+        assert_email_sent(subject: "Welcome to Atelier")
+
+        run_campaigns!(DateTime.add(now, 2, :day))
+        assert_email_sent(subject: "Three things to try")
+      end
+
+    * `track!/3` - an event, as `Tayori.track/3`, at a time (`:at`).
+    * `run_campaigns!/2` - what is due at a time: the people of the
+      sequences whose time came are advanced, the broadcasts whose time
+      came are sent, and their letters go through the app's mailer, in
+      the test's process, with or without Oban.
+    * `post_webhook!/2` - a mail provider's payload, as if the provider
+      had posted it (its signature aside): a bounce, a complaint.
   """
 
   @compile {:no_warn_undefined, [LazyHTML]}
@@ -27,6 +55,7 @@ defmodule Tayori.Test do
   import ExUnit.Assertions
 
   alias Phoenix.LiveViewTest
+  alias Tayori.Campaigns.{Runner, Webhooks}
 
   @doc """
   Writes and publishes an entry, in the first language. Options:
@@ -138,4 +167,74 @@ defmodule Tayori.Test do
   end
 
   defp html(view), do: view |> LiveViewTest.render() |> LazyHTML.from_fragment()
+
+  # ── Campaigns ───────────────────────────────────────────────────
+
+  @doc """
+  Tracks an event of a person, as `Tayori.track/3`: the active sequences
+  it triggers take them in. Options: `:meta`, `:at` (now). Raises without
+  the `:campaigns` module.
+  """
+  @spec track!(String.t(), String.t(), keyword()) :: :ok
+  def track!(person_id, name, opts \\ []) do
+    campaigns!()
+    :ok = Tayori.track(person_id, name, opts)
+  end
+
+  @doc """
+  Runs the campaigns at a time (now), in the test's process: each person
+  whose time came is advanced, and gets the letters due then; each
+  broadcast whose time came is sent. The letters go through the app's
+  mailer at once, with or without Oban, so that `Swoosh.TestAssertions`
+  sees them.
+
+  Options: `:batch_size` - the people of a broadcast read at a time
+  (500).
+
+      run_campaigns!(DateTime.add(signed_up_at, 2, :day))
+      assert_email_sent(subject: "Your first project")
+  """
+  @spec run_campaigns!(DateTime.t(), keyword()) :: :ok
+  def run_campaigns!(at \\ DateTime.utc_now(), opts \\ []) do
+    config = campaigns!()
+    opts = Keyword.take(opts, [:batch_size]) ++ [inline: true, resume: true]
+    Runner.run_due(%{config | oban: nil}, at, opts)
+  end
+
+  @doc """
+  Hands a payload to a mail provider of the `:providers` of `:campaigns`
+  (`:resend`, `:postmark` or the app's own), as if the provider had
+  posted it to its webhook, its signature aside: a hard bounce or a
+  complaint suppresses the address. Returns how many events it had.
+
+      post_webhook!(:resend, %{
+        "type" => "email.bounced",
+        "data" => %{"email_id" => "re_1", "to" => ["ada@example.com"]}
+      })
+
+      assert Tayori.Campaigns.suppressed?("ada@example.com", :product)
+  """
+  @spec post_webhook!(atom() | String.t(), map()) :: non_neg_integer()
+  def post_webhook!(provider, payload) when is_map(payload) do
+    config = campaigns!()
+
+    case Webhooks.provider(config, to_string(provider)) do
+      {module, _opts} ->
+        Webhooks.handle(config, module, payload)
+
+      nil ->
+        raise ArgumentError,
+              "Tayori.Test: #{inspect(provider)} is not in the :providers of :campaigns"
+    end
+  end
+
+  defp campaigns! do
+    config = Tayori.Config.get()
+
+    unless Tayori.Config.module?(config, :campaigns) do
+      raise ArgumentError, "Tayori.Test: the :campaigns module is off"
+    end
+
+    config
+  end
 end

@@ -31,11 +31,33 @@ defmodule Tayori.Config do
       any language, so Tayori names none: a language without a name shows
       its tag.
     * `:prefix` - the schema of the tables, in PostgreSQL.
+    * `:modules` - what Tayori does for the app: `:changelog`, the news
+      for everyone, and `:campaigns`, letters to each person by what they
+      did (`[:changelog]`). A module that is off has no admin page, no
+      route, no MCP tool, no process and no job.
+    * `:campaigns` - the `:campaigns` module (required with it):
+        * `:audience` - the app's `Tayori.Audience`, who its people are
+          (required).
+        * `:url` - the address where `tayori_mail` is mounted
+          (`"https://atelier.app/letters"`), for the links of the letters
+          (required).
+        * `:from` - who the letters are from: `{"Rui at Atelier", "rui@atelier.app"}`
+          or an address (`:email_from` when not given; one is required).
+        * `:reply_to` - the address replies go to.
+        * `:providers` - the webhooks of the mail provider, for bounces
+          and complaints, by name: the options of a built-in one
+          (`resend: [secret: "whsec_..."]`, `postmark: [username: "u", password: "p"]`),
+          or the app's own module of `Tayori.Campaigns.Provider` with its
+          options (`ses: {MyApp.TayoriSES, topic_arn: "..."}`).
+        * `:keep_events_days` - how long the events are kept (400).
+
+      The module also needs `:mailer` and `:secret_key_base`, which signs
+      the links to unsubscribe.
     * `:notifier` - a module of the `Tayori.Notifier` behaviour, told of
       each entry once, when it is published.
-    * `:features` - the extras the app wants, none by default; the
-      changelog itself is always there. A feature that is off has no
-      admin page, no route, no element and no process:
+    * `:features` - the extras of the changelog the app wants, none by
+      default (only with the `:changelog` module). A feature that is off
+      has no admin page, no route, no element and no process:
         * `:reactions` - readers react to an entry with an emoji.
         * `:announcements` - an entry shown as a popup, a toast or a
           banner in the app, until a date.
@@ -125,6 +147,7 @@ defmodule Tayori.Config do
   """
 
   @features [:reactions, :announcements, :analytics, :subscriptions, :webhooks, :embed]
+  @modules [:changelog, :campaigns]
   @reactions ["👍", "🎉", "❤️", "🚀", "👀"]
 
   @enforce_keys [:repo, :pubsub]
@@ -144,6 +167,8 @@ defmodule Tayori.Config do
     :emails,
     :embed,
     :mcp,
+    :campaigns,
+    modules: [:changelog],
     scheduler: true,
     locales: ["en"],
     locale_names: %{},
@@ -167,6 +192,8 @@ defmodule Tayori.Config do
           emails: emails(),
           embed: %{origins: [String.t(), ...], max_age: pos_integer()} | nil,
           mcp: mcp() | nil,
+          campaigns: campaigns() | nil,
+          modules: [module_name(), ...],
           scheduler: boolean(),
           locales: [String.t(), ...],
           locale_names: %{String.t() => String.t()},
@@ -178,6 +205,9 @@ defmodule Tayori.Config do
   @type feature ::
           :reactions | :announcements | :analytics | :subscriptions | :webhooks | :embed
 
+  @typedoc "What Tayori does for the app."
+  @type module_name :: :changelog | :campaigns
+
   @key {Tayori, :config}
 
   @doc "Builds the config from the options of the child, and checks them."
@@ -185,7 +215,9 @@ defmodule Tayori.Config do
   def new(opts) do
     repo = Keyword.get(opts, :repo) || raise ArgumentError, "Tayori needs the :repo option"
     pubsub = Keyword.get(opts, :pubsub) || raise ArgumentError, "Tayori needs the :pubsub option"
+    modules = modules(Keyword.get(opts, :modules, [:changelog]))
     features = features(Keyword.get(opts, :features, []))
+    check_modules(modules, features, opts)
     check_dependencies(features, opts)
     {locales, locale_names} = locales(Keyword.get(opts, :locales, ["en"]))
 
@@ -196,6 +228,8 @@ defmodule Tayori.Config do
       emails: emails(Keyword.get(opts, :emails, [])),
       embed: embed(opts[:embed]),
       mcp: mcp(opts[:mcp]),
+      modules: modules,
+      campaigns: if(:campaigns in modules, do: campaigns(opts[:campaigns], opts[:email_from])),
       mailer: opts[:mailer],
       email_from: opts[:email_from],
       page_url: opts[:page_url] && String.trim_trailing(opts[:page_url], "/"),
@@ -254,6 +288,41 @@ defmodule Tayori.Config do
     end
 
     Enum.uniq(features)
+  end
+
+  defp modules(modules) do
+    unless is_list(modules) and modules != [] and Enum.all?(modules, &(&1 in @modules)) do
+      raise ArgumentError,
+            ":modules must be a list of #{inspect(@modules)}, got: #{inspect(modules)}"
+    end
+
+    Enum.uniq(modules)
+  end
+
+  # The features are the changelog's; the campaigns send letters, signed
+  # to unsubscribe.
+  defp check_modules(modules, features, opts) do
+    if features != [] and :changelog not in modules do
+      raise ArgumentError,
+            ":features are the changelog's: add :changelog to :modules, or remove " <>
+              inspect(features)
+    end
+
+    if :campaigns in modules do
+      for key <- [:mailer, :secret_key_base], opts[key] == nil do
+        raise ArgumentError, "the :campaigns module needs the #{inspect(key)} option"
+      end
+
+      unless Code.ensure_loaded?(Swoosh.Email) do
+        raise ArgumentError, "the :campaigns module needs the :swoosh dependency"
+      end
+
+      if opts[:campaigns] == nil do
+        raise ArgumentError,
+              "the :campaigns module needs the :campaigns option, with the audience and the " <>
+                ~s(address of the letters: campaigns: [audience: MyApp.TayoriAudience, url: "https://example.com/letters"])
+      end
+    end
   end
 
   defp reactions(reactions) do
@@ -349,6 +418,9 @@ defmodule Tayori.Config do
   def option(:oban, %{name: _, queue: _} = oban), do: oban
   def option(:oban, value), do: oban(value)
   def option(:locales, value), do: locales(value)
+  def option(:modules, value), do: modules(value)
+  def option(:campaigns, nil), do: nil
+  def option(:campaigns, value), do: campaigns(value, nil)
   def option(_key, value), do: value
 
   @typedoc "The `:inbox` option, checked."
@@ -556,6 +628,162 @@ defmodule Tayori.Config do
   defp upload_url(other),
     do: raise(ArgumentError, ":upload_url of :mcp must be a string, got: #{inspect(other)}")
 
+  @typedoc "The `:campaigns` option, checked."
+  @type campaigns :: %{
+          audience: module(),
+          url: String.t(),
+          from: String.t() | {String.t(), String.t()},
+          reply_to: String.t() | nil,
+          providers: %{atom() => {module(), map()}},
+          keep_events_days: pos_integer()
+        }
+
+  @campaigns_keys [:audience, :url, :from, :reply_to, :providers, :keep_events_days]
+
+  defp campaigns(opts, email_from) when is_list(opts) do
+    case Keyword.split(opts, @campaigns_keys) do
+      {opts, []} ->
+        %{
+          audience: audience(opts[:audience]),
+          url: campaigns_url(opts[:url]),
+          from: from(opts[:from] || email_from),
+          reply_to: reply_to(opts[:reply_to]),
+          providers: providers(Keyword.get(opts, :providers, [])),
+          keep_events_days: keep_events_days(Keyword.get(opts, :keep_events_days, 400))
+        }
+
+      {_opts, other} ->
+        raise ArgumentError,
+              ":campaigns takes #{Enum.map_join(@campaigns_keys, ", ", &inspect/1)}, " <>
+                "got: #{inspect(Keyword.keys(other))}"
+    end
+  end
+
+  defp campaigns(other, _email_from),
+    do: raise(ArgumentError, ":campaigns must be a keyword list, got: #{inspect(other)}")
+
+  defp audience(audience) when is_atom(audience) and audience != nil do
+    unless Code.ensure_loaded?(audience) and function_exported?(audience, :query, 0) and
+             function_exported?(audience, :where_ids, 2) and
+             function_exported?(audience, :recipient, 1) do
+      raise ArgumentError,
+            ":audience of :campaigns must be a Tayori.Audience, got: #{inspect(audience)}"
+    end
+
+    audience
+  end
+
+  defp audience(other) do
+    raise ArgumentError,
+          ":campaigns needs :audience, the app's Tayori.Audience, got: #{inspect(other)}"
+  end
+
+  defp campaigns_url(url) when is_binary(url) do
+    case URI.parse(url) do
+      %URI{scheme: scheme, host: host, query: nil}
+      when scheme in ["http", "https"] and host not in [nil, ""] ->
+        String.trim_trailing(url, "/")
+
+      _ ->
+        raise ArgumentError,
+              ":url of :campaigns must be an http(s) address, with no query, got: #{inspect(url)}"
+    end
+  end
+
+  defp campaigns_url(other) do
+    raise ArgumentError,
+          ":campaigns needs :url, the address where tayori_mail is mounted, got: #{inspect(other)}"
+  end
+
+  defp from({name, address} = from) when is_binary(name) and is_binary(address) do
+    if address?(address), do: from, else: bad_from(from)
+  end
+
+  defp from(address) when is_binary(address) do
+    if address?(address), do: address, else: bad_from(address)
+  end
+
+  defp from(nil) do
+    raise ArgumentError,
+          "the :campaigns module needs who the letters are from: :from of :campaigns, " <>
+            "or :email_from"
+  end
+
+  defp from(other), do: bad_from(other)
+
+  defp bad_from(other) do
+    raise ArgumentError,
+          ~s(:from of :campaigns must be an address or {"Name", "address"}, got: #{inspect(other)})
+  end
+
+  defp reply_to(nil), do: nil
+
+  defp reply_to(address) when is_binary(address) do
+    if address?(address),
+      do: address,
+      else: raise(ArgumentError, ":reply_to of :campaigns must be an address")
+  end
+
+  defp reply_to(other),
+    do: raise(ArgumentError, ":reply_to of :campaigns must be an address, got: #{inspect(other)}")
+
+  defp address?(address), do: address =~ ~r/\A[^\s@]+@[^\s@]+\z/
+
+  # Each provider by the last part of its webhook's path: a built-in's
+  # options, or the app's own module of Tayori.Campaigns.Provider with its
+  # options. The built-ins are named by atom: they are Tayori's own.
+  defp providers(providers) when is_list(providers), do: Map.new(providers, &provider/1)
+
+  defp providers(other) do
+    raise ArgumentError,
+          ":providers of :campaigns must be a keyword list, got: #{inspect(other)}"
+  end
+
+  defp provider({:resend, opts}) when is_list(opts) do
+    secret = opts[:secret]
+
+    unless is_binary(secret) and String.starts_with?(secret, "whsec_") do
+      raise ArgumentError, ~s(:resend of :providers needs [secret: "whsec_..."])
+    end
+
+    {:resend, {:"Elixir.Tayori.Campaigns.Providers.Resend", %{secret: secret}}}
+  end
+
+  defp provider({:postmark, opts}) when is_list(opts) do
+    unless is_binary(opts[:username]) and is_binary(opts[:password]) do
+      raise ArgumentError, ~s(:postmark of :providers needs [username: "...", password: "..."])
+    end
+
+    {:postmark,
+     {:"Elixir.Tayori.Campaigns.Providers.Postmark",
+      %{username: opts[:username], password: opts[:password]}}}
+  end
+
+  defp provider({name, {module, opts}})
+       when is_atom(name) and is_atom(module) and is_list(opts) do
+    unless Code.ensure_loaded?(module) and function_exported?(module, :verify, 3) and
+             function_exported?(module, :events, 1) do
+      raise ArgumentError,
+            "#{inspect(module)} of :providers is not a Tayori.Campaigns.Provider: " <>
+              "it needs verify/3 and events/1"
+    end
+
+    {name, {module, Map.new(opts)}}
+  end
+
+  defp provider(other) do
+    raise ArgumentError,
+          ":providers of :campaigns takes resend: [...], postmark: [...] or " <>
+            "name: {MyApp.Provider, opts}, got: #{inspect(other)}"
+  end
+
+  defp keep_events_days(days) when is_integer(days) and days > 0, do: days
+
+  defp keep_events_days(other) do
+    raise ArgumentError,
+          ":keep_events_days of :campaigns must be a positive integer, got: #{inspect(other)}"
+  end
+
   defp oban(nil), do: nil
   defp oban(name) when is_atom(name), do: oban(name: name)
 
@@ -613,6 +841,15 @@ defmodule Tayori.Config do
   @spec feature?(t(), feature()) :: boolean()
   def feature?(%__MODULE__{features: features}, feature) when feature in @features,
     do: feature in features
+
+  @doc "All the modules of Tayori."
+  @spec modules() :: [module_name()]
+  def modules, do: @modules
+
+  @doc "Whether the app turned a module on."
+  @spec module?(t(), module_name()) :: boolean()
+  def module?(%__MODULE__{modules: modules}, module) when module in @modules,
+    do: module in modules
 
   @doc "The language every entry has."
   @spec default_locale(t()) :: String.t()

@@ -36,3 +36,28 @@ fill them.
 
 Jumon and Kotoba test their build task (`test/mix/*_build_test.exs`,
 tagged :build); Tayori's build task has no tests of its own yet.
+
+## Campaigns, after the first
+
+The campaigns' first version sends letters, step by step. Next:
+
+* **Branches and waits for an event.** A step that waits until a person
+  does something (or a time passes), and paths by a condition.
+* **Other actions.** An announcement in the app, or a webhook, as a
+  step, beside the letters.
+* **The app's own actions and triggers.** A step that calls the app's
+  code, and triggers the app defines beyond events.
+* **A dry run for a person.** What a sequence would send them, and when,
+  from where they are.
+* **Click tracking.** Links through Tayori, counted per step; opens stay
+  out.
+* **A cap across campaigns.** At most so many letters a person gets in
+  a week, whatever the sequences.
+* **Quiet hours and time zones.** A letter waits for a person's
+  morning.
+* **Entry on joining a segment.** A sequence for those who come to
+  match a condition, without an event.
+* **Re-entry.** A sequence a person may go through again, after a time.
+* **More providers.** Amazon SES, Mailgun, SendGrid built in, beside
+  Resend and Postmark.
+* **A canvas.** The steps drawn as a flow, once there are branches.
