@@ -108,6 +108,12 @@ defmodule Tayori.Router do
     live "/inbox", Tayori.Admin.InboxLive, :index
     live "/categories", Tayori.Admin.CategoriesLive, :index
     live "/settings", Tayori.Admin.SettingsLive, :index
+    live "/audience", Tayori.Admin.AudienceLive, :index
+    live "/audience/new", Tayori.Admin.SegmentLive, :new
+    live "/audience/:id", Tayori.Admin.SegmentLive, :edit
+    live "/campaigns", Tayori.Admin.CampaignsLive, :index
+    live "/campaigns/new", Tayori.Admin.CampaignLive, :new
+    live "/campaigns/:id", Tayori.Admin.CampaignLive, :edit
     live "/:id", Tayori.Admin.EntryLive, :edit
   end
 

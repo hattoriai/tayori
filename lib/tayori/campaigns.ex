@@ -864,6 +864,54 @@ defmodule Tayori.Campaigns do
     }
   end
 
+  @doc """
+  The numbers of a list of campaigns, by id, in two queries: how many
+  people `:entered` each and reached its `:goal`, its `:recipients` (the
+  letters it made, as `results/1` counts them) and its letters `:sent`.
+  """
+  @spec counts([Campaign.t()]) :: %{
+          String.t() => %{
+            entered: non_neg_integer(),
+            goal: non_neg_integer(),
+            recipients: non_neg_integer(),
+            sent: non_neg_integer()
+          }
+        }
+  def counts([]), do: %{}
+
+  def counts(campaigns) when is_list(campaigns) do
+    config = Config.get()
+    ids = Enum.map(campaigns, fn %Campaign{id: id} -> id end)
+    zero = Map.new(ids, &{&1, %{entered: 0, goal: 0, recipients: 0, sent: 0}})
+
+    enrollments =
+      from(e in Enrollment,
+        where: e.campaign_id in ^ids,
+        group_by: [e.campaign_id, e.state, e.reason],
+        select: {e.campaign_id, e.state, e.reason, count(e.id)}
+      )
+      |> config.repo.all(prefix: config.prefix)
+
+    deliveries =
+      from(d in Delivery,
+        where: d.campaign_id in ^ids,
+        group_by: [d.campaign_id, d.status],
+        select: {d.campaign_id, d.status, count(d.id)}
+      )
+      |> config.repo.all(prefix: config.prefix)
+
+    counts =
+      Enum.reduce(enrollments, zero, fn {id, state, reason, n}, acc ->
+        goal = if state == "completed" and reason == "goal", do: n, else: 0
+        Map.update!(acc, id, &%{&1 | entered: &1.entered + n, goal: &1.goal + goal})
+      end)
+
+    Enum.reduce(deliveries, counts, fn {id, status, n}, acc ->
+      sent = if status == "sent", do: n, else: 0
+      Map.update!(acc, id, &%{&1 | recipients: &1.recipients + n, sent: &1.sent + sent})
+    end)
+  end
+
   defp statuses(counts) do
     Map.new(@statuses, fn {status, key} -> {key, Map.get(counts, status, 0)} end)
   end

@@ -88,7 +88,7 @@ defmodule Tayori.Admin.Components do
   attr :label, :string, required: true
   attr :type, :string, default: "text"
   attr :hint, :string, default: nil
-  attr :rest, :global, include: ~w(disabled placeholder rows maxlength autocomplete)
+  attr :rest, :global, include: ~w(disabled placeholder rows maxlength autocomplete min max step)
 
   @doc "A labelled input with its errors."
   def input(%{type: "textarea"} = assigns) do

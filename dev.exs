@@ -1,7 +1,8 @@
 # The Tayori development server: `mix dev`, then http://localhost:4099.
 #
 # One Phoenix endpoint with a small app ("Atelier", a studio's project
-# tool) and its news: the admin at /admin/news (Tayori's theme) and
+# tool), its news and its campaigns (letters to its people, a table of
+# its own in the same database): the admin at /admin/news (Tayori's theme) and
 # /sumi/news (the Sumi theme), the news in the app at /, the public page
 # at /changelog, and /elsewhere, a site on another origin with the news
 # (the :embed feature: localhost and 127.0.0.1 are two origins). The entries are in SQLite (tmp/dev.sqlite3), the
@@ -75,8 +76,134 @@ defmodule TayoriDev.Migration do
   def down, do: Tayori.Migrations.down(to: 0)
 end
 
-# Atelier's news: eight entries with screenshots, in dev/seeds.exs.
+defmodule TayoriDev.CampaignsMigration do
+  @moduledoc false
+  # The campaigns' tables, and Atelier's people, whom they write to.
+  use Ecto.Migration
+
+  def up do
+    Tayori.Migrations.up(version: 2)
+
+    create table(:atelier_people) do
+      add :name, :string
+      add :email, :string
+      add :locale, :string
+      add :plan, :string
+      add :projects, :integer, null: false, default: 0
+      add :marketing, :boolean, null: false, default: false
+      add :closed_at, :utc_datetime_usec
+      add :inserted_at, :utc_datetime_usec, null: false
+    end
+  end
+
+  def down do
+    drop table(:atelier_people)
+    Tayori.Migrations.down(to: 1)
+  end
+end
+
+defmodule TayoriDev.Person do
+  @moduledoc "A person of Atelier: the campaigns write to them."
+  use Ecto.Schema
+
+  schema "atelier_people" do
+    field :name, :string
+    field :email, :string
+    field :locale, :string
+    field :plan, :string
+    field :projects, :integer, default: 0
+    field :marketing, :boolean, default: false
+    field :closed_at, :utc_datetime_usec
+    field :inserted_at, :utc_datetime_usec
+  end
+end
+
+defmodule TayoriDev.Audience do
+  @moduledoc "Atelier's people, as the campaigns see them: those whose account is open."
+  @behaviour Tayori.Audience
+
+  import Ecto.Query
+
+  alias Tayori.Audience
+  alias TayoriDev.Person
+
+  @impl true
+  def query, do: from(p in Person, as: :person, where: is_nil(p.closed_at))
+
+  @impl true
+  def where_ids(query, ids) do
+    ids = for "person:" <> id <- ids, {id, ""} <- [Integer.parse(id)], do: id
+    where(query, [person: p], p.id in ^ids)
+  end
+
+  @impl true
+  def recipient(%Person{} = person) do
+    %Tayori.Recipient{
+      id: "person:#{person.id}",
+      email: person.email,
+      name: person.name,
+      locale: person.locale,
+      since: person.inserted_at,
+      data: %{
+        "first_name" => person.name |> String.split() |> List.first(),
+        "plan" => person.plan,
+        "dashboard_url" => "http://localhost:#{System.get_env("PORT", "4099")}/",
+        "marketing" => person.marketing
+      }
+    }
+  end
+
+  @impl true
+  def person_id, do: dynamic([person: p], fragment("'person:' || CAST(? AS TEXT)", p.id))
+
+  @impl true
+  def attributes do
+    [
+      Audience.attribute(:name, "Name", :string, dynamic([person: p], p.name)),
+      Audience.attribute(:email, "Email", :string, dynamic([person: p], p.email)),
+      Audience.attribute(
+        :plan,
+        "Plan",
+        {:enum, [{"free", "Free"}, {"pro", "Pro"}, {"studio", "Studio"}]},
+        dynamic([person: p], p.plan)
+      ),
+      Audience.attribute(:projects, "Projects", :integer, dynamic([person: p], p.projects),
+        description: "How many projects they made."
+      ),
+      Audience.attribute(
+        :signed_up_at,
+        "Signed up",
+        :datetime,
+        dynamic([person: p], p.inserted_at)
+      ),
+      Audience.attribute(
+        :marketing,
+        "Takes news and offers",
+        :boolean,
+        dynamic([person: p], p.marketing)
+      ),
+      Audience.attribute(:locale, "Language", :string, dynamic([person: p], p.locale))
+    ]
+  end
+
+  @impl true
+  def events do
+    [
+      {"signed_up", "Signed up"},
+      {"project_created", "Made a project"},
+      {"invited_teammate", "Invited a teammate"}
+    ]
+  end
+
+  @impl true
+  def can_email?(%Tayori.Recipient{data: data}, :marketing), do: data["marketing"] == true
+  def can_email?(_recipient, :product), do: true
+end
+
+# Atelier's news: eight entries with screenshots, in dev/seeds.exs; its
+# people, segments and campaigns in dev/campaign_seeds.exs.
 Code.require_file("dev/seeds.exs", __DIR__)
+Code.require_file("dev/campaign_seeds.exs", __DIR__)
 
 defmodule TayoriDev.Mailer do
   @moduledoc "Atelier's mailer: the emails stay in memory, at /dev/mailbox."
@@ -632,6 +759,17 @@ defmodule TayoriDev.Router do
     )
   end
 
+  # The campaigns' letters: the page to unsubscribe, and the mail
+  # providers' webhooks. No session, no CSRF token.
+  pipeline :letters do
+    plug :accepts, ["html", "json"]
+  end
+
+  scope "/" do
+    pipe_through :letters
+    tayori_mail("/letters")
+  end
+
   scope "/dev" do
     pipe_through :browser
     forward "/mailbox", Plug.Swoosh.MailboxPreview
@@ -716,7 +854,14 @@ Task.async(fn ->
 
   # The tables first, then Tayori, whose scheduler reads them at once.
   {:ok, _pid} = TayoriDev.Repo.start_link()
-  Ecto.Migrator.run(TayoriDev.Repo, [{0, TayoriDev.Migration}], :up, all: true, log: false)
+
+  Ecto.Migrator.run(
+    TayoriDev.Repo,
+    [{0, TayoriDev.Migration}, {1, TayoriDev.CampaignsMigration}],
+    :up,
+    all: true,
+    log: false
+  )
 
   {:ok, _pid} =
     Supervisor.start_link(
@@ -731,6 +876,16 @@ Task.async(fn ->
          embed: [origins: ["http://localhost:#{port}", "http://127.0.0.1:#{port}"]],
          mailer: TayoriDev.Mailer,
          email_from: {"Atelier", "news@atelier.test"},
+         modules: [:changelog, :campaigns],
+         campaigns: [
+           audience: TayoriDev.Audience,
+           url: "http://localhost:#{port}/letters",
+           from: {"Hanzo at Atelier", "hanzo@atelier.test"},
+           reply_to: "hanzo@atelier.test",
+           providers: [
+             resend: [secret: "whsec_" <> Base.encode64("atelier-development-signing-key")]
+           ]
+         ],
          page_url: "http://localhost:#{port}/changelog",
          inbox: [
            sources: [
@@ -750,6 +905,7 @@ Task.async(fn ->
     )
 
   TayoriDev.Seeds.run()
+  TayoriDev.CampaignSeeds.run()
 
   IO.puts("Tayori development server: http://localhost:#{port}")
   Process.sleep(:infinity)

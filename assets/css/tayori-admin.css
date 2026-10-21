@@ -2367,6 +2367,661 @@ select.ta-input {
 
 /* ── Small screens, touch, motion, contrast ─────────────────────── */
 
+/* ── Campaigns: the condition builder ──────────────────────────── */
+
+.ta-conditions {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.ta-conditions-fieldset {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.ta-conditions-fieldset > legend {
+  margin-bottom: 0.25rem;
+  padding: 0;
+}
+
+.ta-cond-group {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid var(--tayori-rule);
+  border-radius: var(--tayori-radius);
+  background: color-mix(in oklab, var(--tayori-surface) 55%, var(--ta-card));
+}
+
+.ta-cond-subgroup {
+  border-left: 2px solid color-mix(in oklab, var(--tayori-accent) 45%, var(--tayori-rule));
+  background: var(--ta-card);
+}
+
+.ta-cond-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ta-cond-head select.ta-input {
+  width: auto;
+  min-height: 2rem;
+  padding-block: 0.25rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.ta-cond-list {
+  display: grid;
+  gap: 0.375rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ta-cond-none {
+  padding: 0.25rem 0.125rem;
+}
+
+.ta-cond-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-left: -0.375rem;
+}
+
+.ta-rule {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.375rem 0.375rem 0.5rem;
+  border: 1px solid var(--tayori-rule);
+  border-radius: var(--tayori-radius);
+  background: var(--ta-card);
+}
+
+.ta-rule .ta-input {
+  width: auto;
+  min-width: 0;
+  min-height: 2rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+}
+
+.ta-rule select.ta-input {
+  padding-right: 1.75rem;
+}
+
+.ta-rule-subject {
+  max-width: 14rem;
+}
+
+.ta-rule-value {
+  flex: 1 1 9rem;
+}
+
+.ta-rule .ta-rule-number {
+  flex: 0 0 5.5rem;
+  width: 5.5rem;
+}
+
+.ta-rule-unit {
+  color: var(--tayori-muted);
+  font-size: 0.8125rem;
+}
+
+.ta-rule-check {
+  align-items: center;
+  padding: 0 0.25rem;
+}
+
+.ta-rule-picks {
+  display: flex;
+  flex: 1 1 12rem;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.ta-rule-pick {
+  display: inline-flex;
+  align-items: center;
+  height: 1.75rem;
+  padding: 0 0.625rem;
+  border: 1px solid var(--tayori-border);
+  border-radius: 999px;
+  color: var(--tayori-muted);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    border-color var(--tayori-transition),
+    background-color var(--tayori-transition),
+    color var(--tayori-transition);
+}
+
+.ta-rule-pick input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ta-rule-pick:hover {
+  color: var(--tayori-text);
+}
+
+.ta-rule-pick:has(:checked) {
+  border-color: color-mix(in oklab, var(--tayori-accent) 55%, transparent);
+  background: color-mix(in oklab, var(--tayori-accent) 11%, transparent);
+  color: color-mix(in oklab, var(--tayori-accent) 80%, var(--tayori-text));
+}
+
+.ta-rule-pick:has(:focus-visible) {
+  box-shadow: var(--tayori-focus-ring);
+}
+
+.ta-rule-remove {
+  margin-left: auto;
+}
+
+.ta-rule-raw {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ta-conditions-result {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.ta-conditions-sentence {
+  margin: 0;
+  padding-left: 0.75rem;
+  border-left: 2px solid var(--tayori-rule);
+  color: color-mix(in oklab, var(--tayori-text) 85%, var(--tayori-muted));
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.ta-conditions-errors {
+  display: grid;
+  gap: 0.125rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ta-conditions-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.ta-conditions-count .tayori-icon {
+  --tayori-icon-size: 15px;
+  color: var(--tayori-muted);
+}
+
+.ta-people {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--tayori-rule);
+  border-radius: var(--tayori-radius);
+  list-style: none;
+}
+
+.ta-people li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.125rem 1rem;
+  padding: 0.4375rem 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.ta-people li + li {
+  border-top: 1px solid var(--tayori-rule);
+}
+
+.ta-people-name {
+  font-weight: 500;
+}
+
+/* ── Campaigns: the audience and the lists ─────────────────────── */
+
+.ta-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.ta-table th,
+.ta-table td {
+  padding: 0.5rem 0.75rem 0.5rem 0;
+  border-bottom: 1px solid var(--tayori-rule);
+  text-align: left;
+  vertical-align: top;
+}
+
+.ta-table thead th {
+  color: var(--tayori-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ta-table tbody th {
+  font-weight: 500;
+}
+
+.ta-table tbody th .ta-hint {
+  display: block;
+  font-weight: 400;
+}
+
+.ta-table tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+.ta-features code {
+  justify-self: start;
+  width: fit-content;
+}
+
+.ta-segment-link {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.ta-list-link {
+  margin-bottom: 0.625rem;
+}
+
+.ta-section-gap {
+  margin-top: 2rem;
+}
+
+/* ── Campaigns: the editor ─────────────────────────────────────── */
+
+.ta-campaign-main {
+  display: grid;
+  min-width: 0;
+}
+
+/* Fields side by side start at the top, with a hint or without. */
+.ta-grid-2 > .ta-field,
+.ta-preview-controls > .ta-field {
+  align-content: start;
+}
+
+.ta-letter-steps .ta-card {
+  margin: 0;
+}
+
+.ta-choices-wide {
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+}
+
+.ta-choice-text {
+  display: flex;
+  justify-items: start;
+  padding: 0.625rem 0.75rem;
+  font-size: 0.875rem;
+  text-align: left;
+}
+
+.ta-choice-text > span {
+  display: grid;
+  gap: 0.125rem;
+}
+
+.ta-choice-text strong {
+  color: var(--tayori-text);
+  font-weight: 600;
+}
+
+.ta-trigger-event {
+  margin-top: -0.25rem;
+}
+
+.ta-campaign-conditions {
+  display: grid;
+  gap: 1.5rem;
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--tayori-rule);
+}
+
+.ta-settings-actions {
+  margin-top: 1.25rem;
+}
+
+.ta-steps-section {
+  margin-top: 1rem;
+}
+
+.ta-subheading-row {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0 0 0.875rem;
+}
+
+.ta-section-title {
+  margin: 0;
+  font: var(--tayori-title-weight) 1.25rem / 1.2 var(--tayori-title-font);
+  letter-spacing: -0.01em;
+}
+
+.ta-letter-steps {
+  position: relative;
+  display: grid;
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+/* The steps go down a line, one after the other. */
+.ta-letter-steps::before {
+  content: "";
+  position: absolute;
+  top: 1.5rem;
+  bottom: 1.5rem;
+  left: 1.9375rem;
+  width: 1px;
+  background: var(--tayori-border);
+}
+
+.ta-step {
+  position: relative;
+  margin: 0;
+}
+
+.ta-step-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0.875rem;
+}
+
+.ta-step-number {
+  display: grid;
+  place-items: center;
+  width: 1.375rem;
+  height: 1.375rem;
+  margin-top: 0.0625rem;
+  border-radius: 999px;
+  background: var(--tayori-text);
+  color: var(--tayori-background);
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.ta-step-main {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.ta-step-when {
+  margin: 0;
+  color: var(--tayori-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.ta-step-subject {
+  margin: 0;
+  overflow: hidden;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ta-step-results {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.875rem;
+  margin: 0.25rem 0 0;
+  color: var(--tayori-muted);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.ta-step-open {
+  border-color: color-mix(in oklab, var(--tayori-accent) 35%, var(--tayori-rule));
+}
+
+.ta-step-open .ta-languages {
+  margin-top: 0.25rem;
+}
+
+.ta-wait {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+
+.ta-wait-part {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.875rem;
+}
+
+.ta-wait-part .ta-input {
+  width: 5rem;
+}
+
+.ta-letter-body .kotoba-content {
+  min-height: 12rem;
+}
+
+.ta-merge-hint {
+  margin-top: 0.75rem;
+}
+
+.ta-step-skip {
+  margin: 1.25rem 0;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--tayori-rule);
+}
+
+.ta-step-open > .ta-actions {
+  margin-top: 1.25rem;
+}
+
+.ta-add-step {
+  margin-bottom: 1rem;
+}
+
+/* The status, and the word before a letter goes. */
+.ta-status-line {
+  margin: 0 0 0.375rem;
+}
+
+.ta-status-actions {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.ta-status-actions:empty {
+  display: none;
+}
+
+.ta-status-actions > .ta-actions:empty {
+  display: none;
+}
+
+.ta-confirm {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding: 0.875rem;
+  border: 1px solid color-mix(in oklab, var(--tayori-attention) 45%, var(--tayori-rule));
+  border-radius: var(--tayori-radius);
+  background: color-mix(in oklab, var(--tayori-attention) 7%, var(--ta-card));
+  font-size: 0.875rem;
+  animation: tayori-rise var(--tayori-ease);
+}
+
+.ta-confirm p {
+  margin: 0;
+}
+
+.ta-enroll {
+  padding-top: 1rem;
+  border-top: 1px solid var(--tayori-rule);
+}
+
+.ta-results-table {
+  margin-top: 0.25rem;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.ta-results-table th,
+.ta-results-table td {
+  padding: 0.375rem 0.25rem;
+  text-align: right;
+}
+
+.ta-results-table th:first-child {
+  text-align: left;
+}
+
+.ta-results-table thead th {
+  font-size: 0.6875rem;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.ta-results-table abbr {
+  text-decoration: none;
+}
+
+/* The preview of a letter. */
+.ta-preview-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0 1rem;
+  margin-bottom: 1rem;
+}
+
+.ta-letter-envelope {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.ta-letter-frame {
+  display: block;
+  width: 100%;
+  height: 34rem;
+  border: 1px solid var(--tayori-rule);
+  border-radius: var(--tayori-radius);
+  /* The letter is written for a white page, in any theme. */
+  background: #f4f4f5;
+  color-scheme: light;
+}
+
+.ta-test-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--tayori-rule);
+}
+
+.ta-test-form .ta-field {
+  margin: 0;
+}
+
+.ta-test-form + .ta-hint {
+  margin-top: 0.5rem;
+}
+
+.ta-facts + .ta-subheading {
+  margin-top: 1.5rem;
+}
+
+.ta-hook-url {
+  display: block;
+  width: fit-content;
+  margin-top: 0.25rem;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .ta-rule-subject {
+    max-width: none;
+  }
+
+  .ta-rule-subject,
+  .ta-rule-value,
+  .ta-rule-picks {
+    flex: 1 1 100%;
+  }
+
+  .ta-letter-steps::before {
+    display: none;
+  }
+
+  .ta-step-head {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .ta-step-head .ta-row-actions {
+    grid-column: 2;
+    margin-left: -0.5rem;
+  }
+
+  .ta-letter-frame {
+    height: 30rem;
+  }
+
+  .ta-heading-actions {
+    flex-wrap: wrap;
+  }
+}
+
+@media (forced-colors: active) {
+  .ta-rule-pick:has(:checked),
+  .ta-step-number {
+    forced-color-adjust: none;
+    border-color: Highlight;
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  .ta-cond-group,
+  .ta-rule,
+  .ta-confirm {
+    border: 1px solid CanvasText;
+  }
+}
+
 @media (max-width: 1080px) {
   .ta-editor {
     grid-template-columns: 1fr;
