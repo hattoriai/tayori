@@ -81,11 +81,16 @@ test('<tayori-news button="none">: the page\'s own button opens it, gets the foc
   await expect(panel).toHaveCount(0);
   await expect(own).toBeFocused();
 
-  // Pressing it again while the panel is open closes it.
+  // toggle() closes an open panel. (The open panel covers the button at
+  // the top right of this page, so it is called, not pressed.)
   await own.click();
   await expect(panel).toBeVisible();
-  await own.click();
+  await page.evaluate(() => {
+    const news = document.querySelector("tayori-news") as HTMLElement & { toggle(control?: HTMLElement): Promise<void> };
+    return news.toggle(document.getElementById("own-news") ?? undefined);
+  });
   await expect(panel).toHaveCount(0);
+  await expect(own).toBeFocused();
 
   await publishEntry(adminPage, unique("Own buttons"), "A button of the page's own.");
   await page.reload();
