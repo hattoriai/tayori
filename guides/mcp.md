@@ -5,8 +5,12 @@ Tayori ships an [MCP](https://modelcontextprotocol.io) server,
 Code (or Claude Desktop, or an agent of your own) to your app, and it
 writes the news with you: it reads what shipped in the inbox, adds what is
 missing, drafts an entry, writes it in each of your languages with its
-screenshots, and publishes it when you say so. It acts as one of your
-admins, and your resolver decides what it may do, as in the admin.
+screenshots, and publishes it when you say so. With the campaigns
+(`Tayori.Campaigns`), it writes your letters with you too: it reads your
+audience, tries and saves segments, makes sequences and broadcasts,
+writes their letters, previews them and sends you a test, and starts or
+sends them when you say so. It acts as one of your admins, and your
+resolver decides what it may do, as in the admin.
 
 No key of a model is involved: the MCP client is the model, and Tayori
 gives it tools. [Writing with AI](ai.md) in the admin is separate.
@@ -29,6 +33,37 @@ gives it tools. [Writing with AI](ai.md) in the admin is separate.
 | `request_upload` | `tayori:write` | An address for one image, and the curl command that sends it (below) |
 | `upload_image` | `tayori:write` | A small image (1 MB) in the call, as base64 |
 
+With the `:campaigns` module on (`modules: [:changelog, :campaigns]`):
+
+| Tool | Scope | What it does |
+|---|---|---|
+| `list_audience` | `tayori:campaigns:read` | Your audience's attributes (type, operators, an enum's values), its events, the segments with their counts, and the limits of a condition |
+| `preview_segment` | `tayori:campaigns:read` | A `condition` or a `segment_id`: how many people match it now, the first 10, and the sentence; a wrong condition gets its errors |
+| `list_campaigns` | `tayori:campaigns:read` | The campaigns, the newest first, by `kind`, with the `archived` ones or not |
+| `get_campaign` | `tayori:campaigns:read` | A campaign whole: its settings, its audience's count, its steps with their letters in Markdown, its merge tags, what keeps it from starting (`problems`), its results |
+| `preview_letter` | `tayori:campaigns:read` | A step's letter as a person gets it: subject, preheader, text, and the merge tags they lack. Nothing is sent |
+| `save_segment` | `tayori:campaigns:write` | A new segment (`name`, `condition`, `description`), or a change of one by its `id` |
+| `create_campaign` | `tayori:campaigns:write` | A draft: `name`, `kind`, `purpose`, `trigger_event`, `audience`, `goal`, `min_gap_hours`, `max_days`, `from_name`, `reply_to` |
+| `update_campaign` | `tayori:campaigns:write` | Any of those settings but the kind; `{}` takes a goal off, an empty `trigger_event` makes a sequence by hand, `max_days: 0` takes the end off |
+| `add_step` | `tayori:campaigns:write` | A step of a sequence, `after_days`, `after_hours`, `after_minutes` from entry, with a `skip_if` and a letter in Markdown |
+| `update_step` | `tayori:campaigns:write` | A step's time and `skip_if`, and its letter in one `locale` (a new one is added); a broadcast's letter too |
+| `remove_step` | `tayori:campaigns:write` | Removes a step of a sequence and its letters |
+| `send_test_letter` | `tayori:campaigns:write` | A step's letter to one address (`to`, else the writer's), "[Test] " before its subject, with a person's merge tags |
+| `pause_campaign` | `tayori:campaigns:write` | Pauses an active sequence, or takes a scheduled broadcast back to a draft |
+| `start_campaign` | `tayori:campaigns:send` | Starts a sequence, a draft, or resumes a paused one |
+| `send_broadcast` | `tayori:campaigns:send` | Sends a broadcast now, or `at` a time; `expected_recipients` must be the audience's count now |
+
+The tools of a module that is off are not listed. A condition is a JSON
+object, as `Tayori.Conditions` takes it:
+`{"attribute": "plan", "op": "in", "value": ["pro"]}`,
+`{"event": "signed_up", "op": "happened", "within_days": 30}`,
+`{"segment": "<id>", "op": "in"}`, in `{"all": [...]}`, `{"any": [...]}`
+and `{"not": ...}`. Each tool that takes one checks it against your
+audience, and answers the errors of `Tayori.Conditions.validate/3` and the
+sentence of `Tayori.Conditions.describe/3` ("Plan is Pro"). The letters
+are written in Markdown, as the entries are, with their merge tags
+(`{{first_name|there}}`).
+
 A tool answers JSON, which the client reads as text and as structured
 content. An error is a tool error in words the model can act on: "No
 entry with the id or slug "exports".", "Unknown categories: News. The
@@ -42,8 +77,17 @@ What every tool keeps to:
   changes a status. The server's instructions tell the model to publish
   only when you ask it to; `publish_entry` is marked destructive, so your
   client asks you before it runs.
-* **Nothing deleted.** There is no tool that deletes an entry, a change
-  or a category. A change put aside comes back in the admin.
+* **Nobody emailed but by `start_campaign` and `send_broadcast`.** And
+  a test by `send_test_letter`, to the address given only. The
+  instructions tell the model to start or send only when you ask, and to
+  say first how many people it reaches; both tools are marked
+  destructive and open-world. `send_broadcast` takes
+  `expected_recipients`, the count the model told you: when the audience
+  has another count now, nothing is sent, and the error gives the count.
+* **Nothing deleted.** There is no tool that deletes an entry, a change,
+  a category, a segment or a campaign. A change put aside comes back in
+  the admin. `remove_step` removes a step of a sequence; the letters it
+  sent stay in the results.
 * **Your categories and segments.** A category is one of yours, by its
   key; a segment one of your resolver's `segments/0`. A model that
   invents one is told which there are.
@@ -85,7 +129,8 @@ nobody in until its config names the resolver that decides:
 On every request, the principal (what your Sake subject module's
 `fetch/1` returns) goes to the resolver's `resolve_access/1`, as the
 admin of a request does: `:all` may use every tool its token's scopes
-allow, `:read_only` only the `tayori:read` ones, anything else nothing:
+allow, `:read_only` only the read ones (`tayori:read` and
+`tayori:campaigns:read`), anything else nothing:
 the client is shown no tools, and cannot call any. So make the principal
 of an admin the value your resolver's `resolve_user/1` gives for them,
 and the admin and MCP decide alike.
@@ -136,8 +181,14 @@ rest: the subject module, the `Sake` child, the OAuth routes.
 
 * `tayori:read` - "Read the news and the inbox".
 * `tayori:write` - "Write, draft and publish the news".
+* `tayori:campaigns:read` - "Read the audience and the campaigns".
+* `tayori:campaigns:write` - "Write segments, campaigns and their
+  letters" (and send a test letter).
+* `tayori:campaigns:send` - "Start campaigns and send broadcasts to the
+  app's people".
 
-Your subject module's `scopes_for/2` maps your roles to them, with the
+Keep `tayori:campaigns:send` apart: a role may write the letters and
+leave the sending to another. Your subject module's `scopes_for/2` maps your roles to them, with the
 scopes of the other servers you mount:
 
 ```elixir
@@ -148,8 +199,15 @@ defmodule MyAppWeb.MCPSubject do
   # fetch/1 returns the admin as MyAppWeb.TayoriResolver.resolve_user/1 does.
 
   @impl true
-  def scopes_for(%{role: :admin}, _resource), do: ["tayori:read", "tayori:write", "lotus:read"]
-  def scopes_for(%{role: :support}, _resource), do: ["tayori:read"]
+  def scopes_for(%{role: :admin}, _resource) do
+    ["tayori:read", "tayori:write", "tayori:campaigns:read", "tayori:campaigns:write",
+     "tayori:campaigns:send", "lotus:read"]
+  end
+
+  def scopes_for(%{role: :marketing}, _resource),
+    do: ["tayori:campaigns:read", "tayori:campaigns:write"]
+
+  def scopes_for(%{role: :support}, _resource), do: ["tayori:read", "tayori:campaigns:read"]
   def scopes_for(_user, _resource), do: []
 end
 ```
@@ -161,8 +219,8 @@ claude mcp add --transport http atelier https://atelier.app/mcp
 ```
 
 The first time, your browser opens on your app's login, then the consent
-page with the scopes. Allow the `tayori:read` tools once, and keep the
-write tools on ask.
+page with the scopes. Allow the read tools once, and keep the write and
+send tools on ask.
 
 ## A conversation
 
@@ -187,6 +245,28 @@ a section for each category, which Claude reads back (`get_entry`).
 `publish_entry` with `at: "2026-10-21T09:00:00Z"`: the entry is
 scheduled, and Claude gives its URL. Nothing was published before you
 said so.
+
+### With the campaigns
+
+> **You:** Write to the Pro people who have no project yet, about
+> templates.
+
+Claude reads the audience (`list_audience`): `plan` is an enum with
+`pro`, and `has_projects` a boolean. It tries the condition
+(`preview_segment`): "Plan is Pro and not (has a project)", 182 people.
+
+> **You:** Good. A broadcast, Thursday at ten.
+
+`create_campaign` (kind `broadcast`, that audience), then `update_step`
+with the subject and the letter in Markdown, and `preview_letter` for
+one of the 182. `send_test_letter` sends it to you.
+
+> **You:** Looks right. Send it.
+
+Claude says it reaches 182 people, and calls `send_broadcast` with
+`expected_recipients: 182` and `at: "2026-10-22T10:00:00Z"`. Had
+someone joined in the meantime, nothing would have been sent, and
+Claude would have told you the new count.
 
 ## Screenshots from a browser agent
 
