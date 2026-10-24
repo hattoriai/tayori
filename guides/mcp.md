@@ -307,7 +307,7 @@ sends the file there with curl:
 3. **curl** sends the file, and answers its URL and its Markdown:
 
    ```json
-   {"url": "/uploads/kotoba/2026/10/…-exports.png", "markdown": "![](/uploads/kotoba/2026/10/…-exports.png)",
+   {"url": "/uploads/2026/10/…-exports.png", "markdown": "![](/uploads/2026/10/…-exports.png)",
     "contentType": "image/png", "width": 1440, "height": 900, "bytes": 182311}
    ```
 
@@ -318,7 +318,7 @@ sends the file there with curl:
    ```markdown
    Exports are one click from any project.
 
-   ![The Export button, above the project's files](/uploads/kotoba/2026/10/…-exports.png)
+   ![The Export button, above the project's files](/uploads/2026/10/…-exports.png)
    ```
 
    The image becomes an attachment of the body, as a file dropped in the
@@ -339,8 +339,8 @@ whole address in the config:
 mcp: [
   resolver: MyAppWeb.TayoriResolver,
   upload_url: "https://atelier.app/api/uploads/news/uploads",
-  # The storage of the admin's editor, when it is not Kotoba's own config.
-  storage: MyApp.KotobaStorage
+  # The store of the admin's editor, when it is not Storehouse's own config.
+  storage: MyApp.NewsStore
 ]
 ```
 
@@ -369,9 +369,9 @@ What the route keeps to:
 * **Images only.** The bytes decide, not the content type: a PNG, JPEG,
   GIF or WebP image (`Kotoba.Attachments`), up to 25 MB, as the editor's
   uploads. Anything else is a 415, and is not stored.
-* **The editor's storage.** The file is stored by
+* **The editor's store.** The file is stored by
   `Kotoba.Attachments.store/2`, with the `:storage` of the config or
-  Kotoba's own, under a new key. Tayori remembers each image it stored,
+  Storehouse's own (`config :storehouse, adapter: ...`), under a new key. Tayori remembers each image it stored,
   by its URL (`mcp_file:<hash>` in `tayori_settings`), so that the
   Markdown of an entry finds it.
 

@@ -48,6 +48,39 @@ and Tayori follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `Tayori.Migrations` version 2: the campaigns' tables, made whatever
   the modules. `mix tayori.gen.migration` writes the upgrade.
 
+### Changed
+
+- Requires [Kotoba](https://hexdocs.pm/kotoba) 0.8 and
+  [Storehouse](https://hexdocs.pm/storehouse) 0.2: the images of the
+  editor, the covers and the agents' uploads are kept with Storehouse, in
+  the app's store (`config :storehouse, adapter: ...`). Each file is
+  checked by its bytes and stored under a new key, as before.
+- `:storage` of `tayori_admin` and of the `:mcp` config is a
+  `Storehouse.Adapter` (Storehouse's own config when not given).
+
+### Upgrading
+
+Nothing to change at once. An app that keeps its uploads with Kotoba's
+own store (`config :kotoba, Kotoba.Storage.Local, ...` and
+`plug Kotoba.Storage.Local.Plug`) works as it did: the same files, the
+same URLs, with deprecation warnings. Kotoba 1.0 removes that store, so
+move to Storehouse before then:
+
+1. Replace `config :kotoba, Kotoba.Storage.Local, ...` with
+   `config :storehouse, Storehouse.Local, ...`, with the same `root`, and
+   `url_prefix: "/uploads/kotoba"` (Kotoba's old default, unless you gave
+   another), so that the images in your entries stay where they were.
+2. Replace `plug Kotoba.Storage.Local.Plug` with
+   `plug Storehouse.Local.Plug`.
+3. A store of your own, given as `:storage` or in
+   `config :kotoba, storage: ...`: `@behaviour Storehouse.Adapter` in
+   place of `@behaviour Kotoba.Storage` (the callbacks are the same), and
+   `config :storehouse, adapter: MyApp.Store`.
+
+The warnings stop when the steps are done. Kotoba's
+[Upgrading](https://hexdocs.pm/kotoba/upgrading.html) guide, "To Kotoba
+0.8", has the same steps.
+
 ## [0.3.0] - 2026-10-21
 
 ### Added

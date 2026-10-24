@@ -188,9 +188,22 @@ jobs:
         working-directory: assets
 
   # One job for each browser engine. The Chromium job keeps the name "e2e".
+  #
+  # In Playwright's own image, whose browsers and their system packages are
+  # in it already: installing WebKit's packages from Ubuntu's mirrors took
+  # from a minute to half an hour (as in Issho). Erlang and Elixir come from
+  # hex.pm's builds for Ubuntu 24.04 (the image's), so nothing comes from apt.
   e2e:
     name: ${{ matrix.browser == 'chromium' && 'e2e' || format('e2e ({0})', matrix.browser) }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container:
+      # Its version is e2e/package-lock.json's @playwright/test.
+      image: mcr.microsoft.com/playwright:v1.56.1-noble
+      options: --ipc=host
+    env:
+      # Firefox, run as root, wants its own home.
+      HOME: /root
     strategy:
       fail-fast: false
       matrix:
@@ -199,29 +212,31 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Erlang and Elixir exactly as in .tool-versions.
-      - uses: erlef/setup-beam@v1
+      - name: Erlang and Elixir, as in .tool-versions
         id: beam
-        with:
-          version-file: .tool-versions
-          version-type: strict
+        run: |
+          otp=$(awk '$1 == "erlang" { print $2 }' .tool-versions)
+          elixir=$(awk '$1 == "elixir" { print $2 }' .tool-versions)
+          mkdir -p /opt/beam/elixir
+          curl -fsSL "https://builds.hex.pm/builds/otp/amd64/ubuntu-24.04/OTP-$otp.tar.gz" | tar xz -C /opt/beam
+          (cd "/opt/beam/OTP-$otp" && ./Install -minimal "/opt/beam/OTP-$otp" > /dev/null)
+          curl -fsSL -o /tmp/elixir.zip "https://builds.hex.pm/builds/elixir/v$elixir.zip"
+          npx --yes extract-zip@2.0.1 /tmp/elixir.zip /opt/beam/elixir
+          echo "/opt/beam/OTP-$otp/bin" >> "$GITHUB_PATH"
+          echo "/opt/beam/elixir/bin" >> "$GITHUB_PATH"
+          echo "otp=$otp" >> "$GITHUB_OUTPUT"
+          echo "elixir=$elixir" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .tool-versions
-          cache: npm
-          cache-dependency-path: |
-            assets/package-lock.json
-            e2e/package-lock.json
+      - run: mix local.hex --force && mix local.rebar --force
 
       - uses: actions/cache@v4
         with:
           path: |
             deps
             _build
-          key: mix-e2e-${{ steps.beam.outputs.elixir-version }}-${{ steps.beam.outputs.otp-version }}-${{ hashFiles('mix.lock') }}
+          key: mix-e2e-image-${{ steps.beam.outputs.elixir }}-${{ steps.beam.outputs.otp }}-${{ hashFiles('mix.lock') }}
           restore-keys: |
-            mix-e2e-${{ steps.beam.outputs.elixir-version }}-${{ steps.beam.outputs.otp-version }}-
+            mix-e2e-image-${{ steps.beam.outputs.elixir }}-${{ steps.beam.outputs.otp }}-
 
       - run: mix deps.get
 
@@ -229,9 +244,6 @@ jobs:
         working-directory: assets
 
       - run: npm ci
-        working-directory: e2e
-
-      - run: npx playwright install --with-deps ${{ matrix.browser }}
         working-directory: e2e
 
       # The Playwright web server runs `mix tayori.build` (the real bundle)

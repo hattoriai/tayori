@@ -25,13 +25,13 @@ if Code.ensure_loaded?(Sake.Server) do
 
     defp mcp(%{config: config}) do
       root = Path.expand("../../tmp/mcp_uploads", __DIR__)
-      previous = Application.get_env(:kotoba, Kotoba.Storage.Local)
-      Application.put_env(:kotoba, Kotoba.Storage.Local, root: root)
+      previous = Application.get_env(:storehouse, Storehouse.Local)
+      Application.put_env(:storehouse, Storehouse.Local, root: root)
 
       on_exit(fn ->
         if previous,
-          do: Application.put_env(:kotoba, Kotoba.Storage.Local, previous),
-          else: Application.delete_env(:kotoba, Kotoba.Storage.Local)
+          do: Application.put_env(:storehouse, Storehouse.Local, previous),
+          else: Application.delete_env(:storehouse, Storehouse.Local)
       end)
 
       config =
