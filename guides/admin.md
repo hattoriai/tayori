@@ -93,12 +93,14 @@ and readers of a language an entry lacks read the first.
 ## Attachments
 
 The editor is Kotoba's, with its attachments: images, PDFs and videos,
-dropped or pasted into the body. Kotoba keeps them in its storage, which
-your app configures (`config :kotoba, storage: ...`, see Kotoba's Uploads
-guide), or in another for the admin alone:
+dropped or pasted into the body. Kotoba keeps them with
+[Storehouse](https://hexdocs.pm/storehouse), in the store your app
+configures (`config :storehouse, adapter: ...`, see Kotoba's
+[Uploads](https://hexdocs.pm/kotoba/uploads.html) guide), or in another
+for the admin alone:
 
 ```elixir
-tayori_admin "/news", resolver: MyAppWeb.TayoriResolver, storage: MyApp.NewsStorage
+tayori_admin "/news", resolver: MyAppWeb.TayoriResolver, storage: MyApp.NewsStore
 ```
 
 ## Writing
@@ -156,7 +158,7 @@ the nonce of your policy, read from `conn.assigns` (one key, or
   (the editor and the date picker place their popovers with inline
   styles);
 * `connect-src 'self' wss:` for the LiveView socket;
-* `img-src` and `media-src` with the origin of Kotoba's storage, for
+* `img-src` and `media-src` with the origin of the store, for
   attachments.
 
 ## Reconnects after a deploy

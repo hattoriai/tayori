@@ -130,8 +130,9 @@ defmodule Tayori.Config do
           whole (`"https://atelier.app/api/news/uploads"`), where an agent
           sends its screenshots. Without it, an agent sends only small
           images, in the call.
-        * `:storage` - the `Kotoba.Storage` of the uploads (Kotoba's own
-          config when not given), the one of the admin's editor.
+        * `:storage` - the store of the uploads, a `Storehouse.Adapter`
+          (Storehouse's own config when not given), the one of the admin's
+          editor.
     * `:scheduler` - `false` starts nothing that runs by itself: no
       scheduler, and with Oban no look at boot for what is due. For an
       app's tests, where those queries would outlive a test's sandbox, and

@@ -32,7 +32,7 @@ Application.put_env(:elixir, :time_zone_database, Tz.TimeZoneDatabase)
 Logger.configure(level: :info)
 
 Application.put_env(:tayori, TayoriDev.Repo, database: database, pool_size: 5)
-Application.put_env(:kotoba, Kotoba.Storage.Local, root: uploads, url_prefix: "/uploads")
+Application.put_env(:storehouse, Storehouse.Local, root: uploads, url_prefix: "/uploads")
 Application.put_env(:tayori, TayoriDev.Mailer, adapter: Swoosh.Adapters.Local)
 Application.put_env(:swoosh, :local, true)
 
@@ -807,7 +807,7 @@ defmodule TayoriDev.Endpoint do
   plug Plug.Static, at: "/vendor/phoenix", from: {:phoenix, "priv/static"}
   plug Plug.Static, at: "/vendor/phoenix_live_view", from: {:phoenix_live_view, "priv/static"}
   plug Plug.Static, at: "/deps/kotoba", from: {:kotoba, "priv/static"}
-  plug Kotoba.Storage.Local.Plug, at: "/uploads"
+  plug Storehouse.Local.Plug, at: "/uploads"
   plug Plug.Static, at: "/dev-seed", from: Path.expand("dev/seed", __DIR__)
 
   plug Plug.Parsers, parsers: [:urlencoded, :multipart, :json], pass: ["*/*"], json_decoder: JSON

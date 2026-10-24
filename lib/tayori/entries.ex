@@ -280,7 +280,7 @@ defmodule Tayori.Entries do
 
   @doc """
   Takes the cover off an entry. The image stays in the storage: delete it
-  with the storage adapter (`Kotoba.Storage`) if nothing else uses it.
+  with the store (`Storehouse.delete/2`) if nothing else uses it.
   """
   @spec remove_cover(Entry.t()) :: {:ok, Entry.t()} | {:error, Ecto.Changeset.t()}
   def remove_cover(%Entry{} = entry), do: put(entry, cover: nil)

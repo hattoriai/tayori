@@ -109,7 +109,7 @@ defmodule Tayori.Uploads do
 
   @doc """
   Stores the image at `path`: `{:ok, attachment}`, or `{:error, reason}`
-  (`:too_large`, `:not_an_image`, or the storage's).
+  (`:too_large`, `:not_an_image`, or the store's).
   """
   def store(path, name, claim) do
     config = Config.get()

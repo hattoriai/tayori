@@ -329,10 +329,10 @@ defmodule Tayori.AdminTest do
   describe "the editor's cover" do
     setup do
       root = Path.expand("../../tmp/uploads-#{System.unique_integer([:positive])}", __DIR__)
-      Application.put_env(:kotoba, Kotoba.Storage.Local, root: root)
+      Application.put_env(:storehouse, Storehouse.Local, root: root)
 
       on_exit(fn ->
-        Application.delete_env(:kotoba, Kotoba.Storage.Local)
+        Application.delete_env(:storehouse, Storehouse.Local)
         File.rm_rf!(root)
       end)
 
@@ -355,7 +355,7 @@ defmodule Tayori.AdminTest do
 
       save(view, %{"cover_alt" => "A chart of exports"})
 
-      assert %{"url" => "/uploads/kotoba/" <> _, "width" => 1, "height" => 1} =
+      assert %{"url" => "/uploads/" <> _, "width" => 1, "height" => 1} =
                cover = Entries.get!(entry.id).cover
 
       assert cover["alt"] == "A chart of exports"

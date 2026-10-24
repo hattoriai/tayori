@@ -98,7 +98,7 @@ defmodule Tayori.Router do
     storage: [
       type: :atom,
       doc:
-        "The `Kotoba.Storage` of the attachments of the editor (Kotoba's own config when not given)."
+        "The store of the attachments of the editor, a `Storehouse.Adapter` (Storehouse's own config when not given)."
     ]
   )
 
