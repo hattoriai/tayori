@@ -7,6 +7,16 @@ and Tayori follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+### Changed
+
+- The webhooks' bodies are kept by PhoenixMountable's reader, which the
+  libraries of an app share: `body_reader: {PhoenixMountable.RawBody,
+  :read_body, [MyAppWeb.Router]}`, added by `mix tayori.install`. It finds
+  the campaigns' webhooks and GitHub's hook through the router, wherever
+  the app mounts them. `Tayori.RawBody.read_body/2` and
+  `Tayori.GitHub.read_body/2`, the readers of before, still work and are
+  deprecated.
+
 ## [0.4.0] - 2026-10-24
 
 ### Added

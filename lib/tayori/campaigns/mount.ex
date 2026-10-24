@@ -33,7 +33,8 @@ defmodule Tayori.Campaigns.Mount do
 
   The webhook's signature is of the body as it was sent. An endpoint
   whose `Plug.Parsers` reads JSON reads it before the router: give it
-  `body_reader: {Tayori.RawBody, :read_body, []}` (see `Tayori.RawBody`).
+  `body_reader: {PhoenixMountable.RawBody, :read_body, [MyAppWeb.Router]}`
+  (see `Tayori.RawBody`).
 
   Without the `:campaigns` module, every route is a 404.
   """
@@ -41,6 +42,8 @@ defmodule Tayori.Campaigns.Mount do
   @behaviour Plug
 
   use Phoenix.Component
+  # The webhooks' bodies as they were sent, kept by the endpoint's reader.
+  use PhoenixMountable.RawBody, only: [:webhook]
 
   import Ecto.Query, only: [from: 2]
   import Plug.Conn, except: [assign: 3]
@@ -134,7 +137,7 @@ defmodule Tayori.Campaigns.Mount do
       {:error, :no_raw_body} ->
         Logger.error(
           "Tayori cannot check a mail provider's webhook: the endpoint read the body before it. " <>
-            "Give Plug.Parsers `body_reader: {Tayori.RawBody, :read_body, []}`."
+            "Give Plug.Parsers `body_reader: {PhoenixMountable.RawBody, :read_body, [MyAppWeb.Router]}`."
         )
 
         {:error, 500, "no_raw_body"}

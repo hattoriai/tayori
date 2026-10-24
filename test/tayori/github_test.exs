@@ -287,7 +287,7 @@ defmodule Tayori.GitHubTest do
           assert {conn.status, json!(conn)} == {500, %{"error" => "no_raw_body"}}
         end)
 
-      assert log =~ "body_reader: {Tayori.GitHub, :read_body, []}"
+      assert log =~ "body_reader: {PhoenixMountable.RawBody, :read_body, [MyAppWeb.Router]}"
 
       # Another request is not copied.
       conn =
@@ -302,6 +302,38 @@ defmodule Tayori.GitHubTest do
         )
 
       refute Map.has_key?(conn.private, :tayori_raw_body)
+    end
+
+    test "the webhook behind Plug.Parsers: the raw body kept by PhoenixMountable's reader" do
+      {:ok, secret} = GitHub.new_secret()
+      body = fixture("pull_request_merged")
+
+      parsers =
+        Plug.Parsers.init(
+          parsers: [:json],
+          pass: ["*/*"],
+          json_decoder: JSON,
+          body_reader: {PhoenixMountable.RawBody, :read_body, [TayoriTest.Host.Router]}
+        )
+
+      conn =
+        Plug.Test.conn(:post, @path, body)
+        |> put_req_header("content-type", "application/json")
+        |> put_req_header("x-github-event", "pull_request")
+        |> put_req_header("x-hub-signature-256", sign(body, secret))
+        |> Plug.Parsers.call(parsers)
+
+      assert conn.body_params["number"] == 1234
+      conn = Machines.call(conn, :github)
+      assert {conn.status, json!(conn)["added"]} == {200, 1}
+
+      # Another route of the same plug is not copied.
+      conn =
+        Plug.Test.conn(:post, "/machines/news/changes", ~s({"a": 1}))
+        |> put_req_header("content-type", "application/json")
+        |> Plug.Parsers.call(parsers)
+
+      assert {:error, :no_raw_body} = Tayori.RawBody.fetch(conn, 1_000)
     end
 
     test "a form-encoded delivery" do
