@@ -58,7 +58,7 @@ defmodule TayoriDev.Seeds do
   end
 
   defp store(path) do
-    {:ok, node} = Kotoba.Attachments.store(path, storage: Kotoba.Storage.Local)
+    {:ok, node} = Kotoba.Attachments.store(path)
     node
   end
 
