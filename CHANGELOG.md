@@ -7,6 +7,8 @@ and Tayori follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+## [0.4.0] - 2026-10-24
+
 ### Added
 
 - Modules: `:modules` in `Tayori.Config`, `[:changelog]` by default, so
