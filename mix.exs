@@ -80,7 +80,7 @@ defmodule Tayori.MixProject do
       {:phoenix_ecto, "~> 4.6"},
       # The mounts in the app's router, their assets and the migrations.
       # 0.2.3 compiles the installer in an app without Igniter.
-      {:phoenix_mountable, "~> 0.2.3"},
+      {:phoenix_mountable, "~> 0.2.4"},
       {:igniter, "~> 0.6", optional: true},
       {:phoenix, if(@oldest, do: "~> 1.7.14", else: "~> 1.7.14 or ~> 1.8")},
       {:phoenix_html, "~> 4.1"},

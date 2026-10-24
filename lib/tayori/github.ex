@@ -45,16 +45,18 @@ defmodule Tayori.GitHub do
 
   The signature is of the body as GitHub sent it. An endpoint whose
   `Plug.Parsers` reads JSON (a Phoenix app's does) reads the body before
-  the router; `read_body/2` keeps a copy of it for the requests GitHub
-  signs, and only for them:
+  the router; PhoenixMountable's reader asks the router which plug a
+  request goes to and keeps a copy of the body for the plugs that ask for
+  it (Tayori's hooks do), wherever their routes are mounted:
 
       plug Plug.Parsers,
         parsers: [:urlencoded, :multipart, :json],
         pass: ["*/*"],
-        body_reader: {Tayori.GitHub, :read_body, []},
+        body_reader: {PhoenixMountable.RawBody, :read_body, [MyAppWeb.Router]},
         json_decoder: Phoenix.json_library()
 
-  Without it, a delivery is answered with a 500, and the log says why.
+  `mix tayori.install` writes it. Without it, a delivery is answered with
+  a 500, and the log says why.
   """
 
   alias Tayori.{Config, Settings, Source}
@@ -115,6 +117,10 @@ defmodule Tayori.GitHub do
   and keeps a copy of a body GitHub signed, for `verify/2`. The same as
   `Tayori.RawBody.read_body/2`, which also keeps the bodies of the mail
   providers' webhooks.
+
+  Deprecated: `{PhoenixMountable.RawBody, :read_body, [MyAppWeb.Router]}`
+  takes its place, and keeps the bodies of every library that asks for
+  them. This one still works.
   """
   @spec read_body(Plug.Conn.t(), keyword()) ::
           {:ok, binary(), Plug.Conn.t()} | {:more, binary(), Plug.Conn.t()} | {:error, term()}

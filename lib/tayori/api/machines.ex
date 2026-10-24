@@ -7,6 +7,9 @@ defmodule Tayori.API.Machines do
 
   @behaviour Plug
 
+  # GitHub's deliveries as they were sent, kept by the endpoint's reader.
+  use PhoenixMountable.RawBody, only: [:github]
+
   import Plug.Conn
 
   alias Tayori.{GitHub, Inbox, Ingest}
@@ -176,20 +179,26 @@ defmodule Tayori.API.Machines do
     json(conn, 200, %{added: result.added, existing: result.existing, errors: errors})
   end
 
-  # The body as GitHub signed it: read here, or kept by GitHub.read_body/2
-  # when the endpoint's parsers read it.
+  # The body as GitHub signed it: read here, or kept by the endpoint's
+  # reader when its parsers read it (Tayori.RawBody).
   defp raw_body(%{body_params: %Plug.Conn.Unfetched{}} = conn), do: read(conn, @max_github_body)
 
-  defp raw_body(%{private: %{tayori_raw_body: iodata}} = conn),
-    do: {:ok, IO.iodata_to_binary(iodata), conn}
-
   defp raw_body(conn) do
-    Logger.error(
-      "Tayori cannot check GitHub's signature: the endpoint read the body before it. " <>
-        "Give Plug.Parsers `body_reader: {Tayori.GitHub, :read_body, []}`."
-    )
+    case Tayori.RawBody.fetch(conn, @max_github_body) do
+      {:ok, body, conn} ->
+        {:ok, body, conn}
 
-    {:error, 500, "no_raw_body", conn}
+      {:error, :too_large} ->
+        {:error, 413, "too_large", conn}
+
+      {:error, _no_raw_body} ->
+        Logger.error(
+          "Tayori cannot check GitHub's signature: the endpoint read the body before it. " <>
+            "Give Plug.Parsers `body_reader: {PhoenixMountable.RawBody, :read_body, [MyAppWeb.Router]}`."
+        )
+
+        {:error, 500, "no_raw_body", conn}
+    end
   end
 
   defp signed(conn, body) do

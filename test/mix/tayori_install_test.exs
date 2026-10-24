@@ -52,6 +52,19 @@ defmodule Mix.Tasks.Tayori.InstallTest do
   end
   """
 
+  @endpoint """
+  defmodule TestWeb.Endpoint do
+    use Phoenix.Endpoint, otp_app: :test
+
+    plug Plug.Parsers,
+      parsers: [:urlencoded, :multipart, :json],
+      pass: ["*/*"],
+      json_decoder: Phoenix.json_library()
+
+    plug TestWeb.Router
+  end
+  """
+
   @mix_exs """
   defmodule Test.MixProject do
     use Mix.Project
@@ -117,6 +130,32 @@ defmodule Mix.Tasks.Tayori.InstallTest do
     assert css =~ ~r/@import "[^"]*kotoba\/priv\/static\/kotoba.css";/
     assert css =~ ~r/@import "[^"]*tayori\/priv\/static\/tayori.css";/
     assert css =~ ~r/\/\* @import "[^"]*tayori-sumi.css"; \*\//
+  end
+
+  test "gives the endpoint's parsers the reader of raw bodies, for the webhooks" do
+    endpoint =
+      install(%{"lib/test_web/endpoint.ex" => @endpoint}) |> file("lib/test_web/endpoint.ex")
+
+    assert endpoint =~ "body_reader: {PhoenixMountable.RawBody, :read_body, [TestWeb.Router]}"
+  end
+
+  test "keeps the endpoint's reader of Tayori, and says what takes its place" do
+    old =
+      String.replace(
+        @endpoint,
+        "pass: [\"*/*\"],",
+        "pass: [\"*/*\"],\n    body_reader: {Tayori.GitHub, :read_body, []},"
+      )
+
+    igniter = install(%{"lib/test_web/endpoint.ex" => old})
+
+    assert file(igniter, "lib/test_web/endpoint.ex") =~
+             "body_reader: {Tayori.GitHub, :read_body, []}"
+
+    assert Enum.any?(
+             igniter.warnings,
+             &(&1 =~ "{PhoenixMountable.RawBody, :read_body, [TestWeb.Router]}")
+           )
   end
 
   test "starts Tayori after the repo and the PubSub" do

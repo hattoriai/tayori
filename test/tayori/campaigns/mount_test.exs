@@ -327,6 +327,19 @@ defmodule Tayori.Campaigns.MountTest do
 
       assert {:ok, ^body, _conn} = Tayori.RawBody.fetch(kept, 1_000)
       assert {:error, :no_raw_body} = Tayori.RawBody.fetch(plain, 1_000)
+
+      # PhoenixMountable's reader, which asks the router.
+      shared = parse.(conn, {PhoenixMountable.RawBody, :read_body, [TayoriTest.Host.Router]})
+      assert {:ok, ^body, _conn} = Tayori.RawBody.fetch(shared, 1_000)
+      assert {:error, :too_large} = Tayori.RawBody.fetch(shared, 10)
+
+      other =
+        parse.(
+          %{conn | path_info: ["letters", "unsubscribe", "x"]},
+          {PhoenixMountable.RawBody, :read_body, [TayoriTest.Host.Router]}
+        )
+
+      assert {:error, :no_raw_body} = Tayori.RawBody.fetch(other, 1_000)
     end
   end
 

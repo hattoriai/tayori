@@ -236,16 +236,20 @@ route answers 404.
 GitHub signs the body as it sent it, and Tayori checks the signature
 against it. A Phoenix endpoint parses JSON before the router, so the body
 is gone when the route is reached. Give your endpoint's `Plug.Parsers`
-Tayori's body reader, which keeps a copy of the bodies GitHub signs, and
-only those:
+PhoenixMountable's body reader, which keeps a copy of the bodies of the
+routes that need them, GitHub's hook among them, and only those (`mix
+tayori.install` adds it):
 
 ```elixir
 plug Plug.Parsers,
   parsers: [:urlencoded, :multipart, :json],
   pass: ["*/*"],
-  body_reader: {Tayori.GitHub, :read_body, []},
+  body_reader: {PhoenixMountable.RawBody, :read_body, [MyAppWeb.Router]},
   json_decoder: Phoenix.json_library()
 ```
+
+`{Tayori.GitHub, :read_body, []}`, the reader of Tayori 0.4 and before,
+still works.
 
 Without it, each delivery is answered with a 500, and the log says why.
 

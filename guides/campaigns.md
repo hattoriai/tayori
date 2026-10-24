@@ -104,13 +104,14 @@ client's one-click unsubscribe and a provider's webhook carry no CSRF
 token. Each request proves itself instead: the link's token is signed,
 and the webhook is signed or authenticated. The webhook's signature is
 of the body as it was sent; when your endpoint's `Plug.Parsers` reads
-JSON before the router, give it Tayori's body reader:
+JSON before the router, give it PhoenixMountable's body reader, which
+`mix tayori.install` adds and every library that needs one shares:
 
 ```elixir
 plug Plug.Parsers,
   parsers: [:urlencoded, :multipart, :json],
   json_decoder: JSON,
-  body_reader: {Tayori.RawBody, :read_body, []}
+  body_reader: {PhoenixMountable.RawBody, :read_body, [MyAppWeb.Router]}
 ```
 
 ### Oban

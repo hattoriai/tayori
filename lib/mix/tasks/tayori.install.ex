@@ -32,6 +32,7 @@ defmodule Mix.Tasks.Tayori.Install do
       {Tayori.Router.Page, "/changelog", import: Tayori.Router}
     ],
     migrations: Tayori.Migrations,
+    raw_body: true,
     hook: {"Tayori", "tayori"},
     css: ["tayori.css", {"tayori-sumi.css", :comment}],
     manual: "See https://hexdocs.pm/tayori/quickstart.html"
