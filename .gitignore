@@ -12,3 +12,13 @@ e2e/playwright-report
 erl_crash.dump
 tayori-*.tar
 *.ez
+
+# Claude Code: personal settings and plugin work folders stay local. The
+# shared .claude/settings.json is committed.
+/.claude/settings.local.json
+/.claude/audit
+/.claude/plans
+/.claude/research
+/.claude/reviews
+/.claude/skill-metrics
+/.claude/solutions
