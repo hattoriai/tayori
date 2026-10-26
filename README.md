@@ -2,6 +2,18 @@
 
 ![Tayori — Product news for Phoenix](https://raw.githubusercontent.com/hattoriai/tayori/main/media/banner.png)
 
+<p>
+  <a href="https://hex.pm/packages/tayori">
+    <img alt="Hex Version" src="https://img.shields.io/hexpm/v/tayori.svg">
+  </a>
+  <a href="https://hexdocs.pm/tayori">
+    <img src="https://img.shields.io/badge/docs-hexdocs-blue" alt="HexDocs">
+  </a>
+  <a href="https://github.com/hattoriai/tayori/actions">
+    <img alt="CI Status" src="https://github.com/hattoriai/tayori/actions/workflows/ci.yml/badge.svg">
+  </a>
+</p>
+
 Tayori (便り, "news, a letter from someone") is product news for Phoenix:
 what your app has to say to its people. It has two modules: the
 **changelog**, the same news for everyone, and the **campaigns**,
