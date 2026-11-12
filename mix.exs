@@ -101,7 +101,7 @@ defmodule Tayori.MixProject do
       # The time zones of the development server's date picker.
       {:tz, "~> 0.28", only: [:dev, :test]},
       # The MCP server, Tayori.MCP, mounted in the app's own.
-      {:sake, "~> 0.5.0", optional: true}
+      {:sake, "~> 0.6.1", optional: true}
     ]
   end
 
