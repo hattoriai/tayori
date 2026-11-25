@@ -18,9 +18,10 @@ defmodule Tayori.Config do
     * `:repo` - the app's Ecto repo, where the entries are (required).
     * `:pubsub` - the app's `Phoenix.PubSub`, on which the app's pages
       hear of a new entry as it is published (required).
-    * `:vault` - the app's `Cloak.Vault` (`MyApp.Vault`), which encrypts
-      the AI key of the admin with the app's own keys, and rotates them
-      with the app's other secrets. Without it, `:secret_key_base`.
+    * `:vault` - the app's [Strongbox](https://hex.pm/packages/strongbox)
+      vault (`MyApp.Vault`), which encrypts the AI key of the admin with
+      the app's own keys, and rotates them with the app's other secrets.
+      A `Cloak.Vault` works too. Without it, `:secret_key_base`.
     * `:secret_key_base` - the secret the AI key is encrypted with when
       there is no `:vault`. With neither, the admin cannot keep a key, and
       has no AI.

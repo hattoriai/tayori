@@ -7,6 +7,13 @@ and Tayori follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+### Added
+
+- The `:vault` can be a [Strongbox](https://hex.pm/packages/strongbox)
+  vault, whose `encrypt/1` answers the encrypted bytes: the AI key, the
+  GitHub token and the webhooks' secrets are encrypted with the app's own
+  keys. A `Cloak.Vault` works as before.
+
 ### Changed
 
 - The webhooks' bodies are kept by PhoenixMountable's reader, which the
