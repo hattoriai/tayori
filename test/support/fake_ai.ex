@@ -65,6 +65,14 @@ defmodule TayoriTest.FakeAI do
 end
 
 defmodule TayoriTest.Vault do
+  @moduledoc "The app's vault in the tests: a Strongbox vault, with one key."
+  use Strongbox
+
+  @impl true
+  def keys, do: [%{tag: "k1", key: <<1::256>>}]
+end
+
+defmodule TayoriTest.CloakVault do
   @moduledoc """
   A vault with the functions of a Cloak.Vault, for the tests: a tag, and
   the text reversed and encoded.

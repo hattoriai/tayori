@@ -1,8 +1,8 @@
 defmodule Tayori.Settings do
   @moduledoc false
   # The settings the admin keeps in the app's database (tayori_settings):
-  # a value as a map, and a secret, encrypted by the app's Cloak vault
-  # (the :vault of Tayori's config), else with a key derived from its
+  # a value as a map, and a secret, encrypted by the app's vault (the
+  # :vault of Tayori's config), else with a key derived from its
   # :secret_key_base. The secret is never shown again: the admin can
   # replace it or remove it.
 
@@ -80,11 +80,15 @@ defmodule Tayori.Settings do
     config.vault != nil or config.secret_key_base != nil
   end
 
-  # The app's Cloak vault: its own keys, ciphers and rotation. Tayori
-  # calls the functions every Cloak.Vault has, so it does not depend on
-  # Cloak.
+  # The app's vault: its own keys and rotation. Tayori calls the two
+  # functions a Strongbox vault has, encrypt/1 and decrypt/1, so it does
+  # not depend on Strongbox. A Cloak.Vault has them too, and answers
+  # {:ok, encrypted}.
   defp encrypt!(%Config{vault: vault}, plain) when vault != nil do
     case vault.encrypt(plain) do
+      encrypted when is_binary(encrypted) ->
+        encrypted
+
       {:ok, encrypted} ->
         encrypted
 
