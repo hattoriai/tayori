@@ -104,7 +104,7 @@ defmodule Tayori.MixProject do
       {:sake, "~> 0.6.1", optional: true},
       # The app's vault in the tests: Tayori calls the vault it is given,
       # and does not depend on Strongbox.
-      {:strongbox, "~> 0.1.0-dev", only: :test}
+      {:strongbox, "~> 0.1", only: :test}
     ]
   end
 
